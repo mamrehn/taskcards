@@ -332,7 +332,7 @@
     <div class="container">
         <div class="header">
             <h1>Lernkarten App</h1>
-            <p>Lade eine JSON-Datei hoch, um mit dem Lernen zu beginnen</p>
+            <p>Lade eine JSON-Datei hoch oder wähle ein gespeichertes Deck</p>
         </div>
 
         <div id="file-input-container">
@@ -356,17 +356,24 @@
     }
   ]
 }</div>
+
+            <div id="saved-decks-container">
+                <h3>Gespeicherte Decks</h3>
+                <div id="saved-decks">
+                    <!-- Saved decks will be dynamically inserted here -->
+                </div>
+            </div>
         </div>
 
         <div id="app-content" class="hidden">
             <div class="stats">
                 <div class="stat-item">
                     <div class="stat-value" id="cards-remaining">0</div>
-                    <div class="stat-label">Verbleibende Karten</div>
+                    <div class="stat-label">Verbleibend</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="cards-completed">0</div>
-                    <div class="stat-label">Bearbeitete Karten</div>
+                    <div class="stat-label">Bearbeitet</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="correct-count">0</div>
@@ -400,7 +407,7 @@
                         <div class="controls">
                             <button class="btn btn-success" id="mark-correct">Richtig</button>
                             <button class="btn btn-danger" id="mark-incorrect">Falsch</button>
-                            <button class="btn btn-secondary" id="next-card">Nächste Karte</button>
+                            <button class="btn btn-secondary" id="next-card">Nächste</button>
                         </div>
                     </div>
                 </div>
@@ -410,7 +417,7 @@
                 Du hast alle Karten abgeschlossen! Dein Endergebnis ist: <span id="final-score">0%</span>
                 <div style="margin-top: 1rem;">
                     <button class="btn btn-primary" id="restart-btn">Neu starten</button>
-                    <button class="btn btn-secondary" id="upload-new-btn">Neues Deck hochladen</button>
+                    <button class="btn btn-secondary" id="upload-new-btn">Neues Deck</button>
                 </div>
             </div>
 
@@ -426,6 +433,9 @@
         let incorrectCount = 0;
         let answeredCards = [];
         let isAnswered = false;
+        let currentDeckName = "";
+        let savedDecks = {};
+        let previousIncorrectIndices = [];
 
         // DOM elements
         const fileInput = document.getElementById('file-input');
@@ -449,6 +459,7 @@
         const errorMessageElement = document.getElementById('error-message');
         const flipCard = document.getElementById('flip-card');
         const cardContainer = document.getElementById('card-container');
+        const savedDecksContainer = document.getElementById('saved-decks');
 
         // Event listeners
         fileInput.addEventListener('change', handleFileUpload);
@@ -461,6 +472,12 @@
 
         // Hide the next button initially
         nextCardBtn.style.display = 'none';
+
+        // Load saved decks from local storage on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSavedDecks();
+            displaySavedDecks();
+        });
 
         // Functions
         function toggleJsonSample() {
@@ -494,8 +511,21 @@
                         return;
                     }
 
-                    // Initialize the quiz
-                    initializeQuiz(validCards);
+                    // Save the deck to local storage
+                    const deckName = file.name.replace('.json', '');
+                    currentDeckName = deckName;
+                    
+                    // Check if this is a new deck or an existing one
+                    let incorrectIndices = [];
+                    if (savedDecks[deckName] && savedDecks[deckName].incorrectIndices) {
+                        incorrectIndices = savedDecks[deckName].incorrectIndices;
+                    }
+                    
+                    saveToLocalStorage(deckName, validCards, incorrectIndices);
+                    displaySavedDecks();
+                    
+                    // Initialize the quiz with the loaded cards
+                    initializeQuiz(validCards, incorrectIndices);
                 } catch (error) {
                     showError('Fehler beim Parsen der JSON-Datei. Bitte überprüfe das Dateiformat.');
                     console.error(error);
@@ -504,16 +534,90 @@
             reader.readAsText(file);
         }
 
-        function initializeQuiz(loadedCards) {
+        function loadSavedDecks() {
+            const savedDecksString = localStorage.getItem('flashcardDecks');
+            if (savedDecksString) {
+                savedDecks = JSON.parse(savedDecksString);
+            }
+        }
+
+        function saveToLocalStorage(deckName, deckCards, incorrectIndices = []) {
+            savedDecks[deckName] = {
+                cards: deckCards,
+                incorrectIndices: incorrectIndices
+            };
+            localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+        }
+
+        function updateIncorrectIndices() {
+            if (currentDeckName && savedDecks[currentDeckName]) {
+                savedDecks[currentDeckName].incorrectIndices = previousIncorrectIndices;
+                localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+            }
+        }
+
+        function displaySavedDecks() {
+            savedDecksContainer.innerHTML = '';
+            
+            if (Object.keys(savedDecks).length === 0) {
+                const noDecksMessage = document.createElement('p');
+                noDecksMessage.textContent = 'Keine gespeicherten Decks gefunden.';
+                savedDecksContainer.appendChild(noDecksMessage);
+                return;
+            }
+            
+            for (const deckName in savedDecks) {
+                const deckElement = document.createElement('div');
+                deckElement.className = 'saved-deck';
+                
+                const deckTitle = document.createElement('span');
+                deckTitle.className = 'deck-title';
+                deckTitle.textContent = deckName;
+                deckTitle.addEventListener('click', () => loadSavedDeck(deckName));
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-deck';
+                deleteButton.textContent = '×';
+                deleteButton.title = 'Deck löschen';
+                deleteButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteSavedDeck(deckName);
+                });
+                
+                deckElement.appendChild(deckTitle);
+                deckElement.appendChild(deleteButton);
+                savedDecksContainer.appendChild(deckElement);
+            }
+        }
+
+        function loadSavedDeck(deckName) {
+            if (savedDecks[deckName]) {
+                currentDeckName = deckName;
+                const deckData = savedDecks[deckName];
+                previousIncorrectIndices = deckData.incorrectIndices || [];
+                initializeQuiz(deckData.cards, previousIncorrectIndices);
+            }
+        }
+
+        function deleteSavedDeck(deckName) {
+            if (confirm(`Möchtest du das Deck "${deckName}" wirklich löschen?`)) {
+                delete savedDecks[deckName];
+                localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+                displaySavedDecks();
+            }
+        }
+
+        function initializeQuiz(loadedCards, incorrectIndices = []) {
             // Reset the quiz state
             cards = loadedCards;
             currentCardIndex = 0;
             correctCount = 0;
             incorrectCount = 0;
+            previousIncorrectIndices = incorrectIndices;
             answeredCards = new Array(cards.length).fill(null);
             
-            // Shuffle the cards
-            shuffleCards();
+            // Prioritize incorrectly answered cards if available
+            prioritizeIncorrectCards();
             
             // Show the app content
             document.getElementById('file-input-container').style.display = 'none';
@@ -524,11 +628,47 @@
             showCurrentCard();
         }
 
+        function prioritizeIncorrectCards() {
+            if (previousIncorrectIndices.length > 0) {
+                // Create a copy of the cards array for manipulation
+                const allCards = [...cards];
+                const prioritizedCards = [];
+                
+                // First, add incorrect cards to the beginning
+                for (let i = 0; i < previousIncorrectIndices.length; i++) {
+                    const cardIndex = previousIncorrectIndices[i];
+                    if (cardIndex >= 0 && cardIndex < allCards.length) {
+                        prioritizedCards.push(allCards[cardIndex]);
+                        allCards.splice(cardIndex, 1); // Remove the card from the original array
+                    }
+                }
+                
+                // Shuffle the incorrect cards
+                shuffleArray(prioritizedCards);
+                
+                // Shuffle the remaining cards
+                shuffleArray(allCards);
+                
+                // Combine both arrays
+                cards = [...prioritizedCards, ...allCards];
+                
+                // Reset incorrect indices as we're now studying them
+                previousIncorrectIndices = [];
+            } else {
+                // If no incorrect cards, just shuffle all cards
+                shuffleCards();
+            }
+        }
+
         function shuffleCards() {
+            shuffleArray(cards);
+        }
+
+        function shuffleArray(array) {
             // Fisher-Yates shuffle algorithm
-            for (let i = cards.length - 1; i > 0; i--) {
+            for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [cards[i], cards[j]] = [cards[j], cards[i]];
+                [array[i], array[j]] = [array[j], array[i]];
             }
         }
 
@@ -572,7 +712,12 @@
                 correctCount++;
             } else {
                 incorrectCount++;
+                // Save this card's index as incorrect for future sessions
+                previousIncorrectIndices.push(currentCardIndex);
             }
+            
+            // Update incorrect indices in local storage
+            updateIncorrectIndices();
             
             // Hide the evaluation buttons and show next button
             markCorrectBtn.style.display = 'none';
@@ -614,10 +759,12 @@
             currentCardIndex = 0;
             correctCount = 0;
             incorrectCount = 0;
+            
+            // Reset answered cards but keep the incorrect indices
             answeredCards = new Array(cards.length).fill(null);
             
-            // Shuffle cards again
-            shuffleCards();
+            // Prioritize incorrect cards again
+            prioritizeIncorrectCards();
             
             // Reset UI
             feedbackElement.classList.add('hidden');
@@ -637,6 +784,9 @@
             // Clear any error messages
             errorMessageElement.classList.add('hidden');
             errorMessageElement.textContent = '';
+            
+            // Display saved decks
+            displaySavedDecks();
         }
 
         function showError(message) {
