@@ -97,14 +97,37 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            top: 0;
+            left: 0;
+            transition: opacity 0.4s ease;
         }
         
         .card-front {
             z-index: 2;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        
+        .card.flipped .card-front {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
         
         .card-back {
             transform: rotateY(180deg);
+            z-index: 1;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .card.flipped .card-back {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            z-index: 2;
         }
         
         .card-content {
