@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lernkarten App</title>
+    <style>
+        :root {
+            --primary: #4a6fa5;
+            --secondary: #166088;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            width: 90%;
+            max-width: 800px;
+            margin: 2rem auto;
+            flex: 1;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header h1 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        #file-input-container {
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        #upload-label {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #upload-label:hover {
+            background-color: var(--secondary);
+        }
+        #file-input {
+            display: none;
+        }
+        
+        /* Flip Card Animation Styles */
+        .card-container {
+            perspective: 1000px;
+            margin-bottom: 2rem;
+            min-height: 250px;
+        }
+        
+        .card {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 250px;
+            text-align: center;
+            transition: transform 0.8s;
+            transform-style: preserve-3d;
+        }
+        
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+        
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            box-sizing: border-box;
+            background-color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .card-front {
+            z-index: 2;
+        }
+        
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        
+        .card-content {
+            flex: 1;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+        
+        .question {
+            font-weight: bold;
+            font-size: 1.4rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        
+        .answer {
+            padding: 1rem;
+            background-color: var(--light);
+            border-left: 4px solid var(--primary);
+            margin-top: 1rem;
+            text-align: left;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--secondary);
+        }
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 1rem 0;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+        }
+        .feedback {
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 1rem;
+            color: #6c757d;
+        }
+        .error-message {
+            color: var(--danger);
+            text-align: center;
+            margin: 1rem 0;
+        }
+        .hidden {
+            display: none;
+        }
+        #sample-json {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 0.85rem;
+        }
+        .json-toggle {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+            }
+            .controls {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Lernkarten App</h1>
+            <p>Lade eine JSON-Datei hoch, um mit dem Lernen zu beginnen</p>
+        </div>
+
+        <div id="file-input-container">
+            <label for="file-input" id="upload-label">JSON hochladen</label>
+            <input type="file" id="file-input" accept=".json">
+            <p><span class="json-toggle" onclick="toggleJsonSample()">JSON-Format Beispiel anzeigen</span></p>
+            <div id="sample-json" class="hidden">
+{
+  "cards": [
+    {
+      "question": "Was ist die Hauptstadt von Deutschland?",
+      "answer": "Berlin"
+    },
+    {
+      "question": "Was ist 2+2?",
+      "answer": "4"
+    },
+    {
+      "question": "Was ist der größte Planet in unserem Sonnensystem?",
+      "answer": "Jupiter"
+    }
+  ]
+}</div>
+        </div>
+
+        <div id="app-content" class="hidden">
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="cards-remaining">0</div>
+                    <div class="stat-label">Verbleibende Karten</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="cards-completed">0</div>
+                    <div class="stat-label">Bearbeitete Karten</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="correct-count">0</div>
+                    <div class="stat-label">Richtig</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="incorrect-count">0</div>
+                    <div class="stat-label">Falsch</div>
+                </div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress" id="progress-bar"></div>
+            </div>
+
+            <div class="card-container" id="card-container">
+                <div class="card" id="flip-card">
+                    <div class="card-front">
+                        <div class="card-content">
+                            <div class="question" id="question-text">Frage erscheint hier</div>
+                        </div>
+                        <div class="controls">
+                            <button class="btn btn-primary" id="show-answer">Antwort zeigen</button>
+                        </div>
+                    </div>
+                    <div class="card-back">
+                        <div class="card-content">
+                            <div class="question" id="question-back">Frage erscheint hier</div>
+                            <div class="answer" id="answer-text">Antwort erscheint hier</div>
+                        </div>
+                        <div class="controls">
+                            <button class="btn btn-success" id="mark-correct">Richtig</button>
+                            <button class="btn btn-danger" id="mark-incorrect">Falsch</button>
+                            <button class="btn btn-secondary" id="next-card">Nächste Karte</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feedback hidden" id="feedback">
+                Du hast alle Karten abgeschlossen! Dein Endergebnis ist: <span id="final-score">0%</span>
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-primary" id="restart-btn">Neu starten</button>
+                    <button class="btn btn-secondary" id="upload-new-btn">Neues Deck hochladen</button>
+                </div>
+            </div>
+
+            <div id="error-message" class="error-message hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let cards = [];
+        let currentCardIndex = 0;
+        let correctCount = 0;
+        let incorrectCount = 0;
+        let answeredCards = [];
+        let isAnswered = false;
+
+        // DOM elements
+        const fileInput = document.getElementById('file-input');
+        const appContent = document.getElementById('app-content');
+        const questionText = document.getElementById('question-text');
+        const questionBack = document.getElementById('question-back');
+        const answerText = document.getElementById('answer-text');
+        const showAnswerBtn = document.getElementById('show-answer');
+        const markCorrectBtn = document.getElementById('mark-correct');
+        const markIncorrectBtn = document.getElementById('mark-incorrect');
+        const nextCardBtn = document.getElementById('next-card');
+        const progressBar = document.getElementById('progress-bar');
+        const cardsRemainingElement = document.getElementById('cards-remaining');
+        const cardsCompletedElement = document.getElementById('cards-completed');
+        const correctCountElement = document.getElementById('correct-count');
+        const incorrectCountElement = document.getElementById('incorrect-count');
+        const feedbackElement = document.getElementById('feedback');
+        const finalScoreElement = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+        const uploadNewBtn = document.getElementById('upload-new-btn');
+        const errorMessageElement = document.getElementById('error-message');
+        const flipCard = document.getElementById('flip-card');
+        const cardContainer = document.getElementById('card-container');
+
+        // Event listeners
+        fileInput.addEventListener('change', handleFileUpload);
+        showAnswerBtn.addEventListener('click', showAnswer);
+        markCorrectBtn.addEventListener('click', () => markAnswer(true));
+        markIncorrectBtn.addEventListener('click', () => markAnswer(false));
+        nextCardBtn.addEventListener('click', showNextCard);
+        restartBtn.addEventListener('click', restartQuiz);
+        uploadNewBtn.addEventListener('click', resetAndUpload);
+
+        // Hide the next button initially
+        nextCardBtn.style.display = 'none';
+
+        // Functions
+        function toggleJsonSample() {
+            const sampleJson = document.getElementById('sample-json');
+            sampleJson.classList.toggle('hidden');
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                showError('Bitte lade eine gültige JSON-Datei hoch.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (!data.cards || !Array.isArray(data.cards) || data.cards.length === 0) {
+                        showError('Ungültiges JSON-Format. Bitte stelle sicher, dass deine Datei ein "cards" Array mit mindestens einer Karte enthält.');
+                        return;
+                    }
+
+                    // Check if each card has question and answer
+                    const validCards = data.cards.filter(card => card.question && card.answer);
+                    if (validCards.length === 0) {
+                        showError('Keine gültigen Karten gefunden. Jede Karte muss ein "question" und ein "answer" Feld haben.');
+                        return;
+                    }
+
+                    // Initialize the quiz
+                    initializeQuiz(validCards);
+                } catch (error) {
+                    showError('Fehler beim Parsen der JSON-Datei. Bitte überprüfe das Dateiformat.');
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function initializeQuiz(loadedCards) {
+            // Reset the quiz state
+            cards = loadedCards;
+            currentCardIndex = 0;
+            correctCount = 0;
+            incorrectCount = 0;
+            answeredCards = new Array(cards.length).fill(null);
+            
+            // Shuffle the cards
+            shuffleCards();
+            
+            // Show the app content
+            document.getElementById('file-input-container').style.display = 'none';
+            appContent.classList.remove('hidden');
+            
+            // Update UI
+            updateStatistics();
+            showCurrentCard();
+        }
+
+        function shuffleCards() {
+            // Fisher-Yates shuffle algorithm
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
+            }
+        }
+
+        function showCurrentCard() {
+            if (currentCardIndex >= cards.length) {
+                showFeedback();
+                return;
+            }
+
+            isAnswered = false;
+            const card = cards[currentCardIndex];
+            
+            // Make sure the card is not flipped when showing a new card
+            flipCard.classList.remove('flipped');
+            
+            // Set question on both sides
+            questionText.textContent = card.question;
+            questionBack.textContent = card.question;
+            answerText.textContent = card.answer;
+            
+            // Reset buttons
+            showAnswerBtn.style.display = 'inline-block';
+            markCorrectBtn.style.display = 'inline-block';
+            markIncorrectBtn.style.display = 'inline-block';
+            nextCardBtn.style.display = 'none';
+            
+            updateStatistics();
+        }
+
+        function showAnswer() {
+            flipCard.classList.add('flipped');
+        }
+
+        function markAnswer(isCorrect) {
+            if (isAnswered) return;
+            
+            isAnswered = true;
+            answeredCards[currentCardIndex] = isCorrect;
+            
+            if (isCorrect) {
+                correctCount++;
+            } else {
+                incorrectCount++;
+            }
+            
+            // Hide the evaluation buttons and show next button
+            markCorrectBtn.style.display = 'none';
+            markIncorrectBtn.style.display = 'none';
+            nextCardBtn.style.display = 'inline-block';
+            
+            updateStatistics();
+        }
+
+        function showNextCard() {
+            currentCardIndex++;
+            showCurrentCard();
+        }
+
+        function updateStatistics() {
+            const totalCards = cards.length;
+            const completedCards = correctCount + incorrectCount;
+            const remainingCards = totalCards - completedCards;
+            const percentageComplete = totalCards > 0 ? (completedCards / totalCards) * 100 : 0;
+            
+            cardsRemainingElement.textContent = remainingCards;
+            cardsCompletedElement.textContent = completedCards;
+            correctCountElement.textContent = correctCount;
+            incorrectCountElement.textContent = incorrectCount;
+            
+            progressBar.style.width = `${percentageComplete}%`;
+        }
+
+        function showFeedback() {
+            const totalAnswered = correctCount + incorrectCount;
+            const percentageCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+            
+            finalScoreElement.textContent = `${percentageCorrect}%`;
+            feedbackElement.classList.remove('hidden');
+            cardContainer.classList.add('hidden');
+        }
+
+        function restartQuiz() {
+            currentCardIndex = 0;
+            correctCount = 0;
+            incorrectCount = 0;
+            answeredCards = new Array(cards.length).fill(null);
+            
+            // Shuffle cards again
+            shuffleCards();
+            
+            // Reset UI
+            feedbackElement.classList.add('hidden');
+            cardContainer.classList.remove('hidden');
+            updateStatistics();
+            showCurrentCard();
+        }
+
+        function resetAndUpload() {
+            // Reset everything and show file upload
+            document.getElementById('file-input-container').style.display = 'block';
+            appContent.classList.add('hidden');
+            feedbackElement.classList.add('hidden');
+            cardContainer.classList.remove('hidden');
+            fileInput.value = '';
+            
+            // Clear any error messages
+            errorMessageElement.classList.add('hidden');
+            errorMessageElement.textContent = '';
+        }
+
+        function showError(message) {
+            errorMessageElement.textContent = message;
+            errorMessageElement.classList.remove('hidden');
+            setTimeout(() => {
+                errorMessageElement.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
