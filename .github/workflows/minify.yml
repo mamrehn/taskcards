@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4  # Updated to latest version
         with:
-          node-version: '22'  # Updated to more recent LTS version
+          node-version: '20'  # Updated to more recent LTS version
           cache: 'npm'  # Enable caching for faster installations
       
       - name: Install minification tools
