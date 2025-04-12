@@ -7,7 +7,6 @@
 name: minify
 run-name: Minify JS/CSS/HTML [gh-pages branch]
 
-# Run on pushes to `main` branch
 on:
   push:
     branches:
@@ -17,28 +16,51 @@ jobs:
   checkout-minify-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      # Install NodeJS and CLI tools
-      - uses: actions/setup-node@v3
+      - name: Checkout main
+        uses: actions/checkout@v3
         with:
-          node-version: '16'
-      - run: npm install -g terser
-      - run: npm install -g csso-cli
-      - run: npm install -g html-minifier
+          fetch-depth: 0  # Needed to fetch other branches later
 
-      # Perform minification, overwriting original files
-      # - run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
-      # - run: csso ./css/style.css -o ./css/style.css
-      - run: html-minifier --collapse-boolean-attributes --collapse-whitespace --minify-css --minify-js --minify-urls --remove-attribute-quotes --remove-comments --remove-empty-attributes --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --remove-style-link-type-attributes --remove-tag-whitespace --use-short-doctype -o index.html index.html
+      - name: Set up Node.js and minify tools
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+      - run: npm install -g terser csso-cli html-minifier
 
-      # Commit and push to `gh-pages` using a PAT
-      - name: Commit and Push
+      - name: Fetch gh-pages and switch
+        run: |
+          git fetch origin gh-pages
+          git switch gh-pages || git switch -c gh-pages
+
+      - name: Copy index.html from main
+        run: |
+          git checkout main -- index.html
+
+      - name: Minify index.html
+        run: |
+          html-minifier \
+            --collapse-boolean-attributes \
+            --collapse-whitespace \
+            --minify-css \
+            --minify-js \
+            --minify-urls \
+            --remove-attribute-quotes \
+            --remove-comments \
+            --remove-empty-attributes \
+            --remove-optional-tags \
+            --remove-redundant-attributes \
+            --remove-script-type-attributes \
+            --remove-style-link-type-attributes \
+            --remove-tag-whitespace \
+            --use-short-doctype \
+            -o index.html index.html
+
+      - name: Commit and push to gh-pages
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "mamrehn"
           git config user.email "mamrehn@user.noreply.github.com"
-          git add .
+          git add index.html
           git diff-index --quiet HEAD || git commit -m "Automated minify of ${{ github.sha }}"
           git push --force https://x-access-token:${GH_PAT}@github.com/mamrehn/taskcards.git HEAD:gh-pages
