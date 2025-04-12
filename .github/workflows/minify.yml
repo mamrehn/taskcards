@@ -29,11 +29,11 @@ jobs:
         run: |
           npm install -g terser csso-cli html-minifier
       
-      - name: Minify JavaScript
-        run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
+     # - name: Minify JavaScript
+     #   run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
       
-      - name: Minify CSS
-        run: csso ./css/style.css -o ./css/style.css
+     # - name: Minify CSS
+     #   run: csso ./css/style.css -o ./css/style.css
       
       - name: Minify HTML
         run: |
