@@ -214,6 +214,62 @@
             border-radius: 4px;
         }
         
+        /* Multiple Choice Options Styling */
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            width: 90%;
+            margin: 1rem auto;
+            gap: 0.75rem;
+        }
+        
+        .option-item {
+            position: relative;
+            padding: 0.75rem;
+            border: 2px solid #ced4da;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            text-align: left;
+        }
+        
+        .option-item:hover {
+            border-color: var(--primary);
+            background-color: #f0f5ff;
+        }
+        
+        .option-item.selected {
+            border-color: var(--primary);
+            background-color: rgba(74, 111, 165, 0.1);
+        }
+        
+        .option-item.correct {
+            border-color: var(--success);
+            background-color: rgba(40, 167, 69, 0.1);
+        }
+        
+        .option-item.incorrect {
+            border-color: var(--danger);
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+        
+        .option-checkbox {
+            margin-right: 0.75rem;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .selected-options-display {
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            background-color: #e9f2ff;
+            border-left: 4px solid #92b5e3;
+            text-align: left;
+            border-radius: 4px;
+        }
+
         .controls {
             display: flex;
             justify-content: space-between;
@@ -377,8 +433,9 @@
       "answer": "4"
     },
     {
-      "question": "Was ist der größte Planet in unserem Sonnensystem?",
-      "answer": "Jupiter"
+      "question": "Welche sind Primzahlen?",
+      "options": ["2", "4", "7", "9", "11"],
+      "correct": [0, 2, 4]
     }
   ]
 }</div>
@@ -420,22 +477,51 @@
                     <div class="card-front">
                         <div class="card-content">
                             <div class="question" id="question-text">Frage erscheint hier</div>
+                            <!-- Text input for standard questions -->
                             <input type="text" class="user-answer-input" id="user-answer-input" placeholder="Deine Antwort...">
+                            
+                            <!-- Multiple choice options container -->
+                            <div id="options-container" class="options-container hidden">
+                                <!-- Options will be dynamically inserted here -->
+                            </div>
                         </div>
                         <div class="controls">
                             <button class="btn btn-primary" id="show-answer">Antwort zeigen</button>
+                            <button class="btn btn-primary hidden" id="check-mc-answer">Antwort prüfen</button>
                         </div>
                     </div>
                     <div class="card-back">
                         <div class="card-content">
                             <div class="question" id="question-back">Frage erscheint hier</div>
+                            
+                            <!-- Text answer display -->
                             <div id="user-answer-container" class="hidden">
                                 <div class="user-answer-display">
                                     <strong>Deine Antwort:</strong>
                                     <div id="user-answer-display"></div>
                                 </div>
                             </div>
-                            <div class="answer" id="answer-text">Antwort erscheint hier</div>
+                            
+                            <!-- Multiple choice answer display -->
+                            <div id="selected-options-container" class="hidden">
+                                <div class="selected-options-display">
+                                    <strong>Deine Auswahl:</strong>
+                                    <div id="selected-options-display"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Standard answer display -->
+                            <div id="standard-answer-container">
+                                <div class="answer" id="answer-text">Antwort erscheint hier</div>
+                            </div>
+                            
+                            <!-- Multiple choice correct answer display -->
+                            <div id="mc-correct-answer-container" class="hidden">
+                                <div class="answer">
+                                    <strong>Korrekte Antworten:</strong>
+                                    <div id="mc-correct-answer-text"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="controls">
                             <button class="btn btn-success" id="mark-correct">Richtig</button>
@@ -469,6 +555,7 @@
         let currentDeckName = "";
         let savedDecks = {};
         let previousIncorrectIndices = [];
+        let selectedOptionIndices = []; // For multiple choice questions
 
         // DOM elements
         const fileInput = document.getElementById('file-input');
@@ -481,7 +568,14 @@
         const userAnswerInput = document.getElementById('user-answer-input');
         const userAnswerContainer = document.getElementById('user-answer-container');
         const userAnswerDisplay = document.getElementById('user-answer-display');
+        const optionsContainer = document.getElementById('options-container');
+        const selectedOptionsContainer = document.getElementById('selected-options-container');
+        const selectedOptionsDisplay = document.getElementById('selected-options-display');
+        const mcCorrectAnswerContainer = document.getElementById('mc-correct-answer-container');
+        const mcCorrectAnswerText = document.getElementById('mc-correct-answer-text');
+        const standardAnswerContainer = document.getElementById('standard-answer-container');
         const showAnswerBtn = document.getElementById('show-answer');
+        const checkMcAnswerBtn = document.getElementById('check-mc-answer');
         const markCorrectBtn = document.getElementById('mark-correct');
         const markIncorrectBtn = document.getElementById('mark-incorrect');
         const nextCardBtn = document.getElementById('next-card');
@@ -502,6 +596,7 @@
         // Event listeners
         fileInput.addEventListener('change', handleFileUpload);
         showAnswerBtn.addEventListener('click', showAnswer);
+        checkMcAnswerBtn.addEventListener('click', checkMultipleChoiceAnswer);
         markCorrectBtn.addEventListener('click', () => markAnswer(true));
         markIncorrectBtn.addEventListener('click', () => markAnswer(false));
         nextCardBtn.addEventListener('click', showNextCard);
@@ -542,10 +637,22 @@
                         return;
                     }
 
-                    // Check if each card has question and answer
-                    const validCards = data.cards.filter(card => card.question && card.answer);
+                    // Check if each card has valid format (either question+answer or question+options+correct)
+                    const validCards = data.cards.filter(card => {
+                        // Check standard card format
+                        if (card.question && card.answer) {
+                            return true;
+                        }
+                        // Check multiple choice format
+                        if (card.question && Array.isArray(card.options) && card.options.length > 0 && 
+                            Array.isArray(card.correct) && card.correct.length > 0) {
+                            return true;
+                        }
+                        return false;
+                    });
+                    
                     if (validCards.length === 0) {
-                        showError('Keine gültigen Karten gefunden. Jede Karte muss ein "question" und ein "answer" Feld haben.');
+                        showError('Keine gültigen Karten gefunden. Jede Karte muss entweder ein "question" und ein "answer" Feld ODER ein "question", "options" und "correct" Feld haben.');
                         return;
                     }
 
@@ -729,23 +836,103 @@
             }
 
             isAnswered = false;
+            selectedOptionIndices = []; // Reset selected options
             const card = cards[currentCardIndex];
             
             // Make sure the card is not flipped when showing a new card
             flipCard.classList.remove('flipped');
-            
             // Set question on both sides
             questionText.textContent = card.question;
             questionBack.textContent = card.question;
-            answerText.textContent = card.answer;
             
-            // Reset user answer input
-            userAnswerInput.value = '';
-            userAnswerInput.readOnly = false;
+            // Check if current card is multiple choice or standard
+            const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
+            
+            if (isMultipleChoice) {
+                // Handle multiple choice question
+                userAnswerInput.classList.add('hidden');
+                optionsContainer.classList.remove('hidden');
+                showAnswerBtn.classList.remove('hidden');
+                checkMcAnswerBtn.classList.remove('hidden');
+                
+                // Clear previous options
+                optionsContainer.innerHTML = '';
+                
+                // Create option items
+                card.options.forEach((option, index) => {
+                    const optionItem = document.createElement('div');
+                    optionItem.className = 'option-item';
+                    optionItem.dataset.index = index;
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'option-checkbox';
+                    checkbox.id = `option-${index}`;
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `option-${index}`;
+                    label.textContent = option;
+                    
+                    optionItem.appendChild(checkbox);
+                    optionItem.appendChild(label);
+                    
+                    // Add click handler to toggle selection
+                    optionItem.addEventListener('click', (e) => {
+                        // Prevent triggering when clicking directly on checkbox
+                        if (e.target !== checkbox) {
+                            checkbox.checked = !checkbox.checked;
+                        }
+                        
+                        optionItem.classList.toggle('selected', checkbox.checked);
+                        
+                        // Update selectedOptionIndices
+                        if (checkbox.checked) {
+                            if (!selectedOptionIndices.includes(index)) {
+                                selectedOptionIndices.push(index);
+                            }
+                        } else {
+                            const indexToRemove = selectedOptionIndices.indexOf(index);
+                            if (indexToRemove !== -1) {
+                                selectedOptionIndices.splice(indexToRemove, 1);
+                            }
+                        }
+                    });
+                    
+                    optionsContainer.appendChild(optionItem);
+                });
+                
+                // Set answer text for back of card
+                standardAnswerContainer.classList.add('hidden');
+                mcCorrectAnswerContainer.classList.remove('hidden');
+                
+                // Display correct answers
+                const correctIndices = card.correct;
+                mcCorrectAnswerText.innerHTML = correctIndices.map(index => {
+                    return `<div>- ${card.options[index]}</div>`;
+                }).join('');
+                
+            } else {
+                // Handle standard question
+                userAnswerInput.classList.remove('hidden');
+                optionsContainer.classList.add('hidden');
+                showAnswerBtn.classList.remove('hidden');
+                checkMcAnswerBtn.classList.add('hidden');
+                
+                // Reset user answer input
+                userAnswerInput.value = '';
+                userAnswerInput.readOnly = false;
+                
+                // Set answer text for standard card
+                answerText.textContent = card.answer;
+                standardAnswerContainer.classList.remove('hidden');
+                mcCorrectAnswerContainer.classList.add('hidden');
+            }
+            
+            // Reset containers
             userAnswerContainer.classList.add('hidden');
+            selectedOptionsContainer.classList.add('hidden');
             
             // Reset buttons
-            showAnswerBtn.style.display = 'inline-block';
             markCorrectBtn.style.display = 'inline-block';
             markIncorrectBtn.style.display = 'inline-block';
             nextCardBtn.style.display = 'none';
@@ -756,14 +943,56 @@
         function showAnswer() {
             flipCard.classList.add('flipped');
             
-            // Handle user answer display
-            const userAnswer = userAnswerInput.value.trim();
-            if (userAnswer) {
-                userAnswerDisplay.textContent = userAnswer;
-                userAnswerContainer.classList.remove('hidden');
+            const card = cards[currentCardIndex];
+            const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
+            
+            if (isMultipleChoice) {
+                // Show selected options
+                if (selectedOptionIndices.length > 0) {
+                    selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
+                        return `<div>- ${card.options[index]}</div>`;
+                    }).join('');
+                    selectedOptionsContainer.classList.remove('hidden');
+                } else {
+                    selectedOptionsDisplay.innerHTML = '<div>Keine Auswahl getroffen</div>';
+                    selectedOptionsContainer.classList.remove('hidden');
+                }
             } else {
-                userAnswerContainer.classList.add('hidden');
+                // Handle user text answer display
+                const userAnswer = userAnswerInput.value.trim();
+                if (userAnswer) {
+                    userAnswerDisplay.textContent = userAnswer;
+                    userAnswerContainer.classList.remove('hidden');
+                } else {
+                    userAnswerContainer.classList.add('hidden');
+                }
             }
+        }
+
+        function checkMultipleChoiceAnswer() {
+            const card = cards[currentCardIndex];
+            
+            if (!Array.isArray(card.options) || !Array.isArray(card.correct)) {
+                return; // Not a multiple choice question
+            }
+            
+            // Check if selection matches correct answer
+            const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
+            
+            // Auto-mark the answer
+            markAnswer(isCorrect);
+            
+            // Show the card back with the correct answer
+            showAnswer();
+        }
+        
+        // Helper function to compare arrays
+        function arraysEqual(a, b) {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) return false;
+            }
+            return true;
         }
 
         function markAnswer(isCorrect) {
@@ -787,6 +1016,27 @@
             markCorrectBtn.style.display = 'none';
             markIncorrectBtn.style.display = 'none';
             nextCardBtn.style.display = 'inline-block';
+            
+            // If this was a multiple choice question, highlight correct/incorrect options
+            const card = cards[currentCardIndex];
+            if (Array.isArray(card.options) && Array.isArray(card.correct)) {
+                const optionItems = document.querySelectorAll('.option-item');
+                
+                optionItems.forEach((item, index) => {
+                    const isOptionCorrect = card.correct.includes(parseInt(item.dataset.index));
+                    const isOptionSelected = selectedOptionIndices.includes(parseInt(item.dataset.index));
+                    
+                    // First remove any existing styling classes
+                    item.classList.remove('correct', 'incorrect');
+                    
+                    // Add appropriate styling
+                    if (isOptionCorrect) {
+                        item.classList.add('correct');
+                    } else if (isOptionSelected) {
+                        item.classList.add('incorrect');
+                    }
+                });
+            }
             
             updateStatistics();
         }
