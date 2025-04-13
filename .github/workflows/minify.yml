@@ -26,11 +26,17 @@ jobs:
 
       - name: Install minification and inlining tools
         run: |
-          npm install -g html-minifier inline-source-cli
+          npm install -g terser csso-cli html-minifier inline-source-cli
+      
+     # - name: Minify JavaScript
+     #   run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
+      
+      - name: Minify CSS
+        run: csso style.css -o style.css
 
       - name: Inline JS and CSS into HTML
         run: |
-          inline-source index.html --compress false -o index.html
+          inline-source index.html --compress false --root ./ -o index.inline.html
 
       - name: Minify inlined HTML
         run: |
@@ -49,7 +55,7 @@ jobs:
             --remove-style-link-type-attributes \
             --remove-tag-whitespace \
             --use-short-doctype \
-            -o index.html index.html
+            -o index.html index.inline.html
 
       - name: Configure Git
         run: |
@@ -58,7 +64,7 @@ jobs:
 
       - name: Commit minified files
         run: |
-          git add -A
+          git add index.html  # -A
           git diff --quiet && git diff --staged --quiet || git commit -m "Minify for deployment (SHA: ${{ github.sha }})"
 
       - name: Deploy to gh-pages
