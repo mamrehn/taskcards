@@ -1,41 +1,38 @@
 name: Minify and Deploy
 run-name: Minify JS/CSS/HTML and deploy to gh-pages
-# Run on pushes to `main` branch
+
 on:
   push:
     branches:
       - 'main'
-  # Optional: Allow manual triggering
   workflow_dispatch:
 
 jobs:
   checkout-minify-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Explicit permission to write to the repository
+      contents: write
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # Updated to latest version
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Get all history for proper branch handling
-      
+          fetch-depth: 0
+
       - name: Setup Node.js
-        uses: actions/setup-node@v4  # Updated to latest version
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'  # Updated to more recent LTS version
-      
-      - name: Install minification tools
+          node-version: '22'
+
+      - name: Install minification and inlining tools
         run: |
-          npm install -g terser csso-cli html-minifier
-      
-     # - name: Minify JavaScript
-     #   run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
-      
-      - name: Minify CSS
-        run: csso style.css -o style.css
-      
-      - name: Minify HTML
+          npm install -g html-minifier inline-source-cli
+
+      - name: Inline JS and CSS into HTML
+        run: |
+          inline-source index.html --compress false -o index.html
+
+      - name: Minify inlined HTML
         run: |
           html-minifier \
             --collapse-boolean-attributes \
@@ -53,20 +50,18 @@ jobs:
             --remove-tag-whitespace \
             --use-short-doctype \
             -o index.html index.html
-      
+
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      
+
       - name: Commit minified files
         run: |
           git add -A
-          # Only commit if there are changes
           git diff --quiet && git diff --staged --quiet || git commit -m "Minify for deployment (SHA: ${{ github.sha }})"
-      
+
       - name: Deploy to gh-pages
-        # Use a conditional to handle empty commits gracefully
         run: |
           git push --force origin HEAD:gh-pages || echo "No changes to push"
           echo "🚀 Successfully deployed to gh-pages branch"
