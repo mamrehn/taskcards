@@ -36,9 +36,9 @@ jobs:
 
       - name: Patch HTML to add inline attributes
         run: |
-          sed -i 's/<link rel="stylesheet" href="\(.*\.css\)">/<link rel="stylesheet" href="\1" inline>/' index.html
-          sed -i 's/<link href="\(.*\.css\)" rel="stylesheet">/<link href="\1" rel="stylesheet" inline>/' index.html
-          sed -i 's/<script src="\(.*\.js\)"><\/script>/<script src="\1" inline><\/script>/' index.html
+          sed -i 's/<link rel="stylesheet" href="\(.*\.css\)">/<link inline rel="stylesheet" href="\1">/' index.html
+          sed -i 's/<link href="\(.*\.css\)" rel="stylesheet">/<link inline href="\1" rel="stylesheet">/' index.html
+          sed -i 's/<script src="\(.*\.js\)"><\/script>/<script inline src="\1"><\/script>/' index.html
 
       - name: Inline JS and CSS into HTML
         run: |
