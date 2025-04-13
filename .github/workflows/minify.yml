@@ -36,7 +36,7 @@ jobs:
 
       - name: Inline JS and CSS into HTML
         run: |
-          inline-source index.html --compress false --root ./ -o index.inline.html
+          inline-source index.html --compress false --root ./ -o index.html
 
       - name: Minify inlined HTML
         run: |
@@ -55,7 +55,7 @@ jobs:
             --remove-style-link-type-attributes \
             --remove-tag-whitespace \
             --use-short-doctype \
-            -o index.html index.inline.html
+            -o index.html index.html
 
       - name: Configure Git
         run: |
