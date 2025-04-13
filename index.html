@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +15,7 @@
             --danger: #dc3545;
             --warning: #ffc107;
         }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
@@ -25,12 +27,14 @@
             flex-direction: column;
             min-height: 100vh;
         }
+
         .container {
             width: 90%;
             max-width: 900px;
             margin: 1rem auto;
             flex: 1;
         }
+
         .header {
             text-align: center;
             margin-bottom: 1rem;
@@ -39,19 +43,23 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .header h1 {
             color: var(--primary);
             margin: 0.5rem 0;
             font-size: 1.5rem;
         }
+
         .header p {
             margin: 0.25rem 0;
             font-size: 1.0rem;
         }
+
         #file-input-container {
             margin-bottom: 1rem;
             text-align: center;
         }
+
         #upload-label {
             display: inline-block;
             padding: 0.5rem 1rem;
@@ -61,19 +69,22 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
+
         #upload-label:hover {
             background-color: var(--secondary);
         }
+
         #file-input {
             display: none;
         }
-        
+
         /* Saved Decks Styles */
         #saved-decks {
             margin: 1rem 0;
             max-height: 300px;
             overflow-y: auto;
         }
+
         .saved-deck {
             background-color: white;
             padding: 0.5rem;
@@ -82,13 +93,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
+
         .deck-title {
             font-weight: 500;
             color: var(--primary);
             cursor: pointer;
         }
+
         .delete-deck {
             color: var(--danger);
             background: none;
@@ -97,15 +110,16 @@
             font-size: 1.1rem;
             padding: 0.25rem 0.5rem;
         }
-        
+
         /* Flip Card Animation Styles */
         .card-container {
             perspective: 1000px;
             margin-bottom: 1rem;
             min-height: 350px;
-            height: calc(100vh - 280px); /* Fill available space */
+            height: calc(100vh - 280px);
+            /* Fill available space */
         }
-        
+
         .card {
             position: relative;
             width: 100%;
@@ -118,12 +132,13 @@
             transition: transform 0.8s;
             transform-style: preserve-3d;
         }
-        
+
         .card.flipped {
             transform: rotateY(180deg);
         }
-        
-        .card-front, .card-back {
+
+        .card-front,
+        .card-back {
             position: absolute;
             width: 100%;
             height: 100%;
@@ -140,20 +155,20 @@
             left: 0;
             transition: opacity 0.4s ease;
         }
-        
+
         .card-front {
             z-index: 2;
             opacity: 1;
             visibility: visible;
             pointer-events: auto;
         }
-        
+
         .card.flipped .card-front {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
         }
-        
+
         .card-back {
             transform: rotateY(180deg);
             z-index: 1;
@@ -168,7 +183,7 @@
             pointer-events: auto;
             z-index: 2;
         }
-        
+
         .card-content {
             flex: 1;
             margin-bottom: 0.75rem;
@@ -176,14 +191,14 @@
             overflow-y: auto;
             max-height: 300px;
         }
-        
+
         .question {
             font-weight: bold;
             font-size: 1.4rem;
             color: var(--primary);
             margin-bottom: 0.75rem;
         }
-        
+
         .answer {
             padding: 0.75rem;
             background-color: var(--light);
@@ -191,7 +206,7 @@
             margin-top: 0.5rem;
             text-align: left;
         }
-        
+
         /* User answer input styling */
         .user-answer-input {
             width: 90%;
@@ -202,13 +217,13 @@
             font-size: 1rem;
             transition: border-color 0.15s ease-in-out;
         }
-        
+
         .user-answer-input:focus {
             border-color: var(--primary);
             outline: 0;
             box-shadow: 0 0 0 0.2rem rgba(74, 111, 165, 0.25);
         }
-        
+
         .user-answer-display {
             padding: 0.75rem;
             margin-top: 0.5rem;
@@ -217,7 +232,7 @@
             text-align: left;
             border-radius: 4px;
         }
-        
+
         /* Multiple Choice Options Styling */
         .options-container {
             display: flex;
@@ -226,7 +241,7 @@
             margin: 1rem auto;
             gap: 0.75rem;
         }
-        
+
         .option-item {
             position: relative;
             padding: 0.75rem;
@@ -238,33 +253,33 @@
             align-items: center;
             text-align: left;
         }
-        
+
         .option-item:hover {
             border-color: var(--primary);
             background-color: #f0f5ff;
         }
-        
+
         .option-item.selected {
             border-color: var(--primary);
             background-color: rgba(74, 111, 165, 0.1);
         }
-        
+
         .option-item.correct {
             border-color: var(--success);
             background-color: rgba(40, 167, 69, 0.1);
         }
-        
+
         .option-item.incorrect {
             border-color: var(--danger);
             background-color: rgba(220, 53, 69, 0.1);
         }
-        
+
         .option-checkbox {
             margin-right: 0.75rem;
             width: 18px;
             height: 18px;
         }
-        
+
         .selected-options-display {
             padding: 0.75rem;
             margin-top: 0.5rem;
@@ -281,6 +296,7 @@
             gap: 0.5rem;
             width: 100%;
         }
+
         .btn {
             padding: 0.4rem 0.8rem;
             border: none;
@@ -292,34 +308,43 @@
             min-width: 80px;
             font-size: 1.0rem;
         }
+
         .btn-primary {
             background-color: var(--primary);
             color: white;
         }
+
         .btn-primary:hover {
             background-color: var(--secondary);
         }
+
         .btn-success {
             background-color: var(--success);
             color: white;
         }
+
         .btn-success:hover {
             background-color: #218838;
         }
+
         .btn-danger {
             background-color: var(--danger);
             color: white;
         }
+
         .btn-danger:hover {
             background-color: #c82333;
         }
+
         .btn-secondary {
             background-color: #6c757d;
             color: white;
         }
+
         .btn-secondary:hover {
             background-color: #5a6268;
         }
+
         .stats {
             display: flex;
             justify-content: space-around;
@@ -329,18 +354,22 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .stat-item {
             text-align: center;
         }
+
         .stat-value {
             font-size: 1.2rem;
             font-weight: bold;
             color: var(--primary);
         }
+
         .stat-label {
             font-size: 0.9rem;
             color: #6c757d;
         }
+
         .progress-bar {
             height: 6px;
             background-color: #e9ecef;
@@ -348,25 +377,30 @@
             margin: 0.5rem 0;
             overflow: hidden;
         }
+
         .progress {
             height: 100%;
             background-color: var(--primary);
             width: 0%;
         }
+
         .feedback {
             font-size: 1.0rem;
             text-align: center;
             margin-top: 1rem;
             color: #6c757d;
         }
+
         .error-message {
             color: var(--danger);
             text-align: center;
             margin: 1rem 0;
         }
+
         .hidden {
             display: none;
         }
+
         #sample-json {
             margin-top: 1rem;
             padding: 0.75rem;
@@ -377,6 +411,7 @@
             white-space: pre-wrap;
             font-size: 0.9rem;
         }
+
         .json-toggle {
             margin-top: 0.5rem;
             font-size: 0.9rem;
@@ -384,36 +419,45 @@
             cursor: pointer;
             text-decoration: underline;
         }
+
         @media (max-width: 600px) {
             .container {
                 width: 95%;
                 margin: 0.5rem auto;
             }
+
             .controls {
                 gap: 0.3rem;
             }
+
             .btn {
                 padding: 0.3rem 0.6rem;
                 font-size: 0.9rem;
             }
+
             .card-container {
                 min-height: 330px;
             }
+
             .card {
                 min-height: 330px;
             }
+
             .stats {
                 padding: 0.4rem 0.2rem;
             }
+
             .stat-value {
                 font-size: 1.1rem;
             }
+
             .stat-label {
                 font-size: 0.9rem;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -426,22 +470,38 @@
             <input type="file" id="file-input" accept=".json">
             <p><span class="json-toggle" onclick="toggleJsonSample()">JSON-Format Beispiel anzeigen</span></p>
             <div id="sample-json" class="hidden">
-{
+                {
+                {
   "cards": [
+                "cards": [
     {
+                {
       "question": "Was ist die Hauptstadt von Deutschland?",
+                "question": "Was ist die Hauptstadt von Deutschland?",
       "answer": "Berlin"
+                "answer": "Berlin"
     },
+                },
     {
+                {
       "question": "Was ist 2+2?",
+                "question": "Was ist 2+2?",
       "answer": "4"
+                "answer": "4"
     },
+                },
     {
+                {
       "question": "Welche sind Primzahlen?",
+                "question": "Welche sind Primzahlen?",
       "options": ["2", "4", "7", "9", "11"],
+                "options": ["2", "4", "7", "9", "11"],
       "correct": [0, 2, 4]
+                "correct": [0, 2, 4]
     }
+                }
   ]
+                ]
 }</div>
 
             <div id="saved-decks-container">
@@ -482,8 +542,9 @@
                         <div class="card-content">
                             <div class="question" id="question-text">Frage erscheint hier</div>
                             <!-- Text input for standard questions -->
-                            <input type="text" class="user-answer-input" id="user-answer-input" placeholder="Deine Antwort...">
-                            
+                            <input type="text" class="user-answer-input" id="user-answer-input"
+                                placeholder="Deine Antwort...">
+
                             <!-- Multiple choice options container -->
                             <div id="options-container" class="options-container hidden">
                                 <!-- Options will be dynamically inserted here -->
@@ -497,7 +558,7 @@
                     <div class="card-back">
                         <div class="card-content">
                             <div class="question" id="question-back">Frage erscheint hier</div>
-                            
+
                             <!-- Text answer display -->
                             <div id="user-answer-container" class="hidden">
                                 <div class="user-answer-display">
@@ -505,7 +566,7 @@
                                     <div id="user-answer-display"></div>
                                 </div>
                             </div>
-                            
+
                             <!-- Multiple choice answer display -->
                             <div id="selected-options-container" class="hidden">
                                 <div class="selected-options-display">
@@ -513,12 +574,12 @@
                                     <div id="selected-options-display"></div>
                                 </div>
                             </div>
-                            
+
                             <!-- Standard answer display -->
                             <div id="standard-answer-container">
                                 <div class="answer" id="answer-text">Antwort erscheint hier</div>
                             </div>
-                            
+
                             <!-- Multiple choice correct answer display -->
                             <div id="mc-correct-answer-container" class="hidden">
                                 <div class="answer">
@@ -600,7 +661,7 @@
         // Event listeners
         fileInput.addEventListener('change', handleFileUpload);
         showAnswerBtn.addEventListener('click', showAnswer);
-                markCorrectBtn.addEventListener('click', () => markAnswer(true));
+        markCorrectBtn.addEventListener('click', () => markAnswer(true));
         markIncorrectBtn.addEventListener('click', () => markAnswer(false));
         nextCardBtn.addEventListener('click', showNextCard);
         restartBtn.addEventListener('click', restartQuiz);
@@ -631,10 +692,10 @@
             }
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    
+
                     if (!data.cards || !Array.isArray(data.cards) || data.cards.length === 0) {
                         showError('Ungültiges JSON-Format. Bitte stelle sicher, dass deine Datei ein "cards" Array mit mindestens einer Karte enthält.');
                         return;
@@ -647,13 +708,13 @@
                             return true;
                         }
                         // Check multiple choice format
-                        if (card.question && Array.isArray(card.options) && card.options.length > 0 && 
+                        if (card.question && Array.isArray(card.options) && card.options.length > 0 &&
                             Array.isArray(card.correct) && card.correct.length > 0) {
                             return true;
                         }
                         return false;
                     });
-                    
+
                     if (validCards.length === 0) {
                         showError('Keine gültigen Karten gefunden. Jede Karte muss entweder ein "question" und ein "answer" Feld ODER ein "question", "options" und "correct" Feld haben.');
                         return;
@@ -662,19 +723,19 @@
                     // Save the deck to local storage
                     const deckName = file.name.replace('.json', '');
                     currentDeckName = deckName;
-                    
+
                     // Update the app title with the deck name
                     updateAppTitle(deckName);
-                    
+
                     // Check if this is a new deck or an existing one
                     let incorrectIndices = [];
                     if (savedDecks[deckName] && savedDecks[deckName].incorrectIndices) {
                         incorrectIndices = savedDecks[deckName].incorrectIndices;
                     }
-                    
+
                     saveToLocalStorage(deckName, validCards, incorrectIndices);
                     displaySavedDecks();
-                    
+
                     // Initialize the quiz with the loaded cards
                     initializeQuiz(validCards, incorrectIndices);
                 } catch (error) {
@@ -715,23 +776,23 @@
 
         function displaySavedDecks() {
             savedDecksContainer.innerHTML = '';
-            
+
             if (Object.keys(savedDecks).length === 0) {
                 const noDecksMessage = document.createElement('p');
                 noDecksMessage.textContent = 'Keine gespeicherten Decks gefunden.';
                 savedDecksContainer.appendChild(noDecksMessage);
                 return;
             }
-            
+
             for (const deckName in savedDecks) {
                 const deckElement = document.createElement('div');
                 deckElement.className = 'saved-deck';
-                
+
                 const deckTitle = document.createElement('span');
                 deckTitle.className = 'deck-title';
                 deckTitle.textContent = deckName;
                 deckTitle.addEventListener('click', () => loadSavedDeck(deckName));
-                
+
                 const deleteButton = document.createElement('button');
                 deleteButton.className = 'delete-deck';
                 deleteButton.textContent = '×';
@@ -740,7 +801,7 @@
                     e.stopPropagation();
                     deleteSavedDeck(deckName);
                 });
-                
+
                 deckElement.appendChild(deckTitle);
                 deckElement.appendChild(deleteButton);
                 savedDecksContainer.appendChild(deckElement);
@@ -752,7 +813,7 @@
                 currentDeckName = deckName;
                 // Update the app title with the deck name
                 updateAppTitle(deckName);
-                
+
                 const deckData = savedDecks[deckName];
                 previousIncorrectIndices = deckData.incorrectIndices || [];
                 initializeQuiz(deckData.cards, previousIncorrectIndices);
@@ -775,14 +836,14 @@
             incorrectCount = 0;
             previousIncorrectIndices = incorrectIndices;
             answeredCards = new Array(cards.length).fill(null);
-            
+
             // Prioritize incorrectly answered cards if available
             prioritizeIncorrectCards();
-            
+
             // Show the app content
             document.getElementById('file-input-container').style.display = 'none';
             appContent.classList.remove('hidden');
-            
+
             // Update UI
             updateStatistics();
             showCurrentCard();
@@ -793,7 +854,7 @@
                 // Create a copy of the cards array for manipulation
                 const allCards = [...cards];
                 const prioritizedCards = [];
-                
+
                 // First, add incorrect cards to the beginning
                 for (let i = 0; i < previousIncorrectIndices.length; i++) {
                     const cardIndex = previousIncorrectIndices[i];
@@ -802,16 +863,16 @@
                         allCards.splice(cardIndex, 1); // Remove the card from the original array
                     }
                 }
-                
+
                 // Shuffle the incorrect cards
                 shuffleArray(prioritizedCards);
-                
+
                 // Shuffle the remaining cards
                 shuffleArray(allCards);
-                
+
                 // Combine both arrays
                 cards = [...prioritizedCards, ...allCards];
-                
+
                 // Reset incorrect indices as we're now studying them
                 previousIncorrectIndices = [];
             } else {
@@ -832,275 +893,156 @@
             }
         }
 
-        
-function showCurrentCard() {
-    if (currentCardIndex >= cards.length) {
-        showFeedback();
-        return;
-    }
 
-    isAnswered = false;
-    selectedOptionIndices = []; // Reset selected options
-    const card = cards[currentCardIndex];
-    
-    // Make sure the card is not flipped when showing a new card
-    flipCard.classList.remove('flipped');
-    // Set question on both sides
-    questionText.textContent = card.question;
-    questionBack.textContent = card.question;
-    
-    // Check if current card is multiple choice or standard
-    const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
-    
-    if (isMultipleChoice) {
-        // Handle multiple choice question
-        userAnswerInput.classList.add('hidden');
-        optionsContainer.classList.remove('hidden');
-        showAnswerBtn.classList.remove('hidden');
-        checkMcAnswerBtn.classList.add('hidden'); // Always hide the check button
-        
-        // Clear previous options
-        optionsContainer.innerHTML = '';
-        
-        // Create a copy of options array for shuffling
-        const shuffledOptions = [...card.options];
-        // Create a mapping to track original indices after shuffling
-        const optionMapping = shuffledOptions.map((_, index) => index);
-        
-        // Shuffle options
-        for (let i = shuffledOptions.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
-            [optionMapping[i], optionMapping[j]] = [optionMapping[j], optionMapping[i]];
-        }
-        
-        // Create option items with shuffled order
-        shuffledOptions.forEach((option, index) => {
-            const originalIndex = optionMapping[index];
-            const optionItem = document.createElement('div');
-            optionItem.className = 'option-item';
-            optionItem.dataset.index = originalIndex;
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'option-checkbox';
-            checkbox.id = `option-${index}`;
-            
-            const label = document.createElement('label');
-            label.htmlFor = `option-${index}`;
-            label.textContent = option;
-            
-            optionItem.appendChild(checkbox);
-            optionItem.appendChild(label);
-            
-            // Add click handler to toggle selection
-            optionItem.addEventListener('click', (e) => {
-                checkbox.checked = !checkbox.checked;
-                
-                optionItem.classList.toggle('selected', checkbox.checked);
-                
-                // Update selectedOptionIndices
-                if (checkbox.checked) {
-                    if (!selectedOptionIndices.includes(originalIndex)) {
-                        selectedOptionIndices.push(originalIndex);
-                    }
-                } else {
-                    const indexToRemove = selectedOptionIndices.indexOf(originalIndex);
-                    if (indexToRemove !== -1) {
-                        selectedOptionIndices.splice(indexToRemove, 1);
-                    }
-                }
-            });
-            
-            optionsContainer.appendChild(optionItem);
-        });
-        
-        // Set answer text for back of card
-        standardAnswerContainer.classList.add('hidden');
-        mcCorrectAnswerContainer.classList.remove('hidden');
-        
-        // Display correct answers
-        const correctIndices = card.correct;
-        mcCorrectAnswerText.innerHTML = correctIndices.map(index => {
-            return `<div>- ${card.options[index]}</div>`;
-        }).join('');
-        
-    } else {
-        // Handle standard question
-        userAnswerInput.classList.remove('hidden');
-        optionsContainer.classList.add('hidden');
-        showAnswerBtn.classList.remove('hidden');
-        checkMcAnswerBtn.classList.add('hidden');
-        
-        // Reset user answer input
-        userAnswerInput.value = '';
-        userAnswerInput.readOnly = false;
-        
-        // Set answer text for standard card
-        answerText.textContent = card.answer;
-        standardAnswerContainer.classList.remove('hidden');
-        mcCorrectAnswerContainer.classList.add('hidden');
-    }
-    
-    // Reset containers
-    userAnswerContainer.classList.add('hidden');
-    selectedOptionsContainer.classList.add('hidden');
-    
-    // Reset buttons
-    markCorrectBtn.style.display = 'inline-block';
-    markIncorrectBtn.style.display = 'inline-block';
-    nextCardBtn.style.display = 'none';
-    
-    updateStatistics();
-}
-
+        function showCurrentCard() {
+            if (currentCardIndex >= cards.length) {
+                showFeedback();
+                return;
+            }
 
             isAnswered = false;
             selectedOptionIndices = []; // Reset selected options
             const card = cards[currentCardIndex];
-            
+
             // Make sure the card is not flipped when showing a new card
             flipCard.classList.remove('flipped');
             // Set question on both sides
             questionText.textContent = card.question;
             questionBack.textContent = card.question;
-            
+
             // Check if current card is multiple choice or standard
             const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
-            
+
             if (isMultipleChoice) {
                 // Handle multiple choice question
                 userAnswerInput.classList.add('hidden');
                 optionsContainer.classList.remove('hidden');
                 showAnswerBtn.classList.remove('hidden');
-                checkMcAnswerBtn.classList.remove('hidden');
-                
+                checkMcAnswerBtn.classList.add('hidden'); // Always hide the check button
+
                 // Clear previous options
                 optionsContainer.innerHTML = '';
-                
-                // Create option items
-                card.options.forEach((option, index) => {
+
+                // Create a copy of options array for shuffling
+                const shuffledOptions = [...card.options];
+                // Create a mapping to track original indices after shuffling
+                const optionMapping = shuffledOptions.map((_, index) => index);
+
+                // Shuffle options
+                for (let i = shuffledOptions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+                    [optionMapping[i], optionMapping[j]] = [optionMapping[j], optionMapping[i]];
+                }
+
+                // Create option items with shuffled order
+                shuffledOptions.forEach((option, index) => {
+                    const originalIndex = optionMapping[index];
                     const optionItem = document.createElement('div');
                     optionItem.className = 'option-item';
-                    optionItem.dataset.index = index;
-                    
+                    optionItem.dataset.index = originalIndex;
+
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.className = 'option-checkbox';
                     checkbox.id = `option-${index}`;
-                    
+
                     const label = document.createElement('label');
                     label.htmlFor = `option-${index}`;
                     label.textContent = option;
-                    
+
                     optionItem.appendChild(checkbox);
                     optionItem.appendChild(label);
-                    
+
                     // Add click handler to toggle selection
                     optionItem.addEventListener('click', (e) => {
-                        // Prevent triggering when clicking directly on checkbox
-                        if (e.target !== checkbox) {
-                            checkbox.checked = !checkbox.checked;
-                        }
-                        
+                        checkbox.checked = !checkbox.checked;
+
                         optionItem.classList.toggle('selected', checkbox.checked);
-                        
+
                         // Update selectedOptionIndices
                         if (checkbox.checked) {
-                            if (!selectedOptionIndices.includes(index)) {
-                                selectedOptionIndices.push(index);
+                            if (!selectedOptionIndices.includes(originalIndex)) {
+                                selectedOptionIndices.push(originalIndex);
                             }
                         } else {
-                            const indexToRemove = selectedOptionIndices.indexOf(index);
+                            const indexToRemove = selectedOptionIndices.indexOf(originalIndex);
                             if (indexToRemove !== -1) {
                                 selectedOptionIndices.splice(indexToRemove, 1);
                             }
                         }
                     });
-                    
+
                     optionsContainer.appendChild(optionItem);
                 });
-                
+
                 // Set answer text for back of card
                 standardAnswerContainer.classList.add('hidden');
                 mcCorrectAnswerContainer.classList.remove('hidden');
-                
+
                 // Display correct answers
                 const correctIndices = card.correct;
                 mcCorrectAnswerText.innerHTML = correctIndices.map(index => {
                     return `<div>- ${card.options[index]}</div>`;
                 }).join('');
-                
+
             } else {
                 // Handle standard question
                 userAnswerInput.classList.remove('hidden');
                 optionsContainer.classList.add('hidden');
                 showAnswerBtn.classList.remove('hidden');
                 checkMcAnswerBtn.classList.add('hidden');
-                
+
                 // Reset user answer input
                 userAnswerInput.value = '';
                 userAnswerInput.readOnly = false;
-                
+
                 // Set answer text for standard card
                 answerText.textContent = card.answer;
                 standardAnswerContainer.classList.remove('hidden');
                 mcCorrectAnswerContainer.classList.add('hidden');
             }
-            
+
             // Reset containers
             userAnswerContainer.classList.add('hidden');
             selectedOptionsContainer.classList.add('hidden');
-            
+
             // Reset buttons
             markCorrectBtn.style.display = 'inline-block';
             markIncorrectBtn.style.display = 'inline-block';
             nextCardBtn.style.display = 'none';
-            
+
             updateStatistics();
         }
 
-        
-function showAnswer() {
-    flipCard.classList.add('flipped');
-    
-    const card = cards[currentCardIndex];
-    const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
-    
-    if (isMultipleChoice) {
-        // Check if selection matches correct answer
-        const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-        
-        if (selectedOptionIndices.length > 0) {
-            if (!isCorrect) {
-                // Only show selected options if they were incorrect
-                selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
-                    return `<div>- ${card.options[index]}</div>`;
-                }).join('');
-                selectedOptionsContainer.classList.remove('hidden');
-            } else {
-                selectedOptionsContainer.classList.add('hidden');
-            }
-            
-            // Auto-mark the answer for multiple choice
-            markAnswer(isCorrect);
-        } else {
-            // No selection was made
-            selectedOptionsContainer.classList.add('hidden');
-            // Don't auto-mark - let user decide if they knew the answer
-        }
-    } else {
-        // Handle user text answer display
-        const userAnswer = userAnswerInput.value.trim();
-        if (userAnswer) {
-            userAnswerDisplay.textContent = userAnswer;
-            userAnswerContainer.classList.remove('hidden');
-        } else {
-            userAnswerContainer.classList.add('hidden');
-        }
-    }
-}
+        function showAnswer() {
+            flipCard.classList.add('flipped');
 
+            const card = cards[currentCardIndex];
+            const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
+
+            if (isMultipleChoice) {
+                // Check if selection matches correct answer
+                const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
+
+                if (selectedOptionIndices.length > 0) {
+                    if (!isCorrect) {
+                        // Only show selected options if they were incorrect
+                        selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
+                            return `<div>- ${card.options[index]}</div>`;
+                        }).join('');
+                        selectedOptionsContainer.classList.remove('hidden');
+                    } else {
+                        selectedOptionsContainer.classList.add('hidden');
+                    }
+
+                    // Auto-mark the answer for multiple choice
+                    markAnswer(isCorrect);
+                } else {
+                    // No selection was made
+                    selectedOptionsContainer.classList.add('hidden');
+                    // Don't auto-mark - let user decide if they knew the answer
+                }
             } else {
                 // Handle user text answer display
                 const userAnswer = userAnswerInput.value.trim();
@@ -1111,19 +1053,16 @@ function showAnswer() {
                     userAnswerContainer.classList.add('hidden');
                 }
             }
-        }
-
-                    
             // Check if selection matches correct answer
             const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-            
+
             // Auto-mark the answer
             markAnswer(isCorrect);
-            
+
             // Show the card back with the correct answer
             showAnswer();
         }
-        
+
         // Helper function to compare arrays
         function arraysEqual(a, b) {
             if (a.length !== b.length) return false;
@@ -1135,10 +1074,10 @@ function showAnswer() {
 
         function markAnswer(isCorrect) {
             if (isAnswered) return;
-            
+
             isAnswered = true;
             answeredCards[currentCardIndex] = isCorrect;
-            
+
             if (isCorrect) {
                 correctCount++;
             } else {
@@ -1146,27 +1085,27 @@ function showAnswer() {
                 // Save this card's index as incorrect for future sessions
                 previousIncorrectIndices.push(currentCardIndex);
             }
-            
+
             // Update incorrect indices in local storage
             updateIncorrectIndices();
-            
+
             // Hide the evaluation buttons and show next button
             markCorrectBtn.style.display = 'none';
             markIncorrectBtn.style.display = 'none';
             nextCardBtn.style.display = 'inline-block';
-            
+
             // If this was a multiple choice question, highlight correct/incorrect options
             const card = cards[currentCardIndex];
             if (Array.isArray(card.options) && Array.isArray(card.correct)) {
                 const optionItems = document.querySelectorAll('.option-item');
-                
+
                 optionItems.forEach((item, index) => {
                     const isOptionCorrect = card.correct.includes(parseInt(item.dataset.index));
                     const isOptionSelected = selectedOptionIndices.includes(parseInt(item.dataset.index));
-                    
+
                     // First remove any existing styling classes
                     item.classList.remove('correct', 'incorrect');
-                    
+
                     // Add appropriate styling
                     if (isOptionCorrect) {
                         item.classList.add('correct');
@@ -1175,7 +1114,7 @@ function showAnswer() {
                     }
                 });
             }
-            
+
             updateStatistics();
         }
 
@@ -1189,19 +1128,19 @@ function showAnswer() {
             const completedCards = correctCount + incorrectCount;
             const remainingCards = totalCards - completedCards;
             const percentageComplete = totalCards > 0 ? (completedCards / totalCards) * 100 : 0;
-            
+
             cardsRemainingElement.textContent = remainingCards;
             cardsCompletedElement.textContent = completedCards;
             correctCountElement.textContent = correctCount;
             incorrectCountElement.textContent = incorrectCount;
-            
+
             progressBar.style.width = `${percentageComplete}%`;
         }
 
         function showFeedback() {
             const totalAnswered = correctCount + incorrectCount;
             const percentageCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
-            
+
             finalScoreElement.textContent = `${percentageCorrect}%`;
             feedbackElement.classList.remove('hidden');
             cardContainer.classList.add('hidden');
@@ -1211,13 +1150,13 @@ function showAnswer() {
             currentCardIndex = 0;
             correctCount = 0;
             incorrectCount = 0;
-            
+
             // Reset answered cards but keep the incorrect indices
             answeredCards = new Array(cards.length).fill(null);
-            
+
             // Prioritize incorrect cards again
             prioritizeIncorrectCards();
-            
+
             // Reset UI
             feedbackElement.classList.add('hidden');
             cardContainer.classList.remove('hidden');
@@ -1232,15 +1171,15 @@ function showAnswer() {
             feedbackElement.classList.add('hidden');
             cardContainer.classList.remove('hidden');
             fileInput.value = '';
-            
+
             // Reset the app title
             appTitle.textContent = 'Lernkarten App';
             appSubtitle.style.display = 'block';
-            
+
             // Clear any error messages
             errorMessageElement.classList.add('hidden');
             errorMessageElement.textContent = '';
-            
+
             // Display saved decks
             displaySavedDecks();
         }
@@ -1254,4 +1193,5 @@ function showAnswer() {
         }
     </script>
 </body>
+
 </html>
