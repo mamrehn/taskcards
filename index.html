@@ -103,6 +103,7 @@
             perspective: 1000px;
             margin-bottom: 1rem;
             min-height: 350px;
+            height: calc(100vh - 280px); /* Fill available space */
         }
         
         .card {
@@ -110,6 +111,9 @@
             width: 100%;
             height: 100%;
             min-height: 350px;
+            text-align: center;
+            transition: transform 0.8s;
+            transform-style: preserve-3d;
             text-align: center;
             transition: transform 0.8s;
             transform-style: preserve-3d;
@@ -596,8 +600,7 @@
         // Event listeners
         fileInput.addEventListener('change', handleFileUpload);
         showAnswerBtn.addEventListener('click', showAnswer);
-        checkMcAnswerBtn.addEventListener('click', checkMultipleChoiceAnswer);
-        markCorrectBtn.addEventListener('click', () => markAnswer(true));
+                markCorrectBtn.addEventListener('click', () => markAnswer(true));
         markIncorrectBtn.addEventListener('click', () => markAnswer(false));
         nextCardBtn.addEventListener('click', showNextCard);
         restartBtn.addEventListener('click', restartQuiz);
@@ -829,11 +832,128 @@
             }
         }
 
-        function showCurrentCard() {
-            if (currentCardIndex >= cards.length) {
-                showFeedback();
-                return;
-            }
+        
+function showCurrentCard() {
+    if (currentCardIndex >= cards.length) {
+        showFeedback();
+        return;
+    }
+
+    isAnswered = false;
+    selectedOptionIndices = []; // Reset selected options
+    const card = cards[currentCardIndex];
+    
+    // Make sure the card is not flipped when showing a new card
+    flipCard.classList.remove('flipped');
+    // Set question on both sides
+    questionText.textContent = card.question;
+    questionBack.textContent = card.question;
+    
+    // Check if current card is multiple choice or standard
+    const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
+    
+    if (isMultipleChoice) {
+        // Handle multiple choice question
+        userAnswerInput.classList.add('hidden');
+        optionsContainer.classList.remove('hidden');
+        showAnswerBtn.classList.remove('hidden');
+        checkMcAnswerBtn.classList.add('hidden'); // Always hide the check button
+        
+        // Clear previous options
+        optionsContainer.innerHTML = '';
+        
+        // Create a copy of options array for shuffling
+        const shuffledOptions = [...card.options];
+        // Create a mapping to track original indices after shuffling
+        const optionMapping = shuffledOptions.map((_, index) => index);
+        
+        // Shuffle options
+        for (let i = shuffledOptions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+            [optionMapping[i], optionMapping[j]] = [optionMapping[j], optionMapping[i]];
+        }
+        
+        // Create option items with shuffled order
+        shuffledOptions.forEach((option, index) => {
+            const originalIndex = optionMapping[index];
+            const optionItem = document.createElement('div');
+            optionItem.className = 'option-item';
+            optionItem.dataset.index = originalIndex;
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'option-checkbox';
+            checkbox.id = `option-${index}`;
+            
+            const label = document.createElement('label');
+            label.htmlFor = `option-${index}`;
+            label.textContent = option;
+            
+            optionItem.appendChild(checkbox);
+            optionItem.appendChild(label);
+            
+            // Add click handler to toggle selection
+            optionItem.addEventListener('click', (e) => {
+                checkbox.checked = !checkbox.checked;
+                
+                optionItem.classList.toggle('selected', checkbox.checked);
+                
+                // Update selectedOptionIndices
+                if (checkbox.checked) {
+                    if (!selectedOptionIndices.includes(originalIndex)) {
+                        selectedOptionIndices.push(originalIndex);
+                    }
+                } else {
+                    const indexToRemove = selectedOptionIndices.indexOf(originalIndex);
+                    if (indexToRemove !== -1) {
+                        selectedOptionIndices.splice(indexToRemove, 1);
+                    }
+                }
+            });
+            
+            optionsContainer.appendChild(optionItem);
+        });
+        
+        // Set answer text for back of card
+        standardAnswerContainer.classList.add('hidden');
+        mcCorrectAnswerContainer.classList.remove('hidden');
+        
+        // Display correct answers
+        const correctIndices = card.correct;
+        mcCorrectAnswerText.innerHTML = correctIndices.map(index => {
+            return `<div>- ${card.options[index]}</div>`;
+        }).join('');
+        
+    } else {
+        // Handle standard question
+        userAnswerInput.classList.remove('hidden');
+        optionsContainer.classList.add('hidden');
+        showAnswerBtn.classList.remove('hidden');
+        checkMcAnswerBtn.classList.add('hidden');
+        
+        // Reset user answer input
+        userAnswerInput.value = '';
+        userAnswerInput.readOnly = false;
+        
+        // Set answer text for standard card
+        answerText.textContent = card.answer;
+        standardAnswerContainer.classList.remove('hidden');
+        mcCorrectAnswerContainer.classList.add('hidden');
+    }
+    
+    // Reset containers
+    userAnswerContainer.classList.add('hidden');
+    selectedOptionsContainer.classList.add('hidden');
+    
+    // Reset buttons
+    markCorrectBtn.style.display = 'inline-block';
+    markIncorrectBtn.style.display = 'inline-block';
+    nextCardBtn.style.display = 'none';
+    
+    updateStatistics();
+}
+
 
             isAnswered = false;
             selectedOptionIndices = []; // Reset selected options
@@ -940,23 +1060,47 @@
             updateStatistics();
         }
 
-        function showAnswer() {
-            flipCard.classList.add('flipped');
+        
+function showAnswer() {
+    flipCard.classList.add('flipped');
+    
+    const card = cards[currentCardIndex];
+    const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
+    
+    if (isMultipleChoice) {
+        // Check if selection matches correct answer
+        const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
+        
+        if (selectedOptionIndices.length > 0) {
+            if (!isCorrect) {
+                // Only show selected options if they were incorrect
+                selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
+                    return `<div>- ${card.options[index]}</div>`;
+                }).join('');
+                selectedOptionsContainer.classList.remove('hidden');
+            } else {
+                selectedOptionsContainer.classList.add('hidden');
+            }
             
-            const card = cards[currentCardIndex];
-            const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
-            
-            if (isMultipleChoice) {
-                // Show selected options
-                if (selectedOptionIndices.length > 0) {
-                    selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
-                        return `<div>- ${card.options[index]}</div>`;
-                    }).join('');
-                    selectedOptionsContainer.classList.remove('hidden');
-                } else {
-                    selectedOptionsDisplay.innerHTML = '<div>Keine Auswahl getroffen</div>';
-                    selectedOptionsContainer.classList.remove('hidden');
-                }
+            // Auto-mark the answer for multiple choice
+            markAnswer(isCorrect);
+        } else {
+            // No selection was made
+            selectedOptionsContainer.classList.add('hidden');
+            // Don't auto-mark - let user decide if they knew the answer
+        }
+    } else {
+        // Handle user text answer display
+        const userAnswer = userAnswerInput.value.trim();
+        if (userAnswer) {
+            userAnswerDisplay.textContent = userAnswer;
+            userAnswerContainer.classList.remove('hidden');
+        } else {
+            userAnswerContainer.classList.add('hidden');
+        }
+    }
+}
+
             } else {
                 // Handle user text answer display
                 const userAnswer = userAnswerInput.value.trim();
@@ -969,13 +1113,7 @@
             }
         }
 
-        function checkMultipleChoiceAnswer() {
-            const card = cards[currentCardIndex];
-            
-            if (!Array.isArray(card.options) || !Array.isArray(card.correct)) {
-                return; // Not a multiple choice question
-            }
-            
+                    
             // Check if selection matches correct answer
             const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
             
