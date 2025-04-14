@@ -751,18 +751,26 @@
             const isMultipleChoice = Array.isArray(card.options) && Array.isArray(card.correct);
         
             if (isMultipleChoice) {
-                // For multiple choice, display user's selection
+                // For multiple choice questions
                 if (selectedOptionIndices.length > 0) {
-                    selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
-                        return `<div>- ${card.options[index]}</div>`;
-                    }).join('');
-                    selectedOptionsContainer.classList.remove('hidden');
-                    
-                    // Auto-check if the answer is correct - don't show Richtig/Falsch buttons
+                    // Check if the answer is correct
                     const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
+                    
+                    if (isCorrect) {
+                        // If correct, don't show user's answer, just keep showing the correct answers
+                        selectedOptionsContainer.classList.add('hidden');
+                    } else {
+                        // If incorrect, show what the user selected
+                        selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
+                            return `<div>- ${card.options[index]}</div>`;
+                        }).join('');
+                        selectedOptionsContainer.classList.remove('hidden');
+                    }
+                    
+                    // Auto-evaluate the answer
                     markAnswer(isCorrect);
                     
-                    // For multiple choice, directly show Next button only
+                    // For multiple choice with selections, directly show Next button only
                     markCorrectBtn.style.display = 'none';
                     markIncorrectBtn.style.display = 'none';
                     nextCardBtn.style.display = 'inline-block';
@@ -791,7 +799,7 @@
                 nextCardBtn.style.display = 'none';
             }
         }
-
+        
         // Helper function to compare arrays
         function arraysEqual(a, b) {
             if (a.length !== b.length) return false;
