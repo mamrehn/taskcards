@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="de">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lernkarten App</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
     <div class="container">
         <div class="header">
@@ -16,46 +14,44 @@
         </div>
 
         <div id="file-input-container">
-            <label for="file-input" id="upload-label">JSON hochladen</label>
-            <input type="file" id="file-input" accept=".json">
+            <div class="upload-options">
+                <div class="upload-option">
+                    <label for="file-input" id="upload-label">JSON hochladen</label>
+                    <input type="file" id="file-input" accept=".json">
+                </div>
+                <div class="upload-option">
+                    <label for="zip-input" id="zip-upload-label">ZIP hochladen</label>
+                    <input type="file" id="zip-input" accept=".zip">
+                </div>
+            </div>
             <p><span class="json-toggle" onclick="toggleJsonSample()">JSON-Format Beispiel anzeigen</span></p>
             <div id="sample-json" class="hidden">
                 {
-                {
   "cards": [
-                "cards": [
     {
-                {
       "question": "Was ist die Hauptstadt von Deutschland?",
-                "question": "Was ist die Hauptstadt von Deutschland?",
       "answer": "Berlin"
-                "answer": "Berlin"
     },
-                },
     {
-                {
       "question": "Was ist 2+2?",
-                "question": "Was ist 2+2?",
       "answer": "4"
-                "answer": "4"
     },
-                },
     {
-                {
       "question": "Welche sind Primzahlen?",
-                "question": "Welche sind Primzahlen?",
       "options": ["2", "4", "7", "9", "11"],
-                "options": ["2", "4", "7", "9", "11"],
       "correct": [0, 2, 4]
-                "correct": [0, 2, 4]
     }
-                }
   ]
-                ]
-}</div>
+}
+            </div>
 
             <div id="saved-decks-container">
                 <h3>Gespeicherte Decks</h3>
+                <div id="deck-selection-controls">
+                    <button id="start-selected-decks" class="btn btn-primary" disabled>Mit ausgewählten Decks starten</button>
+                    <button id="select-all-decks" class="btn btn-secondary">Alle auswählen</button>
+                    <button id="deselect-all-decks" class="btn btn-secondary">Alle abwählen</button>
+                </div>
                 <div id="saved-decks">
                     <!-- Saved decks will be dynamically inserted here -->
                 </div>
@@ -108,6 +104,7 @@
                     <div class="card-back">
                         <div class="card-content">
                             <div class="question" id="question-back">Frage erscheint hier</div>
+                            <div class="source-deck" id="source-deck-display"></div>
 
                             <!-- Text answer display -->
                             <div id="user-answer-container" class="hidden">
@@ -148,7 +145,13 @@
             </div>
 
             <div class="feedback hidden" id="feedback">
-                Du hast alle Karten abgeschlossen! Dein Endergebnis ist: <span id="final-score">0%</span>
+                <h2>Quiz abgeschlossen!</h2>
+                <div id="overall-stats">
+                    <p>Gesamtergebnis: <span id="final-score">0%</span></p>
+                </div>
+                <div id="deck-stats-container">
+                    <!-- Individual deck statistics will appear here -->
+                </div>
                 <div style="margin-top: 1rem;">
                     <button class="btn btn-primary" id="restart-btn">Neu starten</button>
                     <button class="btn btn-secondary" id="upload-new-btn">Neues Deck</button>
@@ -159,6 +162,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         // Global variables
         let cards = [];
@@ -167,18 +171,21 @@
         let incorrectCount = 0;
         let answeredCards = [];
         let isAnswered = false;
-        let currentDeckName = "";
+        let activeDecks = []; // Array of deck names that are currently active
         let savedDecks = {};
-        let previousIncorrectIndices = [];
+        let previousIncorrectIndices = {};
         let selectedOptionIndices = []; // For multiple choice questions
+        let deckStats = {}; // For tracking per-deck statistics
 
         // DOM elements
         const fileInput = document.getElementById('file-input');
+        const zipInput = document.getElementById('zip-input');
         const appContent = document.getElementById('app-content');
         const appTitle = document.getElementById('app-title');
         const appSubtitle = document.getElementById('app-subtitle');
         const questionText = document.getElementById('question-text');
         const questionBack = document.getElementById('question-back');
+        const sourceDeckDisplay = document.getElementById('source-deck-display');
         const answerText = document.getElementById('answer-text');
         const userAnswerInput = document.getElementById('user-answer-input');
         const userAnswerContainer = document.getElementById('user-answer-container');
@@ -201,21 +208,29 @@
         const incorrectCountElement = document.getElementById('incorrect-count');
         const feedbackElement = document.getElementById('feedback');
         const finalScoreElement = document.getElementById('final-score');
+        const deckStatsContainer = document.getElementById('deck-stats-container');
         const restartBtn = document.getElementById('restart-btn');
         const uploadNewBtn = document.getElementById('upload-new-btn');
         const errorMessageElement = document.getElementById('error-message');
         const flipCard = document.getElementById('flip-card');
         const cardContainer = document.getElementById('card-container');
         const savedDecksContainer = document.getElementById('saved-decks');
+        const startSelectedDecksBtn = document.getElementById('start-selected-decks');
+        const selectAllDecksBtn = document.getElementById('select-all-decks');
+        const deselectAllDecksBtn = document.getElementById('deselect-all-decks');
 
         // Event listeners
         fileInput.addEventListener('change', handleFileUpload);
+        zipInput.addEventListener('change', handleZipUpload);
         showAnswerBtn.addEventListener('click', showAnswer);
         markCorrectBtn.addEventListener('click', () => markAnswer(true));
         markIncorrectBtn.addEventListener('click', () => markAnswer(false));
         nextCardBtn.addEventListener('click', showNextCard);
         restartBtn.addEventListener('click', restartQuiz);
         uploadNewBtn.addEventListener('click', resetAndUpload);
+        startSelectedDecksBtn.addEventListener('click', startSelectedDecks);
+        selectAllDecksBtn.addEventListener('click', selectAllDecks);
+        deselectAllDecksBtn.addEventListener('click', deselectAllDecks);
 
         // Hide the next button initially
         nextCardBtn.style.display = 'none';
@@ -241,8 +256,81 @@
                 return;
             }
 
+            processJsonFile(file);
+        }
+
+        function handleZipUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/zip' && !file.name.endsWith('.zip')) {
+                showError('Bitte lade eine gültige ZIP-Datei hoch.');
+                return;
+            }
+
             const reader = new FileReader();
-            reader.onload = function (e) {
+            reader.onload = async function(e) {
+                try {
+                    const zip = new JSZip();
+                    const zipContent = await zip.loadAsync(e.target.result);
+                    let processedCount = 0;
+                    let errorCount = 0;
+
+                    // Process each file in the ZIP
+                    const promises = [];
+                    zipContent.forEach((relativePath, zipEntry) => {
+                        if (!zipEntry.dir && relativePath.endsWith('.json')) {
+                            const promise = zipEntry.async('string').then(content => {
+                                try {
+                                    const data = JSON.parse(content);
+                                    
+                                    if (!data.cards || !Array.isArray(data.cards) || data.cards.length === 0) {
+                                        errorCount++;
+                                        return;
+                                    }
+
+                                    // Check card validity
+                                    const validCards = validateCards(data.cards);
+                                    
+                                    if (validCards.length === 0) {
+                                        errorCount++;
+                                        return;
+                                    }
+
+                                    // Save the deck with filename as deck name
+                                    const deckName = relativePath.split('/').pop().replace('.json', '');
+                                    saveToLocalStorage(deckName, validCards, []);
+                                    processedCount++;
+                                } catch (e) {
+                                    errorCount++;
+                                }
+                            });
+                            promises.push(promise);
+                        }
+                    });
+
+                    await Promise.all(promises);
+                    
+                    if (processedCount > 0) {
+                        displaySavedDecks();
+                        showMessage(`${processedCount} Decks erfolgreich importiert${errorCount > 0 ? `, ${errorCount} fehlgeschlagen` : ''}.`);
+                    } else {
+                        showError('Keine gültigen JSON-Dateien in der ZIP-Datei gefunden.');
+                    }
+                    
+                    // Reset the file input
+                    zipInput.value = '';
+                } catch (error) {
+                    showError('Fehler beim Entpacken der ZIP-Datei.');
+                    console.error(error);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processJsonFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
 
@@ -251,19 +339,8 @@
                         return;
                     }
 
-                    // Check if each card has valid format (either question+answer or question+options+correct)
-                    const validCards = data.cards.filter(card => {
-                        // Check standard card format
-                        if (card.question && card.answer) {
-                            return true;
-                        }
-                        // Check multiple choice format
-                        if (card.question && Array.isArray(card.options) && card.options.length > 0 &&
-                            Array.isArray(card.correct) && card.correct.length > 0) {
-                            return true;
-                        }
-                        return false;
-                    });
+                    // Validate cards
+                    const validCards = validateCards(data.cards);
 
                     if (validCards.length === 0) {
                         showError('Keine gültigen Karten gefunden. Jede Karte muss entweder ein "question" und ein "answer" Feld ODER ein "question", "options" und "correct" Feld haben.');
@@ -272,22 +349,20 @@
 
                     // Save the deck to local storage
                     const deckName = file.name.replace('.json', '');
-                    currentDeckName = deckName;
+                    activeDecks = [deckName]; // Set as the only active deck
 
                     // Update the app title with the deck name
-                    updateAppTitle(deckName);
+                    updateAppTitle([deckName]);
 
-                    // Check if this is a new deck or an existing one
-                    let incorrectIndices = [];
-                    if (savedDecks[deckName] && savedDecks[deckName].incorrectIndices) {
-                        incorrectIndices = savedDecks[deckName].incorrectIndices;
-                    }
-
-                    saveToLocalStorage(deckName, validCards, incorrectIndices);
+                    // Save to local storage
+                    saveToLocalStorage(deckName, validCards, []);
                     displaySavedDecks();
 
                     // Initialize the quiz with the loaded cards
-                    initializeQuiz(validCards, incorrectIndices);
+                    initializeQuiz(validCards.map(card => ({...card, sourceDeck: deckName})));
+                    
+                    // Reset the file input
+                    fileInput.value = '';
                 } catch (error) {
                     showError('Fehler beim Parsen der JSON-Datei. Bitte überprüfe das Dateiformat.');
                     console.error(error);
@@ -296,8 +371,27 @@
             reader.readAsText(file);
         }
 
-        function updateAppTitle(deckName) {
-            appTitle.textContent = `Lernkarten App - ${deckName}`;
+        function validateCards(cards) {
+            return cards.filter(card => {
+                // Check standard card format
+                if (card.question && card.answer) {
+                    return true;
+                }
+                // Check multiple choice format
+                if (card.question && Array.isArray(card.options) && card.options.length > 0 &&
+                    Array.isArray(card.correct) && card.correct.length > 0) {
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        function updateAppTitle(deckNames) {
+            if (deckNames.length === 1) {
+                appTitle.textContent = `Lernkarten App - ${deckNames[0]}`;
+            } else {
+                appTitle.textContent = `Lernkarten App - ${deckNames.length} Decks kombiniert`;
+            }
             // Hide the subtitle when a deck is active
             appSubtitle.style.display = 'none';
         }
@@ -307,30 +401,42 @@
             if (savedDecksString) {
                 savedDecks = JSON.parse(savedDecksString);
             }
+            
+            const incorrectIndicesString = localStorage.getItem('flashcardIncorrectIndices');
+            if (incorrectIndicesString) {
+                previousIncorrectIndices = JSON.parse(incorrectIndicesString);
+            }
         }
 
         function saveToLocalStorage(deckName, deckCards, incorrectIndices = []) {
             savedDecks[deckName] = {
-                cards: deckCards,
-                incorrectIndices: incorrectIndices
+                cards: deckCards
             };
             localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+            
+            // Save incorrect indices separately
+            if (!previousIncorrectIndices[deckName]) {
+                previousIncorrectIndices[deckName] = [];
+            }
+            if (incorrectIndices.length > 0) {
+                previousIncorrectIndices[deckName] = [...incorrectIndices];
+            }
+            localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
         }
 
         function updateIncorrectIndices() {
-            if (currentDeckName && savedDecks[currentDeckName]) {
-                savedDecks[currentDeckName].incorrectIndices = previousIncorrectIndices;
-                localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
-            }
+            localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
         }
 
         function displaySavedDecks() {
-            savedDecksContainer.innerHTML = '';
+            const savedDecksDiv = document.getElementById('saved-decks');
+            savedDecksDiv.innerHTML = '';
 
             if (Object.keys(savedDecks).length === 0) {
                 const noDecksMessage = document.createElement('p');
                 noDecksMessage.textContent = 'Keine gespeicherten Decks gefunden.';
-                savedDecksContainer.appendChild(noDecksMessage);
+                savedDecksDiv.appendChild(noDecksMessage);
+                startSelectedDecksBtn.disabled = true;
                 return;
             }
 
@@ -338,10 +444,17 @@
                 const deckElement = document.createElement('div');
                 deckElement.className = 'saved-deck';
 
-                const deckTitle = document.createElement('span');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `deck-checkbox-${deckName}`;
+                checkbox.className = 'deck-checkbox';
+                checkbox.dataset.deckName = deckName;
+                checkbox.addEventListener('change', updateStartButtonState);
+
+                const deckTitle = document.createElement('label');
                 deckTitle.className = 'deck-title';
-                deckTitle.textContent = deckName;
-                deckTitle.addEventListener('click', () => loadSavedDeck(deckName));
+                deckTitle.htmlFor = `deck-checkbox-${deckName}`;
+                deckTitle.textContent = `${deckName} (${savedDecks[deckName].cards.length} Karten)`;
 
                 const deleteButton = document.createElement('button');
                 deleteButton.className = 'delete-deck';
@@ -352,39 +465,96 @@
                     deleteSavedDeck(deckName);
                 });
 
+                deckElement.appendChild(checkbox);
                 deckElement.appendChild(deckTitle);
                 deckElement.appendChild(deleteButton);
-                savedDecksContainer.appendChild(deckElement);
+                savedDecksDiv.appendChild(deckElement);
             }
+            
+            updateStartButtonState();
         }
 
-        function loadSavedDeck(deckName) {
-            if (savedDecks[deckName]) {
-                currentDeckName = deckName;
-                // Update the app title with the deck name
-                updateAppTitle(deckName);
+        function updateStartButtonState() {
+            const checkboxes = document.querySelectorAll('.deck-checkbox:checked');
+            startSelectedDecksBtn.disabled = checkboxes.length === 0;
+        }
 
-                const deckData = savedDecks[deckName];
-                previousIncorrectIndices = deckData.incorrectIndices || [];
-                initializeQuiz(deckData.cards, previousIncorrectIndices);
-            }
+        function startSelectedDecks() {
+            const selectedCheckboxes = document.querySelectorAll('.deck-checkbox:checked');
+            if (selectedCheckboxes.length === 0) return;
+
+            const selectedDeckNames = Array.from(selectedCheckboxes).map(cb => cb.dataset.deckName);
+            activeDecks = selectedDeckNames;
+
+            // Update the app title
+            updateAppTitle(selectedDeckNames);
+
+            // Merge selected decks
+            let mergedCards = [];
+            selectedDeckNames.forEach(deckName => {
+                if (savedDecks[deckName]) {
+                    const cardsWithSource = savedDecks[deckName].cards.map(card => ({
+                        ...card,
+                        sourceDeck: deckName
+                    }));
+                    mergedCards = [...mergedCards, ...cardsWithSource];
+                }
+            });
+
+            // Initialize statistics tracking for each deck
+            resetDeckStats(selectedDeckNames);
+
+            // Initialize the quiz with merged cards
+            initializeQuiz(mergedCards);
+        }
+
+        function resetDeckStats(deckNames) {
+            deckStats = {};
+            deckNames.forEach(deckName => {
+                deckStats[deckName] = {
+                    correct: 0,
+                    incorrect: 0,
+                    total: savedDecks[deckName].cards.length
+                };
+            });
+        }
+
+        function selectAllDecks() {
+            const checkboxes = document.querySelectorAll('.deck-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+            });
+            updateStartButtonState();
+        }
+
+        function deselectAllDecks() {
+            const checkboxes = document.querySelectorAll('.deck-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+            });
+            updateStartButtonState();
         }
 
         function deleteSavedDeck(deckName) {
             if (confirm(`Möchtest du das Deck "${deckName}" wirklich löschen?`)) {
                 delete savedDecks[deckName];
                 localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+                
+                if (previousIncorrectIndices[deckName]) {
+                    delete previousIncorrectIndices[deckName];
+                    localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+                }
+                
                 displaySavedDecks();
             }
         }
 
-        function initializeQuiz(loadedCards, incorrectIndices = []) {
+        function initializeQuiz(loadedCards) {
             // Reset the quiz state
             cards = loadedCards;
             currentCardIndex = 0;
             correctCount = 0;
             incorrectCount = 0;
-            previousIncorrectIndices = incorrectIndices;
             answeredCards = new Array(cards.length).fill(null);
 
             // Prioritize incorrectly answered cards if available
@@ -400,35 +570,41 @@
         }
 
         function prioritizeIncorrectCards() {
-            if (previousIncorrectIndices.length > 0) {
-                // Create a copy of the cards array for manipulation
-                const allCards = [...cards];
-                const prioritizedCards = [];
-
-                // First, add incorrect cards to the beginning
-                for (let i = 0; i < previousIncorrectIndices.length; i++) {
-                    const cardIndex = previousIncorrectIndices[i];
-                    if (cardIndex >= 0 && cardIndex < allCards.length) {
-                        prioritizedCards.push(allCards[cardIndex]);
-                        allCards.splice(cardIndex, 1); // Remove the card from the original array
+            if (activeDecks.length === 0) return;
+            
+            // Create a copy of the cards array for manipulation
+            const allCards = [...cards];
+            const prioritizedCards = [];
+            const remainingCards = [];
+            
+            // First, identify cards from decks with incorrect answers
+            allCards.forEach(card => {
+                const deckName = card.sourceDeck;
+                if (previousIncorrectIndices[deckName] && previousIncorrectIndices[deckName].length > 0) {
+                    // Find if this card was incorrect in its original deck
+                    const originalIndex = savedDecks[deckName].cards.findIndex(c => 
+                        c.question === card.question && 
+                        (c.answer === card.answer || 
+                         (Array.isArray(c.options) && Array.isArray(card.options) && 
+                          JSON.stringify(c.options) === JSON.stringify(card.options)))
+                    );
+                    
+                    if (originalIndex !== -1 && previousIncorrectIndices[deckName].includes(originalIndex)) {
+                        prioritizedCards.push(card);
+                    } else {
+                        remainingCards.push(card);
                     }
+                } else {
+                    remainingCards.push(card);
                 }
+            });
 
-                // Shuffle the incorrect cards
-                shuffleArray(prioritizedCards);
+            // Shuffle both arrays
+            shuffleArray(prioritizedCards);
+            shuffleArray(remainingCards);
 
-                // Shuffle the remaining cards
-                shuffleArray(allCards);
-
-                // Combine both arrays
-                cards = [...prioritizedCards, ...allCards];
-
-                // Reset incorrect indices as we're now studying them
-                previousIncorrectIndices = [];
-            } else {
-                // If no incorrect cards, just shuffle all cards
-                shuffleCards();
-            }
+            // Combine the arrays
+            cards = [...prioritizedCards, ...remainingCards];
         }
 
         function shuffleCards() {
@@ -443,7 +619,6 @@
             }
         }
 
-
         function showCurrentCard() {
             if (currentCardIndex >= cards.length) {
                 showFeedback();
@@ -456,9 +631,13 @@
 
             // Make sure the card is not flipped when showing a new card
             flipCard.classList.remove('flipped');
+            
             // Set question on both sides
             questionText.textContent = card.question;
             questionBack.textContent = card.question;
+            
+            // Show source deck info
+            sourceDeckDisplay.textContent = `Quelle: ${card.sourceDeck}`;
 
             // Check if current card is multiple choice or standard
             const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
@@ -468,7 +647,7 @@
                 userAnswerInput.classList.add('hidden');
                 optionsContainer.classList.remove('hidden');
                 showAnswerBtn.classList.remove('hidden');
-                checkMcAnswerBtn.classList.add('hidden'); // Always hide the check button
+                checkMcAnswerBtn.classList.add('hidden');
 
                 // Clear previous options
                 optionsContainer.innerHTML = '';
@@ -569,32 +748,30 @@
             flipCard.classList.add('flipped');
 
             const card = cards[currentCardIndex];
-            const isMultipleChoice = Array.isArray(card.options) && card.options.length > 0;
+            const isMultipleChoice = Array.isArray(card.options) && Array.isArray(card.correct);
 
             if (isMultipleChoice) {
-                // Check if selection matches correct answer
-                const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-
+                // For multiple choice, display user's selection
                 if (selectedOptionIndices.length > 0) {
-                    if (!isCorrect) {
-                        // Only show selected options if they were incorrect
-                        selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
-                            return `<div>- ${card.options[index]}</div>`;
-                        }).join('');
-                        selectedOptionsContainer.classList.remove('hidden');
-                    } else {
-                        selectedOptionsContainer.classList.add('hidden');
-                    }
-
-                    // Auto-mark the answer for multiple choice
+                    selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
+                        return `<div>- ${card.options[index]}</div>`;
+                    }).join('');
+                    selectedOptionsContainer.classList.remove('hidden');
+                    
+                    // Auto-check if the answer is correct
+                    const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
                     markAnswer(isCorrect);
                 } else {
-                    // No selection was made
+                    // No selection was made, just show the controls
                     selectedOptionsContainer.classList.add('hidden');
-                    // Don't auto-mark - let user decide if they knew the answer
+
+                    // //////////////////////////////////
+
+                    // No options selected, but still show Richtig/Falsch buttons
+                    // to let user decide if they knew the answer
                 }
             } else {
-                // Handle user text answer display
+                // Handle standard text answer display
                 const userAnswer = userAnswerInput.value.trim();
                 if (userAnswer) {
                     userAnswerDisplay.textContent = userAnswer;
@@ -603,14 +780,11 @@
                     userAnswerContainer.classList.add('hidden');
                 }
             }
-            // Check if selection matches correct answer
-            const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-
-            // Auto-mark the answer
-            markAnswer(isCorrect);
-
-            // Show the card back with the correct answer
-            showAnswer();
+            
+            // Always show the markCorrect and markIncorrect buttons
+            markCorrectBtn.style.display = 'inline-block';
+            markIncorrectBtn.style.display = 'inline-block';
+            nextCardBtn.style.display = 'none';
         }
 
         // Helper function to compare arrays
@@ -627,13 +801,40 @@
 
             isAnswered = true;
             answeredCards[currentCardIndex] = isCorrect;
+            const card = cards[currentCardIndex];
+            const deckName = card.sourceDeck;
 
             if (isCorrect) {
                 correctCount++;
+                if (deckStats[deckName]) {
+                    deckStats[deckName].correct++;
+                }
             } else {
                 incorrectCount++;
-                // Save this card's index as incorrect for future sessions
-                previousIncorrectIndices.push(currentCardIndex);
+                if (deckStats[deckName]) {
+                    deckStats[deckName].incorrect++;
+                }
+                
+                // Store the incorrect card in the source deck's incorrect indices
+                if (deckName && savedDecks[deckName]) {
+                    // Find original index in the source deck
+                    const originalDeckCards = savedDecks[deckName].cards;
+                    const originalIndex = originalDeckCards.findIndex(c => 
+                        c.question === card.question && 
+                        (c.answer === card.answer || 
+                        (Array.isArray(c.options) && Array.isArray(card.options) && 
+                        JSON.stringify(c.options) === JSON.stringify(card.options)))
+                    );
+                    
+                    if (originalIndex !== -1) {
+                        if (!previousIncorrectIndices[deckName]) {
+                            previousIncorrectIndices[deckName] = [];
+                        }
+                        if (!previousIncorrectIndices[deckName].includes(originalIndex)) {
+                            previousIncorrectIndices[deckName].push(originalIndex);
+                        }
+                    }
+                }
             }
 
             // Update incorrect indices in local storage
@@ -645,13 +846,13 @@
             nextCardBtn.style.display = 'inline-block';
 
             // If this was a multiple choice question, highlight correct/incorrect options
-            const card = cards[currentCardIndex];
             if (Array.isArray(card.options) && Array.isArray(card.correct)) {
                 const optionItems = document.querySelectorAll('.option-item');
 
-                optionItems.forEach((item, index) => {
-                    const isOptionCorrect = card.correct.includes(parseInt(item.dataset.index));
-                    const isOptionSelected = selectedOptionIndices.includes(parseInt(item.dataset.index));
+                optionItems.forEach(item => {
+                    const optionIndex = parseInt(item.dataset.index);
+                    const isOptionCorrect = card.correct.includes(optionIndex);
+                    const isOptionSelected = selectedOptionIndices.includes(optionIndex);
 
                     // First remove any existing styling classes
                     item.classList.remove('correct', 'incorrect');
@@ -694,6 +895,40 @@
             finalScoreElement.textContent = `${percentageCorrect}%`;
             feedbackElement.classList.remove('hidden');
             cardContainer.classList.add('hidden');
+
+            // Display per-deck statistics
+            deckStatsContainer.innerHTML = '';
+            
+            if (activeDecks.length > 1) {
+                const deckStatsHeader = document.createElement('h3');
+                deckStatsHeader.textContent = 'Statistik pro Deck:';
+                deckStatsContainer.appendChild(deckStatsHeader);
+                
+                const deckStatsList = document.createElement('div');
+                deckStatsList.className = 'deck-stats-list';
+                
+                for (const deckName in deckStats) {
+                    const stats = deckStats[deckName];
+                    const totalAnswered = stats.correct + stats.incorrect;
+                    
+                    if (totalAnswered === 0) continue;
+                    
+                    const deckAccuracy = Math.round((stats.correct / totalAnswered) * 100);
+                    
+                    const deckStatItem = document.createElement('div');
+                    deckStatItem.className = 'deck-stat-item';
+                    deckStatItem.innerHTML = `
+                        <strong>${deckName}:</strong> 
+                        ${stats.correct} richtig, 
+                        ${stats.incorrect} falsch, 
+                        ${deckAccuracy}% Genauigkeit
+                    `;
+                    
+                    deckStatsList.appendChild(deckStatItem);
+                }
+                
+                deckStatsContainer.appendChild(deckStatsList);
+            }
         }
 
         function restartQuiz() {
@@ -701,10 +936,14 @@
             correctCount = 0;
             incorrectCount = 0;
 
-            // Reset answered cards but keep the incorrect indices
+            // Reset deck statistics
+            resetDeckStats(activeDecks);
+
+            // Reset answered cards
             answeredCards = new Array(cards.length).fill(null);
 
-            // Prioritize incorrect cards again
+            // Prioritize incorrect cards again and reshuffle
+            shuffleCards();
             prioritizeIncorrectCards();
 
             // Reset UI
@@ -721,6 +960,7 @@
             feedbackElement.classList.add('hidden');
             cardContainer.classList.remove('hidden');
             fileInput.value = '';
+            zipInput.value = '';
 
             // Reset the app title
             appTitle.textContent = 'Lernkarten App';
@@ -741,7 +981,25 @@
                 errorMessageElement.classList.add('hidden');
             }, 5000);
         }
+
+        function showMessage(message) {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message-popup';
+            messageEl.textContent = message;
+            document.body.appendChild(messageEl);
+            
+            setTimeout(() => {
+                messageEl.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+                setTimeout(() => {
+                    document.body.removeChild(messageEl);
+                }, 300);
+            }, 3000);
+        }
     </script>
 </body>
-
 </html>
+                
