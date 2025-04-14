@@ -746,10 +746,10 @@
 
         function showAnswer() {
             flipCard.classList.add('flipped');
-
+        
             const card = cards[currentCardIndex];
             const isMultipleChoice = Array.isArray(card.options) && Array.isArray(card.correct);
-
+        
             if (isMultipleChoice) {
                 // For multiple choice, display user's selection
                 if (selectedOptionIndices.length > 0) {
@@ -758,17 +758,22 @@
                     }).join('');
                     selectedOptionsContainer.classList.remove('hidden');
                     
-                    // Auto-check if the answer is correct
+                    // Auto-check if the answer is correct - don't show Richtig/Falsch buttons
                     const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
                     markAnswer(isCorrect);
+                    
+                    // For multiple choice, directly show Next button only
+                    markCorrectBtn.style.display = 'none';
+                    markIncorrectBtn.style.display = 'none';
+                    nextCardBtn.style.display = 'inline-block';
                 } else {
-                    // No selection was made, just show the controls
+                    // No selection was made, still let user decide if they knew answer
                     selectedOptionsContainer.classList.add('hidden');
-
-                    // //////////////////////////////////
-
-                    // No options selected, but still show Richtig/Falsch buttons
-                    // to let user decide if they knew the answer
+                    
+                    // Show the evaluation buttons for no selection case
+                    markCorrectBtn.style.display = 'inline-block';
+                    markIncorrectBtn.style.display = 'inline-block';
+                    nextCardBtn.style.display = 'none';
                 }
             } else {
                 // Handle standard text answer display
@@ -779,12 +784,12 @@
                 } else {
                     userAnswerContainer.classList.add('hidden');
                 }
+                
+                // For text answers, show the Richtig/Falsch buttons
+                markCorrectBtn.style.display = 'inline-block';
+                markIncorrectBtn.style.display = 'inline-block';
+                nextCardBtn.style.display = 'none';
             }
-            
-            // Always show the markCorrect and markIncorrect buttons
-            markCorrectBtn.style.display = 'inline-block';
-            markIncorrectBtn.style.display = 'inline-block';
-            nextCardBtn.style.display = 'none';
         }
 
         // Helper function to compare arrays
