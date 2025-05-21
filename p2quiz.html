@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>p2quiz</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="p2quiz.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>p2quiz</h1>
+            <p>Eine serverlose Quiz App</p>
+        </header>
+
+        <div id="role-selection" class="view active card">
+            <h2>Wähle deine Rolle</h2>
+            <button id="host-btn" class="btn">Quiz hosten</button>
+            <button id="player-btn" class="btn">Quiz beitreten</button>
+        </div>
+
+        <div id="host-view" class="view card">
+            <h2>Quiz hosten</h2>
+
+            <div id="host-setup">
+                <div class="duration-setting" style="margin-top: 15px;">
+                    <label for="question-duration-input">Fragedauer (Sekunden):</label>
+                    <input type="number" id="question-duration-input" value="20" min="5" max="60" class="w-full p-2 border rounded">
+                </div>
+                <button id="start-quiz-btn" class="btn btn-accent" style="margin-top: 10px;">Quiz starten</button>
+
+                <div class="file-input-container">
+                    <label for="json-file" class="file-input-label">Fragen importieren (JSON)</label>
+                    <input type="file" id="json-file" accept=".json">
+                </div>
+                <p id="file-status"></p>
+
+                <h3>Oder Fragen manuell erstellen:</h3>
+                <form id="question-form">
+                    <div>
+                        <label for="question-text">Frage:</label>
+                        <input type="text" id="question-text" placeholder="Gebe deine Frage ein">
+                    </div>
+                    <div class="option-group">
+                        <input type="text" class="option-input" placeholder="Option 1">
+                        <input type="checkbox" class="correct-checkbox">
+                        <label>Richtig</label>
+                    </div>
+                    <div class="option-group">
+                        <input type="text" class="option-input" placeholder="Option 2">
+                        <input type="checkbox" class="correct-checkbox">
+                        <label>Richtig</label>
+                    </div>
+                    <button type="button" id="add-option-btn" class="btn">Option hinzufügen</button>
+                    <button type="submit" class="btn">Frage hinzufügen</button>
+                </form>
+
+                <div id="questions-list">
+                    <h3>Hinzugefügte Fragen:</h3>
+                    <div id="questions-container">
+                        <p>Noch keine Fragen hinzugefügt</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="qr-container" class="hidden">
+                <h3>Diesen Link oder QR-Code teilen, damit Spieler beitreten können:</h3>
+                <div id="qrcode" style="cursor: pointer;"></div>
+                <p>Beitrittslink: <a id="join-link" href="#" target="_blank"></a></p>
+                <p>Raum-Code: <span id="room-id"></span></p>
+                <p>Verbundene Spieler: <span id="player-count">0</span></p>
+                <div class="players-list" id="players-list"></div>
+                <button id="start-questions-btn" class="btn btn-accent hidden">Quiz starten</button>
+            </div>
+
+            <div id="host-question-display" class="hidden">
+                <h3 id="current-question-text"></h3>
+                 <ul id="host-current-options" class="host-options-list"></ul>
+                <div class="question-counter" id="question-counter"></div>
+                <div class="timer-bar-container">
+                    <div class="timer-bar" id="timer-bar"></div>
+                </div>
+                <p>Spieler haben geantwortet: <span id="answers-count">0</span>/<span id="total-players">0</span></p>
+                 <div id="host-scoreboard" class="scoreboard hidden">
+                    <h4>Aktuelle Rangliste (Top 10)</h4>
+                    <ol id="scoreboard-list"></ol>
+                </div>
+                <button id="show-next-btn" class="btn hidden">Nächste Frage</button>
+                <button id="show-results-btn" class="btn hidden">Endergebnisse anzeigen</button>
+            </div>
+
+            <div id="host-results" class="view card hidden">
+                <h3>Finale Rangliste</h3>
+                <div id="leaderboard"></div>
+                <button id="new-quiz-btn" class="btn">Neues Quiz hosten</button>
+            </div>
+        </div>
+
+        <div id="player-view" class="view card">
+            <div id="join-form">
+                <h2>Einem Quiz beitreten</h2>
+                 <input type="text" id="room-code-input" placeholder="Host-ID eingeben oder QR scannen">
+                <input type="text" id="player-name-input" placeholder="Ihr Name">
+                <button id="join-btn" class="btn">Quiz beitreten</button>
+                <p>Oder scanne den vom Host bereitgestellten QR-Code</p>
+            </div>
+
+            <div id="waiting-room" class="hidden">
+                <h2>Warten auf den Quizstart</h2>
+                <p id="waiting-message">Du bist dem Raum erfolgreich beigetreten!</p>
+                <div class="loader"></div>
+                <p>Der Host wird das Quiz bald starten...</p>
+            </div>
+
+            <div id="player-question" class="hidden">
+                <h3 id="player-question-text"></h3>
+                <div class="question-counter" id="player-question-counter"></div>
+                <div class="timer-bar-container">
+                    <div class="timer-bar" id="player-timer-bar"></div>
+                </div>
+                <div id="options-container"></div>
+                <button id="submit-answer-btn" class="btn hidden">Antwort absenden</button>
+            </div>
+
+            <div id="player-result" class="hidden">
+                <div id="result-display"></div>
+                <div class="score-display">Deine Punktzahl: <span id="player-score">0</span></div>
+                <p id="waiting-for-next">Warten auf nächste Frage...</p>
+            </div>
+
+            <div id="player-final-result" class="view card hidden">
+                <h2>Quiz beendet!</h2>
+                <div id="player-leaderboard-container" style="margin-bottom: 15px;"></div>
+                <div class="score-display">Deine finale Punktzahl: <span id="final-score">0</span></div>
+                <p>Vielen Dank fürs Mitspielen!</p>
+                <button id="play-again-btn" class="btn">Nochmal spielen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="qr-modal-overlay" class="qr-modal-overlay hidden">
+        <div id="qr-modal-content" class="qr-modal-content">
+            <button id="qr-modal-close" class="qr-modal-close">&times;</button>
+            <h3>Zum Beitreten scannen</h3>
+            <div id="large-qrcode"></div>
+            <p>Beitrittslink: <a id="join-link-modal" href="#" target="_blank"></a></p>
+            <p>Raum-Code: <span id="modal-room-id"></span></p>
+        </div>
+    </div>
+
+    <div id="confetti-container"></div>
+
+    <script>
+        // --- Utility functions ---
+        /**
+         * Shows a specific view and hides all other views.
+         * @param {string} viewToShowId - The ID of the view element to show.
+         */
+        function showView(viewToShowId) {
+            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+            const viewElement = document.getElementById(viewToShowId);
+            if (viewElement) viewElement.classList.add('active');
+            else console.error("View not found:", viewToShowId);
+
+            // Hide role selection buttons once a role is chosen
+            if (viewToShowId === 'host-view' || viewToShowId === 'player-view') {
+                document.getElementById('role-selection').classList.add('hidden');
+            }
+        }
+
+        /**
+         * Generates a random alphanumeric ID of a specified length.
+         * @param {number} length - The desired length of the ID.
+         * @returns {string} The generated alphanumeric ID.
+         */
+        function generateAlphanumericId(length) {
+            const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        /**
+         * Shuffles an array in place using the Fisher-Yates (Knuth) algorithm.
+         * @param {Array} array - The array to shuffle.
+         */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+            }
+        }
+
+        // --- App initialization ---
+        // QR Code Modal elements (declared globally for early access)
+        let qrModalOverlay = null;
+        let qrModalCloseBtn = null;
+        let largeQrcodeContainer = null;
+        let modalRoomIdSpan = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize QR modal elements as soon as DOM is ready
+            qrModalOverlay = document.getElementById('qr-modal-overlay');
+            qrModalCloseBtn = document.getElementById('qr-modal-close');
+            largeQrcodeContainer = document.getElementById('large-qrcode');
+            modalRoomIdSpan = document.getElementById('modal-room-id');
+
+            // Event listener for closing the QR code modal when clicking the close button
+            if (qrModalCloseBtn) {
+                qrModalCloseBtn.addEventListener('click', () => {
+                    if (qrModalOverlay) {
+                        qrModalOverlay.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Event listener for closing the QR code modal when clicking the overlay itself
+            if (qrModalOverlay) {
+                qrModalOverlay.addEventListener('click', (event) => {
+                    // Only close if the click target is the overlay itself, not its children
+                    if (event.target === qrModalOverlay) {
+                        qrModalOverlay.classList.add('hidden');
+                    }
+                });
+            }
+
+
+            // Event listener for "Host a Quiz" button
+            document.getElementById('host-btn').addEventListener('click', () => {
+                showView('host-view');
+                initializeHostFeatures();
+            });
+            // Event listener for "Join a Quiz" button
+            document.getElementById('player-btn').addEventListener('click', () => {
+                showView('player-view');
+                initializePlayerFeatures();
+            });
+
+            // Check URL parameters for a host ID to auto-join on page load
+            const urlParams = new URLSearchParams(window.location.search);
+            const hostIdFromUrl = urlParams.get('host');
+
+            if (hostIdFromUrl) {
+                 // If host ID is in URL, navigate directly to player view and pre-fill
+                 showView('player-view');
+                 initializePlayerFeatures(); // Initialize player features first
+                 document.getElementById('room-code-input').value = hostIdFromUrl;
+            } else {
+                 // Otherwise, show the role selection view
+                 showView('role-selection');
+            }
+        });
+
+        // --- Host State & Initialization Flag ---
+        let hostGlobalQuizState = null;
+        let hostPeerInstance = null;
+        let isHostInitialized = false;
+        let hostTimerInterval = null;
+        let hostQuestionStartTime = null; // To track time for scoring
+        let hostPeerId = null; // Stores the actual PeerJS ID (which will now be the 9-digit alphanumeric room code)
+
+
+        /**
+         * Initializes all features and event listeners for the host role.
+         */
+        function initializeHostFeatures() {
+            console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
+            // Initialize quiz state if not already set
+            if (!hostGlobalQuizState) {
+                hostGlobalQuizState = {
+                    currentQuestionIndex: 0,
+                    questions: [], // Stores original questions
+                    shuffledQuestions: [], // Stores shuffled questions for the current quiz session
+                    players: {}, // Player structure includes score and answer time
+                    answersReceived: 0,
+                    isQuestionActive: false,
+                    roomId: null, // This will be the 9-digit alphanumeric code used as Peer ID
+                    questionDuration: 20 // Default question duration in seconds
+                };
+            }
+
+            const quizState = hostGlobalQuizState;
+            const jsonFileInput = document.getElementById('json-file');
+            const fileStatus = document.getElementById('file-status');
+            const questionForm = document.getElementById('question-form');
+            const questionText = document.getElementById('question-text');
+            const addOptionBtn = document.getElementById('add-option-btn');
+            const questionsContainer = document.getElementById('questions-container');
+            const questionDurationInput = document.getElementById('question-duration-input'); // New duration input
+            const startQuizBtn = document.getElementById('start-quiz-btn');
+            const qrContainer = document.getElementById('qr-container');
+            const hostSetup = document.getElementById('host-setup');
+            const qrcodeElement = document.getElementById('qrcode');
+            const roomIdElement = document.getElementById('room-id');
+            const joinLinkElement = document.getElementById('join-link');
+            const joinLinkModalElement = document.getElementById('join-link-modal'); // Added for modal link
+            const playerCountElement = document.getElementById('player-count');
+            const playersList = document.getElementById('players-list');
+            const startQuestionsBtn = document.getElementById('start-questions-btn');
+            const hostQuestionDisplay = document.getElementById('host-question-display');
+            const currentQuestionTextEl = document.getElementById('current-question-text');
+            const hostCurrentOptionsEl = document.getElementById('host-current-options');
+            const questionCounterEl = document.getElementById('question-counter');
+            const timerBar = document.getElementById('timer-bar');
+            const answersCount = document.getElementById('answers-count');
+            const totalPlayers = document.getElementById('total-players');
+            const hostScoreboardEl = document.getElementById('host-scoreboard');
+            const scoreboardListEl = document.getElementById('scoreboard-list');
+            const showNextBtn = document.getElementById('show-next-btn');
+            const showResultsBtn = document.getElementById('show-results-btn');
+            const hostResults = document.getElementById('host-results');
+            const leaderboard = document.getElementById('leaderboard');
+            const newQuizBtn = document.getElementById('new-quiz-btn');
+
+            // Set default duration input value
+            questionDurationInput.value = quizState.questionDuration;
+
+            // Only set up event listeners once
+            if (!isHostInitialized) {
+                console.log("Setting up host event listeners for the first time.");
+
+                // Event listener for JSON file import
+                jsonFileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (data && Array.isArray(data) && data.every(q => q.question && q.options && q.correct)) {
+                                quizState.questions = data;
+                            } else if (data && data.cards && Array.isArray(data.cards)) {
+                                quizState.questions = data.cards;
+                            } else {
+                                fileStatus.textContent = 'Ungültiges JSON. Erwartet wird ein Array von Fragen oder eine "Karten"-Struktur.';
+                                quizState.questions = [];
+                            }
+                            fileStatus.textContent = quizState.questions.length > 0 ? `Importiert ${quizState.questions.length} Fragen.` : (fileStatus.textContent || 'Keine Fragen im JSON gefunden.');
+                            renderQuestionsList();
+                        } catch (error) {
+                            console.error('Error parsing JSON:', error);
+                            fileStatus.textContent = 'Fehler beim Parsen des JSON. Format überprüfen.';
+                            quizState.questions = [];
+                            renderQuestionsList();
+                        }
+                    };
+                    reader.readAsText(file);
+                });
+
+                // Event listener for adding new option input fields
+                addOptionBtn.addEventListener('click', () => {
+                    const optionGroups = questionForm.querySelectorAll('.option-group');
+                    const newIndex = optionGroups.length + 1;
+                    const optionGroup = document.createElement('div');
+                    optionGroup.className = 'option-group';
+                    optionGroup.innerHTML = `<input type="text" class="option-input" placeholder="Option ${newIndex}"><input type="checkbox" class="correct-checkbox"><label>Richtig</label></div>`;
+                    questionForm.insertBefore(optionGroup, addOptionBtn);
+                });
+
+                // Event listener for submitting a new question
+                questionForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const question = questionText.value.trim();
+                    if (!question) {
+                        alert('Bitte gib eine Frage ein');
+                        return;
+                    }
+
+                    const optionInputs = questionForm.querySelectorAll('.option-input');
+                    const options = [];
+                    const correct = [];
+
+                    optionInputs.forEach((inputEl) => {
+                        const optionText = inputEl.value.trim();
+                        if (optionText) {
+                            const currentIndex = options.length;
+                            options.push(optionText);
+                            const checkbox = inputEl.parentElement.querySelector('.correct-checkbox');
+                            if (checkbox && checkbox.checked) {
+                                correct.push(currentIndex);
+                            }
+                        }
+                    });
+
+                    if (options.length < 2) {
+                        alert('Bitte füge mindestens zwei gültige Optionen hinzu');
+                        return;
+                    }
+                    if (correct.length === 0) {
+                        alert('Bitte wähle mindestens eine richtige Antwort aus');
+                        return;
+                    }
+
+                    quizState.questions.push({ question, options, correct });
+                    questionText.value = '';
+                    questionForm.querySelectorAll('.option-group').forEach((group, index) => {
+                        const input = group.querySelector('.option-input');
+                        const checkbox = group.querySelector('.correct-checkbox');
+                        if (index < 2) {
+                            if(input) input.value = '';
+                            if(checkbox) checkbox.checked = false;
+                        } else {
+                            group.remove();
+                        }
+                    });
+                    renderQuestionsList();
+                });
+
+                // Event listener for starting the quiz
+                startQuizBtn.addEventListener('click', () => {
+                    if (quizState.questions.length === 0) {
+                        alert('Bitte füge mindestens eine Frage hinzu.');
+                        return;
+                    }
+                    const duration = parseInt(questionDurationInput.value, 10);
+                    if (isNaN(duration) || duration < 5 || duration > 60) {
+                        alert('Bitte gebe eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.');
+                        return;
+                    }
+                    quizState.questionDuration = duration;
+
+                    // Shuffle questions once when quiz starts
+                    quizState.shuffledQuestions = [...quizState.questions]; // Create a copy
+                    shuffleArray(quizState.shuffledQuestions);
+
+                    initHostPeer();
+                });
+
+                // Event listener for starting questions (after players join)
+                startQuestionsBtn.addEventListener('click', () => {
+                    if (Object.keys(quizState.players).length === 0) {
+                        alert("Es sind noch keine Spieler beigetreten!");
+                        return;
+                    }
+                    qrContainer.classList.add('hidden');
+                    hostQuestionDisplay.classList.remove('hidden');
+                    quizState.currentQuestionIndex = 0;
+                    startQuestion();
+                });
+
+                // Event listener for moving to the next question
+                showNextBtn.addEventListener('click', () => {
+                    quizState.currentQuestionIndex++;
+                    startQuestion();
+                });
+
+                // Event listener for showing final results
+                showResultsBtn.addEventListener('click', showFinalResults);
+
+                // Event listener for starting a new quiz
+                newQuizBtn.addEventListener('click', () => {
+                    if (hostPeerInstance) {
+                        Object.values(quizState.players).forEach(player => {
+                            if (player.connection && player.connection.open) {
+                                try {
+                                    player.connection.send({ type: 'quiz_terminated' });
+                                } catch (e) { /*ignore*/ }
+                                player.connection.close();
+                            }
+                        });
+                        hostPeerInstance.destroy();
+                        hostPeerInstance = null;
+                        hostPeerId = null;
+                    }
+                    hostGlobalQuizState = null;
+                    isHostInitialized = false;
+                    fileStatus.textContent = '';
+                    if(jsonFileInput) jsonFileInput.value = '';
+                    hostResults.classList.add('hidden');
+                    hostQuestionDisplay.classList.add('hidden');
+                    qrContainer.classList.add('hidden');
+                    hostSetup.classList.remove('hidden');
+                    initializeHostFeatures(); // Re-initialize to reset UI fully
+                });
+
+                // Clean up PeerJS connection on window unload
+                window.addEventListener('beforeunload', () => {
+                    if (hostPeerInstance) {
+                         Object.values(quizState.players).forEach(player => {
+                            if (player.connection && player.connection.open) {
+                                try {
+                                    player.connection.send({ type: 'quiz_terminated' });
+                                } catch (e) { /*ignore*/ }
+                                player.connection.close();
+                            }
+                        });
+                        hostPeerInstance.destroy();
+                        hostPeerInstance = null;
+                    }
+                });
+
+                // Event listener for opening the QR code modal
+                qrcodeElement.addEventListener('click', () => {
+                    if (qrModalOverlay && largeQrcodeContainer && hostPeerId && quizState.roomId) {
+                        qrModalOverlay.classList.remove('hidden');
+                        largeQrcodeContainer.innerHTML = ''; // Clear previous QR
+                        new QRCode(largeQrcodeContainer, {
+                            text: joinLinkElement.href, // Use the full join link
+                            width: 300, // Larger size for modal
+                            height: 300,
+                            colorDark : "#000000",
+                            colorLight : "#ffffff",
+                            correctLevel : QRCode.CorrectLevel.H
+                        });
+                        modalRoomIdSpan.textContent = quizState.roomId; // Display the 9-digit room code in modal
+                    }
+                });
+
+                isHostInitialized = true;
+            }
+
+            renderQuestionsList();
+            updatePlayersList();
+
+            // Logic to determine which host section to display on initialization/re-entry
+            if(hostPeerInstance && hostPeerInstance.open) {
+                if (quizState.isQuestionActive || quizState.currentQuestionIndex < quizState.shuffledQuestions.length) {
+                    hostSetup.classList.add('hidden');
+                    qrContainer.classList.add('hidden');
+                    hostResults.classList.add('hidden');
+                    hostQuestionDisplay.classList.remove('hidden');
+                    // Re-render current question details if returning to view
+                    const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+                    currentQuestionTextEl.textContent = currentQuestion.question;
+                    // Options are displayed without correct indicators while question is active
+                    displayHostOptions(currentQuestion.shuffledOptions || currentQuestion.options, []); // Use shuffled if available
+                    questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
+                    answersCount.textContent = quizState.answersReceived.toString();
+                    totalPlayers.textContent = Object.keys(quizState.players).length.toString();
+                    if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) showNextBtn.classList.remove('hidden');
+                    else showResultsBtn.classList.remove('hidden');
+                } else if (hostResults.classList.contains('active')) {
+                    hostSetup.classList.add('hidden');
+                    qrContainer.classList.add('hidden');
+                    hostQuestionDisplay.classList.add('hidden');
+                    hostResults.classList.remove('hidden');
+                    displayLeaderboard();
+                } else { // Peer is open, but quiz not active, show QR container
+                    hostSetup.classList.add('hidden');
+                    qrContainer.classList.remove('hidden');
+                    if(hostPeerId) {
+                        const currentJoinUrl = updateJoinLink(hostPeerId); // Get the current join URL
+                        generateQRCode(currentJoinUrl); // Generate QR with the full URL
+                        roomIdElement.textContent = quizState.roomId || 'N/A';
+                    }
+                }
+            } else { // Default: show setup if no peer instance
+                hostSetup.classList.remove('hidden');
+                qrContainer.classList.add('hidden');
+                hostQuestionDisplay.classList.add('hidden');
+                hostResults.classList.add('hidden');
+            }
+
+
+            /**
+             * Renders the list of added questions in the host setup view.
+             */
+            function renderQuestionsList() {
+                questionsContainer.innerHTML = '';
+                if (quizState.questions.length === 0) {
+                    questionsContainer.innerHTML = '<p>Noch keine Fragen hinzugefügt</p>';
+                    startQuizBtn.classList.add('hidden');
+                    return;
+                }
+
+                quizState.questions.forEach((q, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'question-item';
+                    const correctIndices = q.correct.map(i => i + 1).join(', ');
+                    item.innerHTML = `
+                        <p><strong>F${index + 1}:</strong> ${q.question}</p>
+                        <p><strong>Optionen:</strong> ${q.options.join('; ')}</p>
+                        <p><strong>Richtige Option(en):</strong> ${correctIndices}</p>
+                        <button class="btn remove-question" data-index="${index}">Entfernen</button>
+                    `;
+                    questionsContainer.appendChild(item);
+                });
+
+                document.querySelectorAll('.remove-question').forEach(button => {
+                    button.onclick = (e) => {
+                        const index = parseInt(e.target.getAttribute('data-index'));
+                        quizState.questions.splice(index, 1);
+                        renderQuestionsList();
+                    };
+                });
+
+                startQuizBtn.classList.remove('hidden');
+            }
+
+            /**
+             * Initializes the PeerJS instance for the host, using the 9-digit alphanumeric room code as the Peer ID.
+             */
+            function initHostPeer() {
+                if (typeof Peer === 'undefined') {
+                    alert('Fehler: Die PeerJS-Bibliothek (Peer.js) konnte nicht geladen werden. Dies könnte an einer Browser-Erweiterung (wie einem Ad-Blocker) oder einem Netzwerkproblem liegen. Bitte überprüfe die Browser-Konsole und den Netzwerk-Tab für weitere Details, versuche, Erweiterungen zu deaktivieren, oder stelle sicher, dass unpkg.com zugänglich ist.');
+                    if(qrContainer) qrContainer.classList.add('hidden');
+                    if(hostSetup) hostSetup.classList.remove('hidden');
+                    return;
+                }
+
+                if (hostPeerInstance) hostPeerInstance.destroy();
+
+                // Generate a random 9-character alphanumeric room code to be used as the Peer ID
+                const rawGeneratedId = generateAlphanumericId(9); // Get raw 9-char ID
+                quizState.roomId = rawGeneratedId.substring(0, 3) + ' ' + rawGeneratedId.substring(3, 6) + ' ' + rawGeneratedId.substring(6, 9); // Store formatted for display
+
+                // Create a new PeerJS instance using the raw 9-character ID
+                hostPeerInstance = new Peer(rawGeneratedId, { debug: 2 });
+
+                hostPeerInstance.on('open', (id) => {
+                    console.log('Host PeerJS Open. Peer ID:', id, 'Generated Room Code:', quizState.roomId);
+                    hostPeerId = id; // Store the actual Peer ID (which is the raw 9-char code)
+                    quizState.peerId = id; // Store in quiz state
+
+                    hostSetup.classList.add('hidden');
+                    qrContainer.classList.remove('hidden');
+
+                    roomIdElement.textContent = quizState.roomId; // Display the formatted 9-digit code
+                    const currentJoinUrl = updateJoinLink(hostPeerId); // Get the full join URL
+                    generateQRCode(currentJoinUrl); // Generate QR with the full URL
+
+                    hostPeerInstance.on('connection', handlePlayerConnection);
+                });
+
+                hostPeerInstance.on('error', (err) => {
+                    console.error('Host PeerJS error:', err);
+                    alert(`Verbindungsfehler: ${err.message}. Bitte versuche es erneut.`);
+                    if(qrContainer) qrContainer.classList.add('hidden');
+                    if(hostSetup) hostSetup.classList.remove('hidden');
+                    if (hostPeerInstance) {
+                        hostPeerInstance.destroy();
+                        hostPeerInstance = null;
+                        hostPeerId = null;
+                        quizState.peerId = null;
+                        quizState.roomId = null;
+                    }
+                    quizState.players = {};
+                    updatePlayersList();
+                });
+
+                hostPeerInstance.on('disconnected', () => console.log('Host PeerJS disconnected.'));
+                hostPeerInstance.on('close', () => console.log('Host PeerJS connection closed.'));
+            }
+
+            /**
+             * Handles incoming player connections to the host.
+             * @param {Peer.DataConnection} connection - The PeerJS data connection object.
+             */
+            function handlePlayerConnection(connection) {
+                console.log('New player attempting to connect:', connection.peer);
+                connection.on('open', () => {
+                    console.log('Player connection established:', connection.peer);
+                    connection.send({ type: 'welcome', message: 'Verbunden. Sende deinen Namen.' });
+                });
+
+                connection.on('data', (data) => handlePlayerData(connection, data));
+
+                connection.on('close', () => {
+                    console.log('Player disconnected:', connection.peer);
+                    if (quizState.players[connection.peer]) {
+                        delete quizState.players[connection.peer];
+                        updatePlayersList();
+                        // If all remaining players have answered or no players left, end question
+                        if (quizState.isQuestionActive && quizState.answersReceived >= Object.keys(quizState.players).length) {
+                             endQuestion();
+                        }
+                    }
+                });
+
+                connection.on('error', (err) => {
+                    console.error('Error with player connection', connection.peer + ':', err);
+                    if (quizState.players[connection.peer]) {
+                        delete quizState.players[connection.peer];
+                        updatePlayersList();
+                    }
+                });
+            }
+
+            /**
+             * Handles data received from connected players.
+             * @param {Peer.DataConnection} connection - The PeerJS data connection object.
+             * @param {Object} data - The data received from the player.
+             */
+            function handlePlayerData(connection, data) {
+                const playerId = connection.peer;
+                console.log('Host received data from', playerId, data);
+
+                switch (data.type) {
+                    case 'join':
+                        if (!quizState.players[playerId]) {
+                            quizState.players[playerId] = {
+                                id: playerId,
+                                name: data.name || 'Anon',
+                                score: 0,
+                                connection: connection,
+                                currentAnswer: [],
+                                answerTime: null
+                            };
+                            updatePlayersList();
+                            connection.send({ type: 'joined', message: 'Erfolgreich beigetreten!' });
+                            console.log('Player joined:', quizState.players[playerId]);
+                        } else {
+                            // Update existing player's name and connection if they reconnect
+                            quizState.players[playerId].name = data.name || quizState.players[playerId].name;
+                            quizState.players[playerId].connection = connection;
+                            updatePlayersList();
+                        }
+                        break;
+                    case 'answer':
+                        if (!quizState.isQuestionActive || !quizState.players[playerId]) return;
+
+                        // Only count as a new answer if player hasn't answered this question yet
+                        if (quizState.players[playerId].currentAnswer === null || quizState.players[playerId].currentAnswer.length === 0) {
+                             quizState.answersReceived++;
+                             const answerReceiveTime = Date.now();
+                             const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000; // Time in seconds
+                             quizState.players[playerId].answerTime = timeTaken;
+                        }
+
+                        quizState.players[playerId].currentAnswer = data.answer;
+                        answersCount.textContent = quizState.answersReceived.toString();
+
+                        if (quizState.answersReceived >= Object.keys(quizState.players).length) {
+                            endQuestion();
+                        }
+                        break;
+                }
+            }
+
+            /**
+             * Updates the displayed list of connected players and player count.
+             */
+            function updatePlayersList() {
+                const playerCount = Object.keys(quizState.players).length;
+                playerCountElement.textContent = playerCount.toString();
+                totalPlayers.textContent = playerCount.toString();
+
+                playersList.innerHTML = '';
+
+                Object.values(quizState.players).forEach(p => {
+                    const i = document.createElement('div');
+                    i.className = 'player-item';
+                    i.textContent = p.name;
+                    playersList.appendChild(i);
+                });
+
+                startQuestionsBtn.classList.toggle('hidden', playerCount === 0);
+            }
+
+            /**
+             * Generates and displays a QR code for the given URL.
+             * @param {string} url - The URL to encode in the QR code.
+             */
+            function generateQRCode(url) {
+                qrcodeElement.innerHTML = ''; // Clear previous QR code
+                if (typeof QRCode === 'undefined') {
+                    console.error("QRCode library not loaded.");
+                    qrcodeElement.innerHTML = `<p style="color:red;">QR-Code-Bibliothek nicht geladen. URL: ${url}</p>`;
+                    return;
+                }
+                try {
+                    new QRCode(qrcodeElement, {
+                        text: url, // Encode the full URL
+                        width: 240, // Increased size for initial display
+                        height: 240,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H // High error correction for complex URLs
+                    });
+                } catch (e) {
+                    console.error("QR Code generation error:", e);
+                    qrcodeElement.innerHTML = `<p style="color:red;">Fehler beim Generieren des QR-Codes. URL: ${url}</p>`;
+                }
+            }
+
+             /**
+              * Updates the join link to include the host's Peer ID.
+              * @param {string} peerId - The host's Peer ID (9-digit alphanumeric code).
+              * @returns {string} The full join URL.
+              */
+            function updateJoinLink(peerId) {
+                // Correctly construct the URL by taking the base path and appending the query parameter
+                const baseUrl = window.location.origin + window.location.pathname.split('?')[0];
+                const joinUrl = `${baseUrl}?host=${peerId}`;
+                joinLinkElement.href = joinUrl;
+                // Display the full URL in the link text
+                joinLinkElement.textContent = joinUrl;
+
+                joinLinkModalElement.href = joinUrl;
+                joinLinkModalElement.textContent = joinUrl; // Also update modal link text
+
+                return joinUrl; // Return the URL for QR code generation
+            }
+
+
+            /**
+             * Starts a new question round on the host side.
+             */
+            function startQuestion() {
+                if (quizState.currentQuestionIndex >= quizState.shuffledQuestions.length) {
+                    showFinalResults();
+                    return;
+                }
+
+                const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+                quizState.answersReceived = 0;
+                quizState.isQuestionActive = true;
+                hostQuestionStartTime = Date.now();
+
+                // Prepare shuffled options and correct indices for this question
+                const optionObjects = currentQuestion.options.map((text, index) => ({ text, originalIndex: index }));
+                shuffleArray(optionObjects); // Shuffle the options
+                const shuffledOptions = optionObjects.map(obj => obj.text);
+                const shuffledCorrectIndices = currentQuestion.correct.map(originalIdx =>
+                    optionObjects.findIndex(obj => obj.originalIndex === originalIdx)
+                );
+
+                // Store shuffled options and correct indices in the current question object
+                currentQuestion.shuffledOptions = shuffledOptions;
+                currentQuestion.shuffledCorrect = shuffledCorrectIndices;
+
+
+                Object.values(quizState.players).forEach(p => {
+                    p.currentAnswer = [];
+                    p.answerTime = null;
+                });
+
+                currentQuestionTextEl.textContent = currentQuestion.question;
+                // Display options on host side WITHOUT correct indicators initially
+                displayHostOptions(shuffledOptions, []); // Use shuffled options for display
+                questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
+                answersCount.textContent = '0';
+                totalPlayers.textContent = Object.keys(quizState.players).length.toString();
+
+                showNextBtn.classList.add('hidden');
+                showResultsBtn.classList.add('hidden');
+                hostScoreboardEl.classList.add('hidden'); // Hide scoreboard while question is active
+
+                startTimer(quizState.questionDuration); // Use host-defined duration
+                sendQuestionToPlayers(currentQuestion); // Pass the question object which now contains shuffled data
+            }
+
+            /**
+             * Displays the question options on the host side.
+             * @param {string[]} options - An array of option strings (already shuffled if applicable).
+             * @param {number[]} [correctIndices=[]] - An optional array of indices for correct answers (already re-mapped if applicable).
+             */
+            function displayHostOptions(options, correctIndices = []) {
+                 hostCurrentOptionsEl.innerHTML = '';
+                 const correctSet = new Set(correctIndices);
+                 options.forEach((option, index) => {
+                     const li = document.createElement('li');
+                     li.textContent = option;
+                     if (correctSet.has(index)) {
+                         li.classList.add('correct');
+                     }
+                     hostCurrentOptionsEl.appendChild(li);
+                 });
+            }
+
+
+            /**
+             * Sends question data to all connected players.
+             * @param {Object} question - The question object to send (now contains shuffled options and correct indices).
+             */
+            function sendQuestionToPlayers(question) {
+                const qData = {
+                    type: 'question',
+                    question: question.question,
+                    options: question.shuffledOptions, // Send shuffled options
+                    correct: question.shuffledCorrect, // Send re-mapped correct indices
+                    index: quizState.currentQuestionIndex,
+                    total: quizState.shuffledQuestions.length,
+                    startTime: hostQuestionStartTime, // Send start time for player timer/scoring
+                    duration: quizState.questionDuration // Send duration to players
+                };
+                Object.values(quizState.players).forEach(p => {
+                    if (p.connection && p.connection.open) p.connection.send(qData);
+                });
+            }
+
+            /**
+             * Starts the timer for the current question.
+             * @param {number} durationSeconds - The total duration of the timer in seconds.
+             */
+            function startTimer(durationSeconds) {
+                timerBar.style.width = '100%';
+                if (hostTimerInterval) clearInterval(hostTimerInterval);
+
+                const totalDurationMs = durationSeconds * 1000;
+                const timerStartTime = Date.now();
+
+                hostTimerInterval = setInterval(() => {
+                     const elapsed = Date.now() - timerStartTime;
+                     const remaining = Math.max(0, totalDurationMs - elapsed);
+                     timerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
+
+                    if (remaining <= 0) {
+                        endQuestion();
+                    }
+                }, 100); // Update every 100ms
+            }
+
+            /**
+             * Ends the current question round, calculates scores, and displays results.
+             */
+            function endQuestion() {
+                if (!quizState.isQuestionActive) return;
+
+                if (hostTimerInterval) {
+                    clearInterval(hostTimerInterval);
+                    hostTimerInterval = null;
+                }
+
+                quizState.isQuestionActive = false;
+
+                // Display correct answers on the host side using the stored shuffled data
+                const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+                displayHostOptions(currentQuestion.shuffledOptions, currentQuestion.shuffledCorrect);
+
+
+                calculateScores();
+                sendResultsToPlayers();
+
+                displayCurrentScoreboard(); // Display the scoreboard
+
+                if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) {
+                    showNextBtn.classList.remove('hidden');
+                    showResultsBtn.classList.add('hidden');
+                } else {
+                    showNextBtn.classList.add('hidden');
+                    showResultsBtn.classList.remove('hidden');
+                }
+            }
+
+            /**
+             * Calculates scores for the current question based on correctness and time taken.
+             */
+            function calculateScores() {
+                const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
+                const correctSet = new Set(currentQ.shuffledCorrect); // Use shuffled correct indices
+                const totalQuestionTime = quizState.questionDuration; // Use host-defined duration
+
+                Object.values(quizState.players).forEach(p => {
+                    if (p.currentAnswer && p.currentAnswer.length > 0) {
+                        const playerAnsSet = new Set(p.currentAnswer);
+
+                        let isCompletelyCorrect = correctSet.size === playerAnsSet.size &&
+                                        [...playerAnsSet].every(item => correctSet.has(item));
+
+                        if (isCompletelyCorrect) {
+                            // Score = Base Points + (Time Remaining / Total Time) * Bonus Points
+                            const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime; // Use max time if no answer time recorded
+                            const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
+                            const timeBonus = (timeRemaining / totalQuestionTime) * 50; // Example: up to 50 bonus points
+
+                            p.score += 100 + timeBonus;
+                        }
+                    }
+                });
+            }
+
+            /**
+             * Sends results of the current question to all players.
+             */
+            function sendResultsToPlayers() {
+                const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
+                const isFinalQ = quizState.currentQuestionIndex === quizState.shuffledQuestions.length - 1;
+
+                Object.values(quizState.players).forEach(p => {
+                    const resData = {
+                        type: 'result',
+                        correct: currentQ.shuffledCorrect, // Send shuffled correct indices
+                        playerAnswer: p.currentAnswer, // Send player's answer indices (which are based on shuffled options)
+                        score: Math.round(p.score), // Send rounded score
+                        isFinal: isFinalQ,
+                        options: currentQ.shuffledOptions // Send shuffled options to player for result display
+                    };
+                    if (p.connection && p.connection.open) p.connection.send(resData);
+                });
+            }
+
+             /**
+              * Displays the current scoreboard (top 10) on the host side.
+              */
+            function displayCurrentScoreboard() {
+                const sortedPlayers = getLeaderboardData();
+                scoreboardListEl.innerHTML = '';
+                hostScoreboardEl.classList.remove('hidden');
+
+                const topPlayers = sortedPlayers.slice(0, 10);
+
+                if (topPlayers.length === 0) {
+                    scoreboardListEl.innerHTML = '<li>Noch keine Spieler.</li>';
+                    return;
+                }
+
+                topPlayers.forEach((p, idx) => {
+                    const li = document.createElement('li');
+                    li.className = 'scoreboard-item';
+                    if (idx === 0) li.classList.add('rank-1');
+                    else if (idx === 1) li.classList.add('rank-2');
+                    else if (idx === 2) li.classList.add('rank-3');
+                    li.innerHTML = `<span>${idx + 1}. ${p.name}</span><span>${Math.round(p.score)} Punkte</span>`;
+                    scoreboardListEl.appendChild(li);
+                });
+            }
+
+
+            /**
+             * Shows the final results leaderboard on the host side.
+             */
+            function showFinalResults() {
+                hostQuestionDisplay.classList.add('hidden');
+                hostResults.classList.remove('hidden'); // Ensure host results view is shown
+
+                displayLeaderboard();
+
+                const leaderboardData = getLeaderboardData();
+
+                Object.values(quizState.players).forEach(p => {
+                    if (p.connection && p.connection.open) {
+                        p.connection.send({
+                            type: 'final',
+                            score: Math.round(p.score),
+                            leaderboard: leaderboardData
+                        });
+                    }
+                });
+            }
+
+            /**
+             * Retrieves and sorts player data for the leaderboard.
+             * @returns {Array<Object>} Sorted array of player objects with name and score.
+             */
+            function getLeaderboardData() {
+                return Object.values(quizState.players)
+                    .map(p => ({ name: p.name, score: p.score }))
+                    .sort((a, b) => b.score - a.score);
+            }
+
+            /**
+             * Displays the final leaderboard on the host side.
+             */
+            function displayLeaderboard() {
+                const sortedPlayers = getLeaderboardData();
+                leaderboard.innerHTML = '';
+
+                sortedPlayers.forEach((p, idx) => {
+                    const i = document.createElement('div');
+                    i.className = 'leaderboard-item';
+                    if (idx === 0) i.classList.add('rank-1');
+                    else if (idx === 1) i.classList.add('rank-2');
+                    else if (idx === 2) i.classList.add('rank-3');
+                    i.innerHTML = `<span>${idx + 1}. ${p.name}</span><span>${Math.round(p.score)} Punkte</span>`;
+                    leaderboard.appendChild(i);
+                });
+            }
+        }
+
+        // --- Player State & Initialization Flag ---
+        let playerPeer = null;
+        let hostConnection = null;
+        let isPlayerInitialized = false;
+        let playerTimerInterval = null;
+        let playerCurrentQuestionOptions = [];
+        let selectedAnswers = [];
+        let playerScore = 0;
+        let playerQuestionStartTime = null;
+
+        // Function to trigger confetti animation
+        function triggerConfetti() {
+            const confettiContainer = document.getElementById('confetti-container');
+            if (!confettiContainer) {
+                console.warn("Confetti-Container nicht gefunden.");
+                return;
+            }
+
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4CAF50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+            const numConfetti = 50; // Number of confetti pieces
+
+            for (let i = 0; i < numConfetti; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = `${Math.random() * 100}vw`; // Random horizontal position
+                piece.style.top = `${-20 - Math.random() * 100}px`; // Start above viewport
+                piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.animationDelay = `${Math.random() * 0.5}s`; // Stagger animation
+                piece.style.animationDuration = `${2 + Math.random() * 2}s`; // Random duration
+
+                confettiContainer.appendChild(piece);
+
+                // Remove the piece after its animation ends
+                piece.addEventListener('animationend', () => {
+                    piece.remove();
+                });
+            }
+        }
+
+
+        /**
+         * Initializes all features and event listeners for the player role.
+         */
+        function initializePlayerFeatures() {
+            console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
+
+            const roomCodeInput = document.getElementById('room-code-input');
+            const playerNameInput = document.getElementById('player-name-input');
+            const joinBtn = document.getElementById('join-btn');
+            const joinForm = document.getElementById('join-form');
+            const waitingRoom = document.getElementById('waiting-room');
+            const waitingMessage = document.getElementById('waiting-message');
+            const playerQuestionView = document.getElementById('player-question');
+            const playerQuestionTextEl = document.getElementById('player-question-text');
+            const playerQuestionCounterEl = document.getElementById('player-question-counter');
+            const playerTimerBar = document.getElementById('player-timer-bar');
+            const optionsContainer = document.getElementById('options-container');
+            const submitAnswerBtn = document.getElementById('submit-answer-btn');
+            const playerResultView = document.getElementById('player-result');
+            const resultDisplay = document.getElementById('result-display');
+            const playerScoreEl = document.getElementById('player-score');
+            const waitingForNext = document.getElementById('waiting-for-next');
+            const playerFinalResultView = document.getElementById('player-final-result');
+            const finalScoreEl = document.getElementById('final-score');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            const playerLeaderboardContainer = document.getElementById('player-leaderboard-container');
+
+            if (!isPlayerInitialized) {
+                console.log("Setting up player event listeners for the first time.");
+
+                joinBtn.addEventListener('click', () => {
+                    const roomCode = roomCodeInput.value.trim();
+                    const playerName = playerNameInput.value.trim() || 'Spieler ' + Math.random().toString(36).substring(2, 6);
+
+                    if (!roomCode) {
+                        alert('Bitte gebe einen Raum-Code ein.');
+                        return;
+                    }
+                    initPlayerPeer(roomCode, playerName);
+                });
+
+                submitAnswerBtn.addEventListener('click', () => {
+                    if (selectedAnswers.length === 0) {
+                        alert('Bitte wähle mindestens eine Antwort aus.');
+                        return;
+                    }
+
+                    if (hostConnection && hostConnection.open) {
+                        hostConnection.send({ type: 'answer', answer: selectedAnswers });
+                        submitAnswerBtn.disabled = true;
+                        optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
+                        console.log("Player submitted answer:", selectedAnswers);
+                    }
+
+                    if (playerTimerInterval) {
+                        clearInterval(playerTimerInterval);
+                        playerTimerInterval = null;
+                    }
+                });
+
+                playAgainBtn.addEventListener('click', () => {
+                    resetPlayerStateAndUI();
+                    isPlayerInitialized = false;
+                    showView('role-selection');
+                });
+
+                window.addEventListener('beforeunload', () => {
+                    if (hostConnection) {
+                        hostConnection.close();
+                        hostConnection = null;
+                    }
+                    if (playerPeer) {
+                        playerPeer.destroy();
+                        playerPeer = null;
+                    }
+                });
+
+                isPlayerInitialized = true;
+            }
+
+            roomCodeInput.value = '';
+            playerNameInput.value = '';
+            joinForm.classList.remove('hidden');
+            waitingRoom.classList.add('hidden');
+            playerQuestionView.classList.add('hidden');
+            playerResultView.classList.add('hidden');
+            playerFinalResultView.classList.add('hidden');
+
+
+            /**
+             * Initializes the PeerJS instance for the player and connects to the host.
+             * @param {string} hostPeerId - The Peer ID of the host (the 9-digit alphanumeric room code).
+             * @param {string} pName - The player's name.
+             */
+            function initPlayerPeer(hostPeerId, pName) {
+                if (typeof Peer === 'undefined') {
+                    alert('Fehler: Die PeerJS-Bibliothek (Peer.js) konnte nicht geladen werden. Dies könnte an einer Browser-Erweiterung (wie einem Ad-Blocker) oder einem Netzwerkproblem liegen. Bitte überprüfe deine Browser-Konsole und den Netzwerk-Tab für weitere Details, versuche, Erweiterungen zu deaktivieren, oder stelle sicher, dass unpkg.com zugänglich ist.');
+                    if(joinForm) joinForm.classList.remove('hidden');
+                    if(waitingRoom) waitingRoom.classList.add('hidden');
+                    return;
+                }
+
+                if (playerPeer) playerPeer.destroy();
+
+                playerPeer = new Peer(undefined, { debug: 2 }); // Player gets a random ID
+
+                playerPeer.on('open', (id) => {
+                    console.log('Player PeerJS ID:', id, 'Connecting to host:', hostPeerId);
+                    if (hostConnection) hostConnection.close();
+                    // Remove spaces from hostPeerId before connecting
+                    hostConnection = playerPeer.connect(hostPeerId.replace(/\s/g, ''), { reliable: true }); // Connect using the host's 9-digit ID
+
+                    joinForm.classList.add('hidden');
+                    waitingRoom.classList.remove('hidden');
+                    waitingMessage.textContent = `Verbinde mit Raum ${hostPeerId}...`;
+
+                    setupConnectionEventHandlers(pName);
+                });
+
+                playerPeer.on('error', (err) => {
+                    console.error('Player PeerJS error:', err);
+                    alert(`Verbindungsfehler: ${err.message}. Bitte überprüfe die Host-ID und versuche es erneut.`);
+                    if(joinForm) joinForm.classList.remove('hidden');
+                    if(waitingRoom) waitingRoom.classList.add('hidden');
+                    if (playerPeer) {
+                        playerPeer.destroy();
+                        playerPeer = null;
+                    }
+                    if (hostConnection) {
+                        hostConnection.close();
+                        hostConnection = null;
+                    }
+                });
+
+                playerPeer.on('disconnected', () => {
+                    console.log('Player PeerJS disconnected.');
+                    waitingMessage.textContent = 'Verbindung getrennt. Versuche erneut zu verbinden...';
+                });
+
+                playerPeer.on('close', () => {
+                    console.log('Player PeerJS closed.');
+                    if(!playerFinalResultView.classList.contains('active')) {
+                        alert("Verbindung verloren.");
+                        resetPlayerStateAndUI();
+                    }
+                });
+            }
+
+            /**
+             * Sets up event handlers for the data connection to the host.
+             * @param {string} pName - The player's name.
+             */
+            function setupConnectionEventHandlers(pName) {
+                if (!hostConnection) return;
+
+                hostConnection.on('open', () => {
+                    console.log('Connected to host:', hostConnection.peer);
+                    hostConnection.send({ type: 'join', name: pName });
+                    waitingMessage.textContent = 'Verbunden! Warte auf Host...';
+                });
+
+                hostConnection.on('data', handleHostData);
+
+                hostConnection.on('close', () => {
+                    console.log('Connection to host closed.');
+                    if (!playerFinalResultView.classList.contains('active')) {
+                        alert('Verbindung zum Host verloren.');
+                        resetPlayerStateAndUI();
+                    }
+                });
+
+                hostConnection.on('error', (err) => {
+                    console.error('Error in host connection:', err);
+                    alert(`Fehler mit Host: ${err.message}.`);
+                    resetPlayerStateAndUI();
+                });
+            }
+
+            /**
+             * Handles data received from the host.
+             * @param {Object} data - The data received from the host.
+             */
+            function handleHostData(data) {
+                console.log('Player received data from host:', data);
+
+                switch (data.type) {
+                    case 'welcome':
+                        waitingMessage.textContent = data.message;
+                        break;
+                    case 'joined':
+                        waitingMessage.textContent = data.message + " Warte auf Quiz...";
+                        break;
+                    case 'question':
+                        playerCurrentQuestionOptions = data.options; // These are already shuffled
+                        selectedAnswers = [];
+                        playerQuestionStartTime = Date.now();
+                        displayQuestion(data);
+                        startPlayerTimer(data.duration); // Use duration received from host
+                        break;
+                    case 'result':
+                        displayResult(data);
+                        playerScore = data.score;
+                        playerScoreEl.textContent = playerScore;
+                        waitingForNext.textContent = data.isFinal ? 'Warten auf finales Ergebnis...' : 'Warten auf nächste Frage...';
+                        break;
+                    case 'final':
+                        displayFinalResult(data);
+                        break;
+                    case 'quiz_terminated':
+                        alert("Der Host hat das Quiz beendet.");
+                        resetPlayerStateAndUI();
+                        showView('role-selection');
+                        break;
+                }
+            }
+
+            /**
+             * Starts the player's timer for the current question.
+             * @param {number} durationSeconds - The total duration of the timer in seconds.
+             */
+            function startPlayerTimer(durationSeconds) {
+                playerTimerBar.style.width = '100%';
+                if (playerTimerInterval) clearInterval(playerTimerInterval);
+
+                const totalDurationMs = durationSeconds * 1000;
+                const timerStartTime = Date.now();
+
+                playerTimerInterval = setInterval(() => {
+                    const elapsed = Date.now() - timerStartTime;
+                    const remaining = Math.max(0, totalDurationMs - elapsed);
+                    playerTimerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
+
+                    if (remaining <= 0) {
+                        clearInterval(playerTimerInterval);
+                        playerTimerInterval = null;
+                        submitAnswerBtn.classList.add('hidden');
+                        optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
+                        console.log("Player timer up.");
+                         // Automatically send an empty answer if time runs out and no answer was selected
+                         if (selectedAnswers.length === 0 && hostConnection && hostConnection.open) {
+                             hostConnection.send({ type: 'answer', answer: [] });
+                             console.log("Player sent empty answer due to timeout.");
+                         }
+                    }
+                }, 100); // Update every 100ms
+            }
+
+            /**
+             * Displays the question and options for the player.
+             * @param {Object} qData - The question data received from the host.
+             */
+            function displayQuestion(qData) {
+                waitingRoom.classList.add('hidden');
+                playerResultView.classList.add('hidden');
+                playerQuestionView.classList.remove('hidden');
+
+                playerQuestionTextEl.textContent = qData.question;
+                playerQuestionCounterEl.textContent = `Frage ${qData.index + 1} von ${qData.total}`;
+
+                optionsContainer.innerHTML = '';
+                selectedAnswers = [];
+
+                // qData.options are already shuffled from the host
+                qData.options.forEach((option, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.textContent = option;
+                    btn.dataset.index = index;
+
+                    btn.addEventListener('click', () => {
+                        const optIdx = parseInt(btn.dataset.index);
+                        const pos = selectedAnswers.indexOf(optIdx);
+
+                        if (pos > -1) {
+                            selectedAnswers.splice(pos, 1);
+                            btn.classList.remove('selected');
+                        } else {
+                            selectedAnswers.push(optIdx);
+                            btn.classList.add('selected');
+                        }
+
+                        submitAnswerBtn.classList.toggle('hidden', selectedAnswers.length === 0);
+                    });
+
+                    optionsContainer.appendChild(btn);
+                });
+
+                submitAnswerBtn.classList.add('hidden');
+                submitAnswerBtn.disabled = false;
+                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('correct-answer', 'incorrect-answer', 'selected'); // Clean up previous result styles
+                });
+            }
+
+            /**
+             * Displays the result of the just-answered question for the player.
+             * @param {Object} rData - The result data received from the host.
+             */
+            function displayResult(rData) {
+                playerQuestionView.classList.add('hidden');
+                playerResultView.classList.remove('hidden');
+
+                let resultHtml = 'Deine Antwort war ';
+                // rData.playerAnswer and rData.correct are based on the shuffled indices
+                const playerAnsSet = new Set(rData.playerAnswer || []);
+                const correctSet = new Set(rData.correct);
+                const options = rData.options; // These are the shuffled options from the host
+
+                let isCompletelyCorrect = correctSet.size === playerAnsSet.size &&
+                                           [...playerAnsSet].every(item => correctSet.has(item));
+
+                if (!rData.playerAnswer || rData.playerAnswer.length === 0) {
+                    resultHtml = "Du hast nicht geantwortet. ";
+                } else if (isCompletelyCorrect) {
+                    resultHtml += '<strong class="correct">RICHTIG!</strong> ';
+                    triggerConfetti(); // Trigger confetti for correct answers
+                } else {
+                    resultHtml += '<strong class="incorrect">FALSCH.</strong> ';
+                }
+
+                resultHtml += '<br>Richtige Antwort(en): ';
+
+                options.forEach((option, index) => {
+                    if (correctSet.has(index)) {
+                         if (playerAnsSet.has(index)) {
+                             resultHtml += `<span class="correct player-selected">"${option}"</span> `;
+                         } else {
+                             resultHtml += `<span class="correct-not-selected">"${option}"</span> `;
+                         }
+                    } else if (playerAnsSet.has(index)) {
+                         resultHtml += `<span class="incorrect player-selected">"${option}"</span> `;
+                    }
+                });
+
+
+                resultDisplay.innerHTML = resultHtml;
+                playerScoreEl.textContent = rData.score;
+
+                // Update player option buttons to show correct/incorrect after result
+                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
+                    const index = parseInt(btn.dataset.index);
+                    btn.disabled = true; // Ensure buttons are disabled
+                    btn.classList.remove('selected'); // Remove selected class from active state
+
+                    if (correctSet.has(index)) {
+                        btn.classList.add('correct-answer');
+                    }
+                    if (playerAnsSet.has(index) && !correctSet.has(index)) {
+                         btn.classList.add('incorrect-answer');
+                    } else if (playerAnsSet.has(index) && correctSet.has(index)) {
+                         btn.classList.add('selected'); // Re-apply selected style if it was correct and selected
+                    }
+                });
+            }
+
+            /**
+             * Displays the final results and leaderboard for the player.
+             * @param {Object} frData - The final results data received from the host.
+             */
+            function displayFinalResult(frData) {
+                console.log("Displaying final results for player:", frData); // Debug log
+                playerQuestionView.classList.add('hidden');
+                playerResultView.classList.add('hidden');
+                waitingRoom.classList.add('hidden');
+                playerFinalResultView.classList.remove('hidden'); // Ensure this view is shown
+
+                finalScoreEl.textContent = frData.score;
+
+                playerLeaderboardContainer.innerHTML = '';
+
+                if (frData.leaderboard) {
+                    const lbDiv = document.createElement('div');
+                    lbDiv.innerHTML = '<h4>Finale Rangliste:</h4>';
+                    const ol = document.createElement('ol');
+                    frData.leaderboard.forEach((p, idx) => { // Added idx for rank highlighting
+                        const li = document.createElement('li');
+                        if (idx === 0) li.classList.add('rank-1');
+                        else if (idx === 1) li.classList.add('rank-2');
+                        else if (idx === 2) li.classList.add('rank-3');
+                        li.textContent = `${p.name}: ${Math.round(p.score)} Punkte`;
+                        ol.appendChild(li);
+                    });
+                    lbDiv.appendChild(ol);
+                    playerLeaderboardContainer.appendChild(lbDiv);
+                } else {
+                    playerLeaderboardContainer.innerHTML = '<p>Keine Ranglistendaten verfügbar.</p>'; // Fallback
+                }
+            }
+
+            /**
+             * Resets the player's state and UI to the initial join form.
+             */
+            function resetPlayerStateAndUI() {
+                if (hostConnection) {
+                    hostConnection.close();
+                    hostConnection = null;
+                }
+                if (playerPeer) {
+                    playerPeer.destroy();
+                    playerPeer = null;
+                }
+
+                if (playerTimerInterval) {
+                    clearInterval(playerTimerInterval);
+                    playerTimerInterval = null;
+                }
+
+                playerScore = 0;
+                selectedAnswers = [];
+                playerCurrentQuestionOptions = [];
+                playerQuestionStartTime = null;
+
+                roomCodeInput.value = '';
+                playerNameInput.value = '';
+                joinForm.classList.remove('hidden');
+                waitingRoom.classList.add('hidden');
+                playerQuestionView.classList.add('hidden');
+                playerResultView.classList.add('hidden');
+                playerFinalResultView.classList.add('hidden');
+                optionsContainer.innerHTML = '';
+                resultDisplay.innerHTML = '';
+                playerLeaderboardContainer.innerHTML = '';
+                playerScoreEl.textContent = '0';
+                finalScoreEl.textContent = '0';
+            }
+        }
+    </script>
+</body>
+</html>
