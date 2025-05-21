@@ -1,0 +1,724 @@
+:root {
+  --primary-color: #46178f;
+  --secondary-color: #5e22b2;
+  --accent-color: #ff3355;
+  --light-color: #f7f7f7;
+  --dark-color: #333;
+  --correct-color: #00c853;
+  --wrong-color: #ff3d00;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Montserrat', Arial, sans-serif;
+}
+
+body {
+  background-color: var(--light-color);
+  color: var(--dark-color);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+.view {
+  display: none;
+}
+
+.active {
+  display: block;
+}
+
+.btn {
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+  margin: 10px 0;
+}
+
+.btn:hover {
+  background-color: var(--primary-color);
+}
+
+.btn-accent {
+  background-color: var(--accent-color);
+}
+
+.btn-accent:hover {
+  background-color: #e62b4c;
+}
+
+.card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+/* Host specific styles */
+#question-form {
+  margin-top: 20px;
+}
+
+.option-group {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.option-group input[type="text"] {
+  flex: 1;
+}
+
+.option-group input[type="checkbox"] {
+  width: auto;
+  margin-left: 10px;
+}
+
+#questions-list {
+  margin-top: 20px;
+}
+
+.question-item {
+  background-color: #f1f1f1;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+/* Player specific styles */
+.option-button {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  margin: 10px 0;
+  text-align: left;
+  border: none;
+  border-radius: 4px;
+  background-color: #f1f1f1;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+
+.option-button:hover {
+  background-color: #e0e0e0;
+}
+
+.option-button.selected {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.option-button.correct {
+  background-color: var(--correct-color);
+  color: white;
+}
+
+.option-button.incorrect {
+  background-color: var(--wrong-color);
+  color: white;
+}
+
+/* QR Code styles */
+#qrcode {
+  margin: 20px auto;
+  text-align: center;
+}
+
+/* Statistics and leaderboard */
+#leaderboard {
+  margin-top: 20px;
+}
+
+.leaderboard-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.leaderboard-item:last-child {
+  border-bottom: none;
+}
+
+/* Loading indicator */
+.loader {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid var(--secondary-color);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Timer bar */
+.timer-bar {
+  height: 10px;
+  background-color: var(--accent-color);
+  width: 100%;
+  border-radius: 5px;
+  margin-top: 10px;
+  transition: width 1s linear;
+}
+
+.players-list {
+  margin: 20px 0;
+}
+
+.player-item {
+  background-color: #f1f1f1;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.hidden {
+  display: none;
+}
+
+.flex-row {
+  display: flex;
+  gap: 10px;
+}
+
+.correct-answers {
+  margin-top: 10px;
+  color: var(--correct-color);
+  font-weight: bold;
+}
+
+#result-display {
+  text-align: center;
+  font-size: 1.5rem;
+  margin: 20px 0;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+#result-display.correct {
+  background-color: rgba(0, 200, 83, 0.2);
+  color: var(--correct-color);
+}
+
+#result-display.incorrect {
+  background-color: rgba(255, 61, 0, 0.2);
+  color: var(--wrong-color);
+}
+
+.score-display {
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+  margin: 15px 0;
+}
+
+.question-counter {
+  text-align: center;
+  margin-bottom: 15px;
+  color: var(--secondary-color);
+}
+
+.file-input-container {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.file-input-container input[type=file] {
+  position: absolute;
+  font-size: 100px;
+  right: 0;
+  top: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-input-label {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: var(--secondary-color);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+
+
+
+
+/* Basic styling for the option buttons (player side) */
+.option-btn {
+    display: block; /* Make buttons block level for better layout */
+    width: 100%; /* Full width */
+    padding: 10px;
+    margin-bottom: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f0f0f0;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.option-btn:hover:not(:disabled) {
+    background-color: #e9e9e9;
+}
+
+/* Styling for the selected option button (player side) */
+.option-btn.selected {
+    background-color: #4CAF50; /* Green background for selected */
+    color: white;
+    border-color: #4CAF50;
+}
+
+  /* Styling for correct answer after result (player side) */
+  .option-btn.correct-answer {
+      background-color: #d4edda; /* Light green */
+    border-color: #c3e6cb;
+    font-weight: bold;
+  }
+
+  /* Styling for incorrect answer selected by player after result (player side) */
+  .option-btn.incorrect-answer.selected {
+      background-color: #f8d7da; /* Light red */
+      border-color: #f5c6cb;
+      font-weight: bold;
+  }
+
+
+/* Styling for host to display options */
+.host-options-list {
+    margin-top: 10px;
+    padding: 0;
+    list-style: none;
+}
+
+.host-options-list li {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+
+/* Style for correct answers on host side (shown after question ends) */
+.host-options-list li.correct {
+    background-color: #d4edda; /* Light green */
+    border-color: #c3e6cb;
+    font-weight: bold;
+}
+
+/* Style for player results - correct answer */
+.result-display .correct {
+    color: #28a745; /* Green */
+    font-weight: bold;
+}
+
+/* Style for player results - incorrect answer */
+.result-display .incorrect {
+    color: #dc3545; /* Red */
+    font-weight: bold;
+}
+
+/* Style for player results - player selected answer */
+.result-display .player-selected {
+      text-decoration: underline;
+      font-weight: bold;
+}
+
+/* Style for player results - correct answer not selected by player */
+  .result-display .correct-not-selected {
+      font-weight: bold;
+      font-style: italic;
+      color: #28a745; /* Green */
+  }
+
+  /* Styling for the scoreboard */
+  .scoreboard {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+  }
+
+  .scoreboard h4 {
+      margin-bottom: 10px;
+  }
+
+  .scoreboard ol {
+      padding-left: 20px;
+  }
+
+  .scoreboard li {
+      margin-bottom: 5px;
+      font-size: 1.1em;
+  }
+
+  .scoreboard-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px dashed #eee;
+  }
+  .scoreboard-item:last-child {
+      border-bottom: none;
+  }
+
+
+
+
+
+  
+/* General body and font size for better readability and mobile friendliness */
+body {
+    font-family: sans-serif;
+    font-size: 18px; /* Increased base font size */
+}
+
+/* Headings font size adjustments */
+h1 { font-size: 2.5em; }
+h2 { font-size: 2em; }
+h3 { font-size: 1.7em; }
+
+/* Basic styling for the option buttons (player side) */
+.option-btn {
+    display: block; /* Make buttons block level for better layout */
+    width: 100%; /* Full width */
+    padding: 15px; /* Increased padding */
+    margin-bottom: 8px; /* Increased margin */
+    border: 1px solid #ddd;
+    border-radius: 8px; /* More rounded corners */
+    background-color: #f0f0f0;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 1.1em; /* Slightly larger font for options */
+}
+
+.option-btn:hover:not(:disabled) {
+    background-color: #e9e9e9;
+}
+
+/* Styling for the selected option button (player side) */
+.option-btn.selected {
+    background-color: #4CAF50; /* Green background for selected */
+    color: white;
+    border-color: #4CAF50;
+}
+
+  /* Styling for correct answer after result (player side) */
+  .option-btn.correct-answer {
+      background-color: #d4edda; /* Light green */
+    border-color: #c3e6cb;
+    font-weight: bold;
+  }
+
+  /* Styling for incorrect answer selected by player after result (player side) */
+  .option-btn.incorrect-answer.selected {
+      background-color: #f8d7da; /* Light red */
+      border-color: #f5c6cb;
+      font-weight: bold;
+  }
+
+
+/* Styling for host to display options */
+.host-options-list {
+    margin-top: 15px; /* Increased margin */
+    padding: 0;
+    list-style: none;
+}
+
+.host-options-list li {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    padding: 10px; /* Increased padding */
+    margin-bottom: 8px; /* Increased margin */
+    border-radius: 8px; /* More rounded corners */
+    font-size: 1.1em; /* Consistent font size */
+}
+
+/* Style for correct answers on host side (shown after question ends) */
+.host-options-list li.correct {
+    background-color: #d4edda; /* Light green */
+    border-color: #c3e6cb;
+    font-weight: bold;
+}
+
+/* Style for player results - correct answer */
+.result-display .correct {
+    color: #28a745; /* Green */
+    font-weight: bold;
+}
+
+/* Style for player results - incorrect answer */
+.result-display .incorrect {
+    color: #dc3545; /* Red */
+    font-weight: bold;
+}
+
+/* Style for player results - player selected answer */
+.result-display .player-selected {
+      text-decoration: underline;
+      font-weight: bold;
+}
+
+/* Style for player results - correct answer not selected by player */
+  .result-display .correct-not-selected {
+      font-weight: bold;
+      font-style: italic;
+      color: #28a745; /* Green */
+  }
+
+  /* Styling for the scoreboard */
+  .scoreboard {
+      margin-top: 25px; /* Increased margin */
+      padding-top: 20px; /* Increased padding */
+      border-top: 1px solid #eee;
+  }
+
+  .scoreboard h4 {
+      margin-bottom: 15px; /* Increased margin */
+      font-size: 1.4em; /* Larger font for scoreboard title */
+  }
+
+  .scoreboard ol {
+      padding-left: 25px; /* Increased padding */
+  }
+
+  .scoreboard li {
+      margin-bottom: 8px; /* Increased margin */
+      font-size: 1.2em; /* Larger font for list items */
+  }
+
+  .scoreboard-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0; /* Increased padding */
+    border-bottom: 1px dashed #eee;
+  }
+  .scoreboard-item:last-child {
+      border-bottom: none;
+  }
+
+/* QR Code Modal Styles */
+.qr-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.qr-modal-content {
+    background: white;
+    padding: 30px; /* Increased padding */
+    border-radius: 12px; /* More rounded corners */
+    position: relative;
+    text-align: center;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3); /* Stronger shadow */
+    max-width: 90%; /* Responsive width */
+}
+
+.qr-modal-close {
+    position: absolute;
+    top: 15px; /* Adjusted position */
+    right: 15px; /* Adjusted position */
+    background: none;
+    border: none;
+    font-size: 2.2em; /* Larger for better tap target */
+    cursor: pointer;
+    color: #333;
+    line-height: 1;
+}
+
+.qr-modal-close:hover {
+    color: #000;
+}
+
+#large-qrcode {
+    margin: 30px auto; /* Increased margin */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* QR Code size within modal */
+#large-qrcode img {
+    width: 300px; /* Significantly increased size */
+    height: 300px;
+    max-width: 100%; /* Ensure it's responsive */
+    height: auto;
+}
+
+/* Leaderboard highlighting */
+.leaderboard-item.rank-1, .scoreboard-item.rank-1 {
+    background-color: #ffeb3b; /* Gold */
+    font-weight: bold;
+    border-color: #fbc02d;
+}
+.leaderboard-item.rank-2, .scoreboard-item.rank-2 {
+    background-color: #e0e0e0; /* Silver */
+    font-weight: bold;
+    border-color: #bdbdbd;
+}
+.leaderboard-item.rank-3, .scoreboard-item.rank-3 {
+    background-color: #ffccbc; /* Bronze */
+    font-weight: bold;
+    border-color: #e64a19;
+}
+
+/* Ensure hidden class always applies display: none */
+.hidden {
+    display: none !important;
+}
+
+/* Confetti styles */
+#confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Allows clicks to pass through */
+    overflow: hidden;
+    z-index: 999;
+}
+
+.confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: var(--confetti-color); /* Will be set via JS */
+    opacity: 0;
+    animation: confetti-fall 3s ease-out forwards;
+}
+
+@keyframes confetti-fall {
+    0% {
+        transform: translateY(-100px) rotateZ(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotateZ(720deg);
+        opacity: 0;
+    }
+}
+
+/* Mobile responsiveness adjustments */
+.container {
+    padding: 15px; /* Add some padding on smaller screens */
+}
+
+.card {
+    padding: 20px; /* Adjust card padding for mobile */
+}
+
+input[type="text"], input[type="number"] {
+    padding: 12px; /* Larger input fields */
+    font-size: 1em;
+}
+
+.btn {
+    padding: 12px 20px; /* Larger buttons */
+    font-size: 1.1em;
+}
+
+.option-group {
+    display: flex;
+    flex-wrap: wrap; /* Allow options to wrap on smaller screens */
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.option-group input[type="text"] {
+    flex-grow: 1;
+    margin-right: 10px;
+    min-width: 150px; /* Ensure input is not too small */
+}
+
+.option-group label {
+    margin-left: 5px;
+}
+
+/* Adjustments for smaller screens */
+@media (max-width: 600px) {
+    body {
+        font-size: 16px; /* Slightly smaller base font on very small screens */
+    }
+    h1 { font-size: 2em; }
+    h2 { font-size: 1.6em; }
+    h3 { font-size: 1.3em; }
+
+    .option-btn {
+        padding: 12px;
+        font-size: 1em;
+    }
+
+    .host-options-list li {
+        padding: 8px;
+        font-size: 1em;
+    }
+
+    .scoreboard h4 {
+        font-size: 1.2em;
+    }
+
+    .scoreboard li {
+        font-size: 1em;
+    }
+
+    .qr-modal-content {
+        padding: 20px;
+    }
+
+    #large-qrcode img {
+        width: 250px; /* Adjust large QR size for very small screens */
+        height: 250px;
+    }
+}
