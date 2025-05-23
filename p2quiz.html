@@ -614,7 +614,7 @@
                     players: {}, // Player structure includes score and answer time
                     answersReceived: 0,
                     isQuestionActive: false,
-                    roomId: null, // This will be the 9-digit alphanumeric code
+                    roomId: null, // This will be the 4-digit alphanumeric code
                     questionDuration: 20 // Default question duration in seconds
                 };
             }
@@ -845,7 +845,7 @@
                             colorLight : "#ffffff",
                             correctLevel : QRCode.CorrectLevel.H
                         });
-                        modalRoomIdSpan.textContent = quizState.roomId; // Display the 9-digit room code in modal
+                        modalRoomIdSpan.textContent = quizState.roomId; // Display the 4-digit room code in modal
                     }
                 });
 
@@ -932,10 +932,10 @@
              * Initializes Supabase for the host, creates a room, and sets up subscriptions.
              */
             async function initHostSupabase() {
-                // Generate a random 9-character alphanumeric room code
-                const rawGeneratedId = generateAlphanumericId(9);
+                // Generate a random 4-character alphanumeric room code
+                const rawGeneratedId = generateAlphanumericId(4);
                 hostRoomId = rawGeneratedId; // Store the raw ID for Supabase
-                quizState.roomId = rawGeneratedId.substring(0, 3) + ' ' + rawGeneratedId.substring(3, 6) + ' ' + rawGeneratedId.substring(6, 9); // Store formatted for display
+                quizState.roomId = rawGeneratedId.substring(0, 2) + ' ' + rawGeneratedId.substring(2, 4); // Store formatted for display
 
                 hostPlayerId = `host-${generateAlphanumericId(12)}`; // Unique ID for the host player
 
@@ -1089,7 +1089,7 @@
                             currentAnswer: playerData.last_answer_data || [],
                             answerTime: playerData.last_answer_time ? (new Date(playerData.last_answer_time).getTime() - hostQuestionStartTime) / 1000 : null
                         };
-                        updatePlayersList(); // Update UI to show new player
+                        updatePlayersList();
                     }
                     // If quiz is not active, just update player's score and connection status
                     if (playerId !== hostPlayerId) { // Only update non-host players
@@ -1202,7 +1202,7 @@
 
              /**
               * Updates the join link to include the host's Peer ID.
-              * @param {string} roomId - The Supabase room ID (9-digit alphanumeric code).
+              * @param {string} roomId - The Supabase room ID (4-digit alphanumeric code).
               * @returns {string} The full join URL.
               */
             function updateJoinLink(roomId) {
