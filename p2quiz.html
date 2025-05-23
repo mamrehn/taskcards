@@ -3,20 +3,337 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>p2quiz</title>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <title>P2P Quiz Spiel</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <link rel="stylesheet" href="p2quiz.css">
+    <link rel="stylesheet" href="moquiz.css">
+    <style>
+        /* General body and font size for better readability and mobile friendliness */
+        body {
+            font-family: sans-serif;
+            font-size: 18px; /* Increased base font size */
+        }
+
+        /* Headings font size adjustments */
+        h1 { font-size: 2.5em; }
+        h2 { font-size: 2em; }
+        h3 { font-size: 1.7em; }
+
+        /* Basic styling for the option buttons (player side) */
+        .option-btn {
+            display: block; /* Make buttons block level for better layout */
+            width: 100%; /* Full width */
+            padding: 15px; /* Increased padding */
+            margin-bottom: 8px; /* Increased margin */
+            border: 1px solid #ddd;
+            border-radius: 8px; /* More rounded corners */
+            background-color: #f0f0f0;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-size: 1.1em; /* Slightly larger font for options */
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background-color: #e9e9e9;
+        }
+
+        /* Styling for the selected option button (player side) */
+        .option-btn.selected {
+            background-color: #4CAF50; /* Green background for selected */
+            color: white;
+            border-color: #4CAF50;
+        }
+
+         /* Styling for correct answer after result (player side) */
+         .option-btn.correct-answer {
+             background-color: #d4edda; /* Light green */
+            border-color: #c3e6cb;
+            font-weight: bold;
+         }
+
+         /* Styling for incorrect answer selected by player after result (player side) */
+         .option-btn.incorrect-answer.selected {
+             background-color: #f8d7da; /* Light red */
+             border-color: #f5c6cb;
+             font-weight: bold;
+         }
+
+
+        /* Styling for host to display options */
+        .host-options-list {
+            margin-top: 15px; /* Increased margin */
+            padding: 0;
+            list-style: none;
+        }
+
+        .host-options-list li {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 10px; /* Increased padding */
+            margin-bottom: 8px; /* Increased margin */
+            border-radius: 8px; /* More rounded corners */
+            font-size: 1.1em; /* Consistent font size */
+        }
+
+        /* Style for correct answers on host side (shown after question ends) */
+        .host-options-list li.correct {
+            background-color: #d4edda; /* Light green */
+            border-color: #c3e6cb;
+            font-weight: bold;
+        }
+
+        /* Style for player results - correct answer */
+        .result-display .correct {
+            color: #28a745; /* Green */
+            font-weight: bold;
+        }
+
+        /* Style for player results - incorrect answer */
+        .result-display .incorrect {
+            color: #dc3545; /* Red */
+            font-weight: bold;
+        }
+
+        /* Style for player results - player selected answer */
+        .result-display .player-selected {
+             text-decoration: underline;
+             font-weight: bold;
+        }
+
+        /* Style for player results - correct answer not selected by player */
+         .result-display .correct-not-selected {
+             font-weight: bold;
+             font-style: italic;
+             color: #28a745; /* Green */
+         }
+
+         /* Styling for the scoreboard */
+         .scoreboard {
+             margin-top: 25px; /* Increased margin */
+             padding-top: 20px; /* Increased padding */
+             border-top: 1px solid #eee;
+         }
+
+         .scoreboard h4 {
+             margin-bottom: 15px; /* Increased margin */
+             font-size: 1.4em; /* Larger font for scoreboard title */
+         }
+
+         .scoreboard ol {
+             padding-left: 25px; /* Increased padding */
+         }
+
+         .scoreboard li {
+             margin-bottom: 8px; /* Increased margin */
+             font-size: 1.2em; /* Larger font for list items */
+         }
+
+         .scoreboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0; /* Increased padding */
+            border-bottom: 1px dashed #eee;
+         }
+         .scoreboard-item:last-child {
+             border-bottom: none;
+         }
+
+        /* QR Code Modal Styles */
+        .qr-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .qr-modal-content {
+            background: white;
+            padding: 30px; /* Increased padding */
+            border-radius: 12px; /* More rounded corners */
+            position: relative;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3); /* Stronger shadow */
+            max-width: 90%; /* Responsive width */
+        }
+
+        .qr-modal-close {
+            position: absolute;
+            top: 15px; /* Adjusted position */
+            right: 15px; /* Adjusted position */
+            background: none;
+            border: none;
+            font-size: 2.2em; /* Larger for better tap target */
+            cursor: pointer;
+            color: #333;
+            line-height: 1;
+        }
+
+        .qr-modal-close:hover {
+            color: #000;
+        }
+
+        #large-qrcode {
+            margin: 30px auto; /* Increased margin */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* QR Code size within modal */
+        #large-qrcode img {
+            width: 300px; /* Significantly increased size */
+            height: 300px;
+            max-width: 100%; /* Ensure it's responsive */
+            height: auto;
+        }
+
+        /* Leaderboard highlighting */
+        .leaderboard-item.rank-1, .scoreboard-item.rank-1 {
+            background-color: #ffeb3b; /* Gold */
+            font-weight: bold;
+            border-color: #fbc02d;
+        }
+        .leaderboard-item.rank-2, .scoreboard-item.rank-2 {
+            background-color: #e0e0e0; /* Silver */
+            font-weight: bold;
+            border-color: #bdbdbd;
+        }
+        .leaderboard-item.rank-3, .scoreboard-item.rank-3 {
+            background-color: #ffccbc; /* Bronze */
+            font-weight: bold;
+            border-color: #e64a19;
+        }
+
+        /* Ensure hidden class always applies display: none */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Confetti styles */
+        #confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allows clicks to pass through */
+            overflow: hidden;
+            z-index: 999;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: var(--confetti-color); /* Will be set via JS */
+            opacity: 0;
+            animation: confetti-fall 3s ease-out forwards;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100px) rotateZ(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotateZ(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Mobile responsiveness adjustments */
+        .container {
+            padding: 15px; /* Add some padding on smaller screens */
+        }
+
+        .card {
+            padding: 20px; /* Adjust card padding for mobile */
+        }
+
+        input[type="text"], input[type="number"] {
+            padding: 12px; /* Larger input fields */
+            font-size: 1em;
+        }
+
+        .btn {
+            padding: 12px 20px; /* Larger buttons */
+            font-size: 1.1em;
+        }
+
+        .option-group {
+            display: flex;
+            flex-wrap: wrap; /* Allow options to wrap on smaller screens */
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .option-group input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
+            min-width: 150px; /* Ensure input is not too small */
+        }
+
+        .option-group label {
+            margin-left: 5px;
+        }
+
+        /* Adjustments for smaller screens */
+        @media (max-width: 600px) {
+            body {
+                font-size: 16px; /* Slightly smaller base font on very small screens */
+            }
+            h1 { font-size: 2em; }
+            h2 { font-size: 1.6em; }
+            h3 { font-size: 1.3em; }
+
+            .option-btn {
+                padding: 12px;
+                font-size: 1em;
+            }
+
+            .host-options-list li {
+                padding: 8px;
+                font-size: 1em;
+            }
+
+            .scoreboard h4 {
+                font-size: 1.2em;
+            }
+
+            .scoreboard li {
+                font-size: 1em;
+            }
+
+            .qr-modal-content {
+                padding: 20px;
+            }
+
+            #large-qrcode img {
+                width: 250px; /* Adjust large QR size for very small screens */
+                height: 250px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>p2quiz</h1>
-            <p>Eine serverlose Quiz App</p>
+            <h1>P2P Quiz Spiel</h1>
+            <p>Eine serverlose Quiz-Anwendung</p>
         </header>
 
         <div id="role-selection" class="view active card">
-            <h2>Wähle deine Rolle</h2>
+            <h2>Wählen Sie Ihre Rolle</h2>
             <button id="host-btn" class="btn">Quiz hosten</button>
             <button id="player-btn" class="btn">Quiz beitreten</button>
         </div>
@@ -41,7 +358,7 @@
                 <form id="question-form">
                     <div>
                         <label for="question-text">Frage:</label>
-                        <input type="text" id="question-text" placeholder="Gebe deine Frage ein">
+                        <input type="text" id="question-text" placeholder="Geben Sie Ihre Frage ein">
                     </div>
                     <div class="option-group">
                         <input type="text" class="option-input" placeholder="Option 1">
@@ -72,7 +389,7 @@
                 <p>Raum-Code: <span id="room-id"></span></p>
                 <p>Verbundene Spieler: <span id="player-count">0</span></p>
                 <div class="players-list" id="players-list"></div>
-                <button id="start-questions-btn" class="btn btn-accent hidden">Quiz starten</button>
+                <button id="start-questions-btn" class="btn btn-accent hidden">Fragen starten</button>
             </div>
 
             <div id="host-question-display" class="hidden">
@@ -92,7 +409,7 @@
             </div>
 
             <div id="host-results" class="view card hidden">
-                <h3>Finale Rangliste</h3>
+                <h3>Endgültige Rangliste</h3>
                 <div id="leaderboard"></div>
                 <button id="new-quiz-btn" class="btn">Neues Quiz hosten</button>
             </div>
@@ -104,12 +421,12 @@
                  <input type="text" id="room-code-input" placeholder="Host-ID eingeben oder QR scannen">
                 <input type="text" id="player-name-input" placeholder="Ihr Name">
                 <button id="join-btn" class="btn">Quiz beitreten</button>
-                <p>Oder scanne den vom Host bereitgestellten QR-Code</p>
+                <p>Oder scannen Sie den vom Host bereitgestellten QR-Code</p>
             </div>
 
             <div id="waiting-room" class="hidden">
                 <h2>Warten auf den Quizstart</h2>
-                <p id="waiting-message">Du bist dem Raum erfolgreich beigetreten!</p>
+                <p id="waiting-message">Sie sind dem Raum erfolgreich beigetreten!</p>
                 <div class="loader"></div>
                 <p>Der Host wird das Quiz bald starten...</p>
             </div>
@@ -126,14 +443,14 @@
 
             <div id="player-result" class="hidden">
                 <div id="result-display"></div>
-                <div class="score-display">Deine Punktzahl: <span id="player-score">0</span></div>
+                <div class="score-display">Ihre Punktzahl: <span id="player-score">0</span></div>
                 <p id="waiting-for-next">Warten auf nächste Frage...</p>
             </div>
 
             <div id="player-final-result" class="view card hidden">
                 <h2>Quiz beendet!</h2>
                 <div id="player-leaderboard-container" style="margin-bottom: 15px;"></div>
-                <div class="score-display">Deine finale Punktzahl: <span id="final-score">0</span></div>
+                <div class="score-display">Ihre Endpunktzahl: <span id="final-score">0</span></div>
                 <p>Vielen Dank fürs Mitspielen!</p>
                 <button id="play-again-btn" class="btn">Nochmal spielen</button>
             </div>
@@ -153,6 +470,13 @@
     <div id="confetti-container"></div>
 
     <script>
+        // Supabase Konfiguration
+        const SUPABASE_URL = 'https://psjanfchvdsefvzxqtac.supabase.co'; // ERSETZEN SIE DIES MIT IHRER SUPABASE PROJECT URL
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzamFuZmNodmRzZWZ2enhxdGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5ODYxMjMsImV4cCI6MjA2MzU2MjEyM30._VlPXwOCbwmG0ilFhNIJanPOEyDoOUY16PUyhswyMYY'; // ERSETZEN SIE DIES MIT IHREM SUPABASE ANON PUBLIC KEY
+
+        // Declare supabaseClient globally
+        let supabaseClient; 
+
         // --- Utility functions ---
         /**
          * Shows a specific view and hides all other views.
@@ -203,6 +527,17 @@
         let modalRoomIdSpan = null;
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Supabase client here, after the DOM is loaded
+            // This ensures the Supabase global object is available
+            if (typeof supabase !== 'undefined' && supabase.createClient) { // Changed from Supabase to supabase
+                const { createClient } = supabase; // Destructure createClient
+                supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } else {
+                console.error("Supabase library not loaded or 'supabase.createClient' is undefined. Please check network and script loading.");
+                alert("Fehler: Die Supabase-Bibliothek konnte nicht geladen werden. Bitte überprüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut.");
+                return; // Prevent further execution if Supabase is not available
+            }
+
             // Initialize QR modal elements as soon as DOM is ready
             qrModalOverlay = document.getElementById('qr-modal-overlay');
             qrModalCloseBtn = document.getElementById('qr-modal-close');
@@ -257,17 +592,18 @@
 
         // --- Host State & Initialization Flag ---
         let hostGlobalQuizState = null;
-        let hostPeerInstance = null;
+        let hostSupabaseChannel = null; // Supabase Broadcast Channel for host to send messages
+        let hostPlayersSubscription = null; // Supabase Realtime subscription for player changes
         let isHostInitialized = false;
         let hostTimerInterval = null;
         let hostQuestionStartTime = null; // To track time for scoring
-        let hostPeerId = null; // Stores the actual PeerJS ID (which will now be the 9-digit alphanumeric room code)
-
+        let hostRoomId = null; // Stores the Supabase room ID
+        let hostPlayerId = null; // Stores the host's own player ID
 
         /**
          * Initializes all features and event listeners for the host role.
          */
-        function initializeHostFeatures() {
+        async function initializeHostFeatures() {
             console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
             // Initialize quiz state if not already set
             if (!hostGlobalQuizState) {
@@ -278,7 +614,7 @@
                     players: {}, // Player structure includes score and answer time
                     answersReceived: 0,
                     isQuestionActive: false,
-                    roomId: null, // This will be the 9-digit alphanumeric code used as Peer ID
+                    roomId: null, // This will be the 9-digit alphanumeric code
                     questionDuration: 20 // Default question duration in seconds
                 };
             }
@@ -367,7 +703,7 @@
                     e.preventDefault();
                     const question = questionText.value.trim();
                     if (!question) {
-                        alert('Bitte gib eine Frage ein');
+                        alert('Bitte geben Sie eine Frage ein');
                         return;
                     }
 
@@ -388,11 +724,11 @@
                     });
 
                     if (options.length < 2) {
-                        alert('Bitte füge mindestens zwei gültige Optionen hinzu');
+                        alert('Bitte fügen Sie mindestens zwei gültige Optionen hinzu');
                         return;
                     }
                     if (correct.length === 0) {
-                        alert('Bitte wähle mindestens eine richtige Antwort aus');
+                        alert('Bitte wählen Sie mindestens eine richtige Antwort aus');
                         return;
                     }
 
@@ -412,14 +748,14 @@
                 });
 
                 // Event listener for starting the quiz
-                startQuizBtn.addEventListener('click', () => {
+                startQuizBtn.addEventListener('click', async () => {
                     if (quizState.questions.length === 0) {
-                        alert('Bitte füge mindestens eine Frage hinzu.');
+                        alert('Bitte fügen Sie mindestens eine Frage hinzu.');
                         return;
                     }
                     const duration = parseInt(questionDurationInput.value, 10);
                     if (isNaN(duration) || duration < 5 || duration > 60) {
-                        alert('Bitte gebe eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.');
+                        alert('Bitte geben Sie eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.');
                         return;
                     }
                     quizState.questionDuration = duration;
@@ -428,11 +764,11 @@
                     quizState.shuffledQuestions = [...quizState.questions]; // Create a copy
                     shuffleArray(quizState.shuffledQuestions);
 
-                    initHostPeer();
+                    await initHostSupabase();
                 });
 
                 // Event listener for starting questions (after players join)
-                startQuestionsBtn.addEventListener('click', () => {
+                startQuestionsBtn.addEventListener('click', async () => {
                     if (Object.keys(quizState.players).length === 0) {
                         alert("Es sind noch keine Spieler beigetreten!");
                         return;
@@ -440,33 +776,36 @@
                     qrContainer.classList.add('hidden');
                     hostQuestionDisplay.classList.remove('hidden');
                     quizState.currentQuestionIndex = 0;
-                    startQuestion();
+                    await startQuestion();
                 });
 
                 // Event listener for moving to the next question
-                showNextBtn.addEventListener('click', () => {
+                showNextBtn.addEventListener('click', async () => {
                     quizState.currentQuestionIndex++;
-                    startQuestion();
+                    await startQuestion();
                 });
 
                 // Event listener for showing final results
                 showResultsBtn.addEventListener('click', showFinalResults);
 
                 // Event listener for starting a new quiz
-                newQuizBtn.addEventListener('click', () => {
-                    if (hostPeerInstance) {
-                        Object.values(quizState.players).forEach(player => {
-                            if (player.connection && player.connection.open) {
-                                try {
-                                    player.connection.send({ type: 'quiz_terminated' });
-                                } catch (e) { /*ignore*/ }
-                                player.connection.close();
-                            }
-                        });
-                        hostPeerInstance.destroy();
-                        hostPeerInstance = null;
-                        hostPeerId = null;
+                newQuizBtn.addEventListener('click', async () => {
+                    // Clean up Supabase subscriptions
+                    if (hostSupabaseChannel) {
+                        await supabaseClient.removeChannel(hostSupabaseChannel);
+                        hostSupabaseChannel = null;
                     }
+                    if (hostPlayersSubscription) {
+                        await supabaseClient.removeChannel(hostPlayersSubscription);
+                        hostPlayersSubscription = null;
+                    }
+
+                    // Remove room and players from DB
+                    if (hostRoomId) {
+                        await supabaseClient.from('players').delete().eq('room_id', hostRoomId); // Delete players first due to foreign key
+                        await supabaseClient.from('rooms').delete().eq('id', hostRoomId);
+                    }
+
                     hostGlobalQuizState = null;
                     isHostInitialized = false;
                     fileStatus.textContent = '';
@@ -475,28 +814,27 @@
                     hostQuestionDisplay.classList.add('hidden');
                     qrContainer.classList.add('hidden');
                     hostSetup.classList.remove('hidden');
+                    document.getElementById('role-selection').classList.remove('hidden'); // Show role selection again
                     initializeHostFeatures(); // Re-initialize to reset UI fully
                 });
 
-                // Clean up PeerJS connection on window unload
-                window.addEventListener('beforeunload', () => {
-                    if (hostPeerInstance) {
-                         Object.values(quizState.players).forEach(player => {
-                            if (player.connection && player.connection.open) {
-                                try {
-                                    player.connection.send({ type: 'quiz_terminated' });
-                                } catch (e) { /*ignore*/ }
-                                player.connection.close();
-                            }
-                        });
-                        hostPeerInstance.destroy();
-                        hostPeerInstance = null;
+                // Clean up Supabase subscriptions on window unload
+                window.addEventListener('beforeunload', async () => {
+                    if (hostSupabaseChannel) {
+                        await supabaseClient.removeChannel(hostSupabaseChannel);
+                    }
+                    if (hostPlayersSubscription) {
+                        await supabaseClient.removeChannel(hostPlayersSubscription);
+                    }
+                    // Optional: Mark host's player as disconnected or remove room
+                    if (hostPlayerId) {
+                        await supabaseClient.from('players').update({ is_connected: false }).eq('id', hostPlayerId);
                     }
                 });
 
                 // Event listener for opening the QR code modal
                 qrcodeElement.addEventListener('click', () => {
-                    if (qrModalOverlay && largeQrcodeContainer && hostPeerId && quizState.roomId) {
+                    if (qrModalOverlay && largeQrcodeContainer && hostRoomId) {
                         qrModalOverlay.classList.remove('hidden');
                         largeQrcodeContainer.innerHTML = ''; // Clear previous QR
                         new QRCode(largeQrcodeContainer, {
@@ -518,7 +856,7 @@
             updatePlayersList();
 
             // Logic to determine which host section to display on initialization/re-entry
-            if(hostPeerInstance && hostPeerInstance.open) {
+            if(hostRoomId) { // Check if a room is already established
                 if (quizState.isQuestionActive || quizState.currentQuestionIndex < quizState.shuffledQuestions.length) {
                     hostSetup.classList.add('hidden');
                     qrContainer.classList.add('hidden');
@@ -540,16 +878,14 @@
                     hostQuestionDisplay.classList.add('hidden');
                     hostResults.classList.remove('hidden');
                     displayLeaderboard();
-                } else { // Peer is open, but quiz not active, show QR container
+                } else { // Room is open, but quiz not active, show QR container
                     hostSetup.classList.add('hidden');
                     qrContainer.classList.remove('hidden');
-                    if(hostPeerId) {
-                        const currentJoinUrl = updateJoinLink(hostPeerId); // Get the current join URL
-                        generateQRCode(currentJoinUrl); // Generate QR with the full URL
-                        roomIdElement.textContent = quizState.roomId || 'N/A';
-                    }
+                    const currentJoinUrl = updateJoinLink(hostRoomId); // Get the current join URL
+                    generateQRCode(currentJoinUrl); // Generate QR with the full URL
+                    roomIdElement.textContent = quizState.roomId || 'N/A';
                 }
-            } else { // Default: show setup if no peer instance
+            } else { // Default: show setup if no room instance
                 hostSetup.classList.remove('hidden');
                 qrContainer.classList.add('hidden');
                 hostQuestionDisplay.classList.add('hidden');
@@ -593,163 +929,242 @@
             }
 
             /**
-             * Initializes the PeerJS instance for the host, using the 9-digit alphanumeric room code as the Peer ID.
+             * Initializes Supabase for the host, creates a room, and sets up subscriptions.
              */
-            function initHostPeer() {
-                if (typeof Peer === 'undefined') {
-                    alert('Fehler: Die PeerJS-Bibliothek (Peer.js) konnte nicht geladen werden. Dies könnte an einer Browser-Erweiterung (wie einem Ad-Blocker) oder einem Netzwerkproblem liegen. Bitte überprüfe die Browser-Konsole und den Netzwerk-Tab für weitere Details, versuche, Erweiterungen zu deaktivieren, oder stelle sicher, dass unpkg.com zugänglich ist.');
-                    if(qrContainer) qrContainer.classList.add('hidden');
-                    if(hostSetup) hostSetup.classList.remove('hidden');
+            async function initHostSupabase() {
+                // Generate a random 9-character alphanumeric room code
+                const rawGeneratedId = generateAlphanumericId(9);
+                hostRoomId = rawGeneratedId; // Store the raw ID for Supabase
+                quizState.roomId = rawGeneratedId.substring(0, 3) + ' ' + rawGeneratedId.substring(3, 6) + ' ' + rawGeneratedId.substring(6, 9); // Store formatted for display
+
+                hostPlayerId = `host-${generateAlphanumericId(12)}`; // Unique ID for the host player
+
+                try {
+                    // Insert room into Supabase
+                    const { data: roomData, error: roomError } = await supabaseClient
+                        .from('rooms')
+                        .insert([
+                            {
+                                id: hostRoomId,
+                                current_question_index: quizState.currentQuestionIndex,
+                                quiz_state: {
+                                    is_active: false,
+                                    question_duration: quizState.questionDuration
+                                },
+                                host_player_id: hostPlayerId
+                            }
+                        ]);
+
+                    if (roomError) throw roomError;
+                    console.log('Room created in Supabase:', roomData);
+
+                    // Insert host as a player
+                    const { data: hostPlayerData, error: hostPlayerError } = await supabaseClient
+                        .from('players')
+                        .insert([
+                            {
+                                id: hostPlayerId,
+                                room_id: hostRoomId,
+                                name: 'Host', // Host's name
+                                score: 0,
+                                is_connected: true
+                            }
+                        ]);
+
+                    if (hostPlayerError) throw hostPlayerError;
+                    console.log('Host player created:', hostPlayerData);
+                    quizState.players[hostPlayerId] = {
+                        id: hostPlayerId,
+                        name: 'Host',
+                        score: 0,
+                        currentAnswer: [],
+                        answerTime: null
+                    };
+                    updatePlayersList();
+
+
+                    // Subscribe to player changes in this room
+                    // This subscription handles both INSERT (new players) and UPDATE (player answers)
+                    hostPlayersSubscription = supabaseClient
+                        .channel(`players_in_room_${hostRoomId}`)
+                        .on('postgres_changes', {
+                            event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+                            schema: 'public',
+                            table: 'players',
+                            filter: `room_id=eq.${hostRoomId}`
+                        }, payload => {
+                            if (payload.eventType === 'INSERT') {
+                                if (payload.new.id !== hostPlayerId) { // Ignore host's own insert
+                                    console.log('New player joined:', payload.new);
+                                    quizState.players[payload.new.id] = {
+                                        id: payload.new.id,
+                                        name: payload.new.name,
+                                        score: payload.new.score,
+                                        currentAnswer: [],
+                                        answerTime: null
+                                    };
+                                    updatePlayersList();
+                                }
+                            } else if (payload.eventType === 'UPDATE') {
+                                if (payload.new.id !== hostPlayerId) { // Ignore host's own updates
+                                    handlePlayerData(payload.new);
+                                }
+                            } else if (payload.eventType === 'DELETE') {
+                                console.log('Player disconnected (deleted):', payload.old.id);
+                                if (quizState.players[payload.old.id]) {
+                                    delete quizState.players[payload.old.id];
+                                    updatePlayersList();
+                                    if (quizState.isQuestionActive && quizState.answersReceived >= Object.keys(quizState.players).length) {
+                                        endQuestion();
+                                    }
+                                }
+                            }
+                        })
+                        .subscribe();
+
+
+                    // Get initial players list
+                    const { data: initialPlayers, error: initialPlayersError } = await supabaseClient
+                        .from('players')
+                        .select('*')
+                        .eq('room_id', hostRoomId)
+                        .eq('is_connected', true); // Only fetch currently connected players
+
+                    if (initialPlayersError) throw initialPlayersError;
+                    initialPlayers.forEach(p => {
+                        if (p.id !== hostPlayerId) {
+                            quizState.players[p.id] = {
+                                id: p.id,
+                                name: p.name,
+                                score: p.score || 0,
+                                currentAnswer: p.last_answer_data || [],
+                                answerTime: p.last_answer_time ? (new Date(p.last_answer_time).getTime() - hostQuestionStartTime) / 1000 : null
+                            };
+                        }
+                    });
+                    updatePlayersList();
+
+
+                    // Initialize broadcast channel for this room
+                    hostSupabaseChannel = supabaseClient.channel(`quiz_room_${hostRoomId}`);
+                    hostSupabaseChannel.subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            console.log('Host subscribed to broadcast channel:', `quiz_room_${hostRoomId}`);
+                            hostSetup.classList.add('hidden');
+                            qrContainer.classList.remove('hidden');
+                            roomIdElement.textContent = quizState.roomId;
+                            const currentJoinUrl = updateJoinLink(hostRoomId);
+                            generateQRCode(currentJoinUrl);
+                        } else if (status === 'CHANNEL_ERROR') {
+                            console.error('Host channel error:', status);
+                            alert('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuchen Sie es erneut.');
+                            resetHostStateAndUI();
+                        }
+                    });
+
+                } catch (error) {
+                    console.error('Error initializing host Supabase:', error);
+                    alert(`Fehler beim Starten des Hosts: ${error.message}. Bitte überprüfen Sie Ihre Supabase-Konfiguration und versuchen Sie es erneut.`);
+                    resetHostStateAndUI();
+                }
+            }
+
+            /**
+             * Handles data received from connected players (via Supabase database updates).
+             * @param {Object} playerData - The updated player data from Supabase.
+             */
+            function handlePlayerData(playerData) {
+                const playerId = playerData.id;
+                console.log('Host received player data update from', playerId, playerData);
+
+                // Ensure the player exists in our local state and the quiz is active
+                if (!quizState.players[playerId] || !quizState.isQuestionActive) {
+                    // If player is new or reconnected, add them to local state
+                    if (!quizState.players[playerId]) {
+                        quizState.players[playerId] = {
+                            id: playerId,
+                            name: playerData.name,
+                            score: playerData.score || 0,
+                            currentAnswer: playerData.last_answer_data || [],
+                            answerTime: playerData.last_answer_time ? (new Date(playerData.last_answer_time).getTime() - hostQuestionStartTime) / 1000 : null
+                        };
+                        updatePlayersList(); // Update UI to show new player
+                    }
+                    // If quiz is not active, just update player's score and connection status
+                    quizState.players[playerId].score = playerData.score || 0;
+                    quizState.players[playerId].is_connected = playerData.is_connected;
+                    updatePlayersList(); // Update connected players count
                     return;
                 }
 
-                if (hostPeerInstance) hostPeerInstance.destroy();
+                // Only count as a new answer if player hasn't answered this question yet
+                // and the answer data is different from the last recorded one for this question
+                const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+                const hasAnsweredCurrentQuestion = quizState.players[playerId].currentAnswer &&
+                                                   JSON.stringify(quizState.players[playerId].currentAnswer) === JSON.stringify(playerData.last_answer_data);
 
-                // Generate a random 9-character alphanumeric room code to be used as the Peer ID
-                const rawGeneratedId = generateAlphanumericId(9); // Get raw 9-char ID
-                quizState.roomId = rawGeneratedId.substring(0, 3) + ' ' + rawGeneratedId.substring(3, 6) + ' ' + rawGeneratedId.substring(6, 9); // Store formatted for display
+                if (playerData.last_answer_data && !hasAnsweredCurrentQuestion) {
+                    quizState.answersReceived++;
+                    const answerReceiveTime = playerData.last_answer_time ? new Date(playerData.last_answer_time).getTime() : Date.now();
+                    const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000; // Time in seconds
+                    quizState.players[playerId].answerTime = timeTaken;
+                    quizState.players[playerId].currentAnswer = playerData.last_answer_data; // Store the new answer
+                    answersCount.textContent = quizState.answersReceived.toString();
 
-                // Create a new PeerJS instance using the raw 9-character ID
-                hostPeerInstance = new Peer(rawGeneratedId, { debug: 2 });
-
-                hostPeerInstance.on('open', (id) => {
-                    console.log('Host PeerJS Open. Peer ID:', id, 'Generated Room Code:', quizState.roomId);
-                    hostPeerId = id; // Store the actual Peer ID (which is the raw 9-char code)
-                    quizState.peerId = id; // Store in quiz state
-
-                    hostSetup.classList.add('hidden');
-                    qrContainer.classList.remove('hidden');
-
-                    roomIdElement.textContent = quizState.roomId; // Display the formatted 9-digit code
-                    const currentJoinUrl = updateJoinLink(hostPeerId); // Get the full join URL
-                    generateQRCode(currentJoinUrl); // Generate QR with the full URL
-
-                    hostPeerInstance.on('connection', handlePlayerConnection);
-                });
-
-                hostPeerInstance.on('error', (err) => {
-                    console.error('Host PeerJS error:', err);
-                    alert(`Verbindungsfehler: ${err.message}. Bitte versuche es erneut.`);
-                    if(qrContainer) qrContainer.classList.add('hidden');
-                    if(hostSetup) hostSetup.classList.remove('hidden');
-                    if (hostPeerInstance) {
-                        hostPeerInstance.destroy();
-                        hostPeerInstance = null;
-                        hostPeerId = null;
-                        quizState.peerId = null;
-                        quizState.roomId = null;
+                    if (quizState.answersReceived >= Object.keys(quizState.players).length) {
+                        endQuestion();
                     }
-                    quizState.players = {};
-                    updatePlayersList();
-                });
-
-                hostPeerInstance.on('disconnected', () => console.log('Host PeerJS disconnected.'));
-                hostPeerInstance.on('close', () => console.log('Host PeerJS connection closed.'));
-            }
-
-            /**
-             * Handles incoming player connections to the host.
-             * @param {Peer.DataConnection} connection - The PeerJS data connection object.
-             */
-            function handlePlayerConnection(connection) {
-                console.log('New player attempting to connect:', connection.peer);
-                connection.on('open', () => {
-                    console.log('Player connection established:', connection.peer);
-                    connection.send({ type: 'welcome', message: 'Verbunden. Sende deinen Namen.' });
-                });
-
-                connection.on('data', (data) => handlePlayerData(connection, data));
-
-                connection.on('close', () => {
-                    console.log('Player disconnected:', connection.peer);
-                    if (quizState.players[connection.peer]) {
-                        delete quizState.players[connection.peer];
-                        updatePlayersList();
-                        // If all remaining players have answered or no players left, end question
-                        if (quizState.isQuestionActive && quizState.answersReceived >= Object.keys(quizState.players).length) {
-                             endQuestion();
-                        }
-                    }
-                });
-
-                connection.on('error', (err) => {
-                    console.error('Error with player connection', connection.peer + ':', err);
-                    if (quizState.players[connection.peer]) {
-                        delete quizState.players[connection.peer];
-                        updatePlayersList();
-                    }
-                });
-            }
-
-            /**
-             * Handles data received from connected players.
-             * @param {Peer.DataConnection} connection - The PeerJS data connection object.
-             * @param {Object} data - The data received from the player.
-             */
-            function handlePlayerData(connection, data) {
-                const playerId = connection.peer;
-                console.log('Host received data from', playerId, data);
-
-                switch (data.type) {
-                    case 'join':
-                        if (!quizState.players[playerId]) {
-                            quizState.players[playerId] = {
-                                id: playerId,
-                                name: data.name || 'Anon',
-                                score: 0,
-                                connection: connection,
-                                currentAnswer: [],
-                                answerTime: null
-                            };
-                            updatePlayersList();
-                            connection.send({ type: 'joined', message: 'Erfolgreich beigetreten!' });
-                            console.log('Player joined:', quizState.players[playerId]);
-                        } else {
-                            // Update existing player's name and connection if they reconnect
-                            quizState.players[playerId].name = data.name || quizState.players[playerId].name;
-                            quizState.players[playerId].connection = connection;
-                            updatePlayersList();
-                        }
-                        break;
-                    case 'answer':
-                        if (!quizState.isQuestionActive || !quizState.players[playerId]) return;
-
-                        // Only count as a new answer if player hasn't answered this question yet
-                        if (quizState.players[playerId].currentAnswer === null || quizState.players[playerId].currentAnswer.length === 0) {
-                             quizState.answersReceived++;
-                             const answerReceiveTime = Date.now();
-                             const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000; // Time in seconds
-                             quizState.players[playerId].answerTime = timeTaken;
-                        }
-
-                        quizState.players[playerId].currentAnswer = data.answer;
-                        answersCount.textContent = quizState.answersReceived.toString();
-
-                        if (quizState.answersReceived >= Object.keys(quizState.players).length) {
-                            endQuestion();
-                        }
-                        break;
                 }
             }
 
             /**
              * Updates the displayed list of connected players and player count.
              */
-            function updatePlayersList() {
-                const playerCount = Object.keys(quizState.players).length;
-                playerCountElement.textContent = playerCount.toString();
-                totalPlayers.textContent = playerCount.toString();
+            async function updatePlayersList() {
+                try {
+                    const { data: players, error } = await supabaseClient
+                        .from('players')
+                        .select('id, name, score') // Fetch score to keep local state updated
+                        .eq('room_id', hostRoomId)
+                        .eq('is_connected', true); // Only show connected players
 
-                playersList.innerHTML = '';
+                    if (error) throw error;
 
-                Object.values(quizState.players).forEach(p => {
-                    const i = document.createElement('div');
-                    i.className = 'player-item';
-                    i.textContent = p.name;
-                    playersList.appendChild(i);
-                });
+                    // Update local quizState.players based on fetched data
+                    const currentConnectedPlayers = {};
+                    players.forEach(p => {
+                        currentConnectedPlayers[p.id] = {
+                            id: p.id,
+                            name: p.name,
+                            score: p.score || 0,
+                            currentAnswer: quizState.players[p.id]?.currentAnswer || [], // Preserve current answer state
+                            answerTime: quizState.players[p.id]?.answerTime || null
+                        };
+                    });
+                    // Add host back if it was filtered out by the select query
+                    if (quizState.players[hostPlayerId]) {
+                        currentConnectedPlayers[hostPlayerId] = quizState.players[hostPlayerId];
+                    }
+                    quizState.players = currentConnectedPlayers;
 
-                startQuestionsBtn.classList.toggle('hidden', playerCount === 0);
+
+                    const playerCount = Object.keys(quizState.players).length;
+                    playerCountElement.textContent = playerCount.toString();
+                    totalPlayers.textContent = playerCount.toString();
+
+                    playersList.innerHTML = '';
+
+                    Object.values(quizState.players).forEach(p => {
+                        const i = document.createElement('div');
+                        i.className = 'player-item';
+                        i.textContent = p.name;
+                        playersList.appendChild(i);
+                    });
+
+                    startQuestionsBtn.classList.toggle('hidden', playerCount === 0);
+                } catch (error) {
+                    console.error('Error updating players list from Supabase:', error);
+                }
             }
 
             /**
@@ -759,7 +1174,7 @@
             function generateQRCode(url) {
                 qrcodeElement.innerHTML = ''; // Clear previous QR code
                 if (typeof QRCode === 'undefined') {
-                    console.error("QRCode library not loaded.");
+                    console.error("QR-Code-Bibliothek nicht geladen.");
                     qrcodeElement.innerHTML = `<p style="color:red;">QR-Code-Bibliothek nicht geladen. URL: ${url}</p>`;
                     return;
                 }
@@ -780,13 +1195,13 @@
 
              /**
               * Updates the join link to include the host's Peer ID.
-              * @param {string} peerId - The host's Peer ID (9-digit alphanumeric code).
+              * @param {string} roomId - The Supabase room ID (9-digit alphanumeric code).
               * @returns {string} The full join URL.
               */
-            function updateJoinLink(peerId) {
+            function updateJoinLink(roomId) {
                 // Correctly construct the URL by taking the base path and appending the query parameter
                 const baseUrl = window.location.origin + window.location.pathname.split('?')[0];
-                const joinUrl = `${baseUrl}?host=${peerId}`;
+                const joinUrl = `${baseUrl}?host=${roomId}`;
                 joinLinkElement.href = joinUrl;
                 // Display the full URL in the link text
                 joinLinkElement.textContent = joinUrl;
@@ -801,7 +1216,7 @@
             /**
              * Starts a new question round on the host side.
              */
-            function startQuestion() {
+            async function startQuestion() {
                 if (quizState.currentQuestionIndex >= quizState.shuffledQuestions.length) {
                     showFinalResults();
                     return;
@@ -824,11 +1239,19 @@
                 currentQuestion.shuffledOptions = shuffledOptions;
                 currentQuestion.shuffledCorrect = shuffledCorrectIndices;
 
-
-                Object.values(quizState.players).forEach(p => {
+                // Reset player answers for the new question in local state and in DB
+                for (const p of Object.values(quizState.players)) {
                     p.currentAnswer = [];
                     p.answerTime = null;
-                });
+                    if (p.id !== hostPlayerId) { // Don't reset host's own entry
+                        try {
+                            await supabaseClient.from('players').update({ last_answer_data: [], last_answer_time: null }).eq('id', p.id);
+                        } catch (error) {
+                            console.error(`Error resetting player ${p.name}'s answer:`, error);
+                        }
+                    }
+                }
+
 
                 currentQuestionTextEl.textContent = currentQuestion.question;
                 // Display options on host side WITHOUT correct indicators initially
@@ -842,7 +1265,7 @@
                 hostScoreboardEl.classList.add('hidden'); // Hide scoreboard while question is active
 
                 startTimer(quizState.questionDuration); // Use host-defined duration
-                sendQuestionToPlayers(currentQuestion); // Pass the question object which now contains shuffled data
+                await sendQuestionToPlayers(currentQuestion); // Pass the question object which now contains shuffled data
             }
 
             /**
@@ -865,10 +1288,10 @@
 
 
             /**
-             * Sends question data to all connected players.
+             * Sends question data to all connected players via Supabase Broadcast.
              * @param {Object} question - The question object to send (now contains shuffled options and correct indices).
              */
-            function sendQuestionToPlayers(question) {
+            async function sendQuestionToPlayers(question) {
                 const qData = {
                     type: 'question',
                     question: question.question,
@@ -879,9 +1302,27 @@
                     startTime: hostQuestionStartTime, // Send start time for player timer/scoring
                     duration: quizState.questionDuration // Send duration to players
                 };
-                Object.values(quizState.players).forEach(p => {
-                    if (p.connection && p.connection.open) p.connection.send(qData);
-                });
+                try {
+                    // Update room state in DB
+                    await supabaseClient
+                        .from('rooms')
+                        .update({
+                            current_question_index: quizState.currentQuestionIndex,
+                            quiz_state: { is_active: true, question_duration: quizState.questionDuration }
+                        })
+                        .eq('id', hostRoomId);
+
+                    // Broadcast question to players
+                    await hostSupabaseChannel.send({
+                        type: 'broadcast',
+                        event: 'quiz_event',
+                        payload: qData
+                    });
+                    console.log('Question broadcasted:', qData);
+                } catch (error) {
+                    console.error('Error sending question via Supabase:', error);
+                    alert('Fehler beim Senden der Frage. Bitte überprüfen Sie Ihre Supabase-Verbindung.');
+                }
             }
 
             /**
@@ -909,7 +1350,7 @@
             /**
              * Ends the current question round, calculates scores, and displays results.
              */
-            function endQuestion() {
+            async function endQuestion() {
                 if (!quizState.isQuestionActive) return;
 
                 if (hostTimerInterval) {
@@ -925,7 +1366,7 @@
 
 
                 calculateScores();
-                sendResultsToPlayers();
+                await sendResultsToPlayers();
 
                 displayCurrentScoreboard(); // Display the scoreboard
 
@@ -966,23 +1407,49 @@
             }
 
             /**
-             * Sends results of the current question to all players.
+             * Sends results of the current question to all players via Supabase Broadcast.
              */
-            function sendResultsToPlayers() {
+            async function sendResultsToPlayers() {
                 const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
                 const isFinalQ = quizState.currentQuestionIndex === quizState.shuffledQuestions.length - 1;
 
-                Object.values(quizState.players).forEach(p => {
-                    const resData = {
-                        type: 'result',
-                        correct: currentQ.shuffledCorrect, // Send shuffled correct indices
-                        playerAnswer: p.currentAnswer, // Send player's answer indices (which are based on shuffled options)
-                        score: Math.round(p.score), // Send rounded score
-                        isFinal: isFinalQ,
-                        options: currentQ.shuffledOptions // Send shuffled options to player for result display
-                    };
-                    if (p.connection && p.connection.open) p.connection.send(resData);
-                });
+                const leaderboardData = getLeaderboardData(); // Get latest leaderboard for results
+
+                for (const p of Object.values(quizState.players)) {
+                    // Update player score in DB
+                    try {
+                        await supabaseClient
+                            .from('players')
+                            .update({ score: p.score })
+                            .eq('id', p.id);
+                    } catch (error) {
+                        console.error(`Error updating player ${p.name}'s score in Supabase:`, error);
+                    }
+                }
+
+                // Broadcast result to all players after all scores are updated in DB
+                const resData = {
+                    type: 'result',
+                    correct: currentQ.shuffledCorrect, // Send shuffled correct indices
+                    // playerAnswer is specific to each player, so we'll send a generic result here.
+                    // Players will check their own last_answer_data from DB or local state.
+                    score: null, // Player will update their own score from DB or local state
+                    isFinal: isFinalQ,
+                    options: currentQ.shuffledOptions, // Send shuffled options to player for result display
+                    leaderboard: leaderboardData // Include leaderboard for final results
+                };
+
+                try {
+                    await hostSupabaseChannel.send({
+                        type: 'broadcast',
+                        event: 'quiz_event',
+                        payload: resData
+                    });
+                    console.log('Results broadcasted.');
+                } catch (error) {
+                    console.error('Error broadcasting results via Supabase:', error);
+                    alert('Fehler beim Senden der Ergebnisse. Bitte überprüfen Sie Ihre Supabase-Verbindung.');
+                }
             }
 
              /**
@@ -1021,17 +1488,8 @@
 
                 displayLeaderboard();
 
-                const leaderboardData = getLeaderboardData();
-
-                Object.values(quizState.players).forEach(p => {
-                    if (p.connection && p.connection.open) {
-                        p.connection.send({
-                            type: 'final',
-                            score: Math.round(p.score),
-                            leaderboard: leaderboardData
-                        });
-                    }
-                });
+                // No need to send 'final' broadcast here, it's already sent with the last 'result'
+                // This function just handles the host UI transition
             }
 
             /**
@@ -1061,11 +1519,42 @@
                     leaderboard.appendChild(i);
                 });
             }
+
+            /**
+             * Resets the host's state and UI to the initial setup form.
+             */
+            async function resetHostStateAndUI() {
+                // Unsubscribe from Supabase channels
+                if (hostSupabaseChannel) {
+                    await supabaseClient.removeChannel(hostSupabaseChannel);
+                    hostSupabaseChannel = null;
+                }
+                if (hostPlayersSubscription) {
+                    await supabaseClient.removeChannel(hostPlayersSubscription);
+                    hostPlayersSubscription = null;
+                }
+
+                hostGlobalQuizState = null;
+                isHostInitialized = false;
+                hostRoomId = null;
+                hostPlayerId = null;
+
+                fileStatus.textContent = '';
+                if(jsonFileInput) jsonFileInput.value = '';
+                hostResults.classList.add('hidden');
+                hostQuestionDisplay.classList.add('hidden');
+                qrContainer.classList.add('hidden');
+                hostSetup.classList.remove('hidden');
+                document.getElementById('role-selection').classList.remove('hidden'); // Show role selection again
+                // Re-initialize host features to ensure all elements are reset
+                initializeHostFeatures();
+            }
         }
 
         // --- Player State & Initialization Flag ---
-        let playerPeer = null;
-        let hostConnection = null;
+        let playerSupabaseChannel = null; // Supabase Broadcast Channel for player to receive messages
+        let playerRoomId = null;
+        let playerCurrentId = null; // The player's unique ID
         let isPlayerInitialized = false;
         let playerTimerInterval = null;
         let playerCurrentQuestionOptions = [];
@@ -1133,33 +1622,45 @@
             if (!isPlayerInitialized) {
                 console.log("Setting up player event listeners for the first time.");
 
-                joinBtn.addEventListener('click', () => {
-                    const roomCode = roomCodeInput.value.trim();
-                    const playerName = playerNameInput.value.trim() || 'Spieler ' + Math.random().toString(36).substring(2, 6);
+                joinBtn.addEventListener('click', async () => {
+                    const roomCode = roomCodeInput.value.trim().replace(/\s/g, ''); // Remove spaces
+                    const playerName = playerNameInput.value.trim() || 'Spieler ' + generateAlphanumericId(4); // Use generated ID for default name
 
                     if (!roomCode) {
-                        alert('Bitte gebe einen Raum-Code ein.');
+                        alert('Bitte geben Sie einen Raum-Code ein.');
                         return;
                     }
-                    initPlayerPeer(roomCode, playerName);
+                    await initPlayerSupabase(roomCode, playerName);
                 });
 
-                submitAnswerBtn.addEventListener('click', () => {
+                submitAnswerBtn.addEventListener('click', async () => {
                     if (selectedAnswers.length === 0) {
-                        alert('Bitte wähle mindestens eine Antwort aus.');
+                        alert('Bitte wählen Sie mindestens eine Antwort aus.');
                         return;
                     }
 
-                    if (hostConnection && hostConnection.open) {
-                        hostConnection.send({ type: 'answer', answer: selectedAnswers });
-                        submitAnswerBtn.disabled = true;
-                        optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
-                        console.log("Player submitted answer:", selectedAnswers);
-                    }
+                    submitAnswerBtn.disabled = true;
+                    optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
+                    console.log("Player submitted answer:", selectedAnswers);
 
                     if (playerTimerInterval) {
                         clearInterval(playerTimerInterval);
                         playerTimerInterval = null;
+                    }
+
+                    // Update player's answer in Supabase
+                    try {
+                        await supabaseClient
+                            .from('players')
+                            .update({
+                                last_answer_data: selectedAnswers,
+                                last_answer_time: new Date().toISOString()
+                            })
+                            .eq('id', playerCurrentId);
+                        console.log('Player answer updated in Supabase.');
+                    } catch (error) {
+                        console.error('Error updating player answer in Supabase:', error);
+                        alert('Fehler beim Absenden der Antwort. Bitte versuchen Sie es erneut.');
                     }
                 });
 
@@ -1169,14 +1670,13 @@
                     showView('role-selection');
                 });
 
-                window.addEventListener('beforeunload', () => {
-                    if (hostConnection) {
-                        hostConnection.close();
-                        hostConnection = null;
+                window.addEventListener('beforeunload', async () => {
+                    if (playerSupabaseChannel) {
+                        await supabaseClient.removeChannel(playerSupabaseChannel);
                     }
-                    if (playerPeer) {
-                        playerPeer.destroy();
-                        playerPeer = null;
+                    // Mark player as disconnected
+                    if (playerCurrentId) {
+                        await supabaseClient.from('players').update({ is_connected: false }).eq('id', playerCurrentId);
                     }
                 });
 
@@ -1193,108 +1693,78 @@
 
 
             /**
-             * Initializes the PeerJS instance for the player and connects to the host.
-             * @param {string} hostPeerId - The Peer ID of the host (the 9-digit alphanumeric room code).
+             * Initializes Supabase for the player and joins a room.
+             * @param {string} hostRoomId - The Supabase room ID.
              * @param {string} pName - The player's name.
              */
-            function initPlayerPeer(hostPeerId, pName) {
-                if (typeof Peer === 'undefined') {
-                    alert('Fehler: Die PeerJS-Bibliothek (Peer.js) konnte nicht geladen werden. Dies könnte an einer Browser-Erweiterung (wie einem Ad-Blocker) oder einem Netzwerkproblem liegen. Bitte überprüfe deine Browser-Konsole und den Netzwerk-Tab für weitere Details, versuche, Erweiterungen zu deaktivieren, oder stelle sicher, dass unpkg.com zugänglich ist.');
-                    if(joinForm) joinForm.classList.remove('hidden');
-                    if(waitingRoom) waitingRoom.classList.add('hidden');
-                    return;
-                }
+            async function initPlayerSupabase(hostRoomId, pName) {
+                playerRoomId = hostRoomId;
+                playerCurrentId = `player-${generateAlphanumericId(12)}`; // Generate a unique ID for this player
 
-                if (playerPeer) playerPeer.destroy();
+                joinForm.classList.add('hidden');
+                waitingRoom.classList.remove('hidden');
+                waitingMessage.textContent = `Verbinde mit Raum ${playerRoomId}...`;
 
-                playerPeer = new Peer(undefined, { debug: 2 }); // Player gets a random ID
+                try {
+                    // Check if room exists
+                    const { data: room, error: roomError } = await supabaseClient
+                        .from('rooms')
+                        .select('id')
+                        .eq('id', playerRoomId)
+                        .single();
 
-                playerPeer.on('open', (id) => {
-                    console.log('Player PeerJS ID:', id, 'Connecting to host:', hostPeerId);
-                    if (hostConnection) hostConnection.close();
-                    // Remove spaces from hostPeerId before connecting
-                    hostConnection = playerPeer.connect(hostPeerId.replace(/\s/g, ''), { reliable: true }); // Connect using the host's 9-digit ID
-
-                    joinForm.classList.add('hidden');
-                    waitingRoom.classList.remove('hidden');
-                    waitingMessage.textContent = `Verbinde mit Raum ${hostPeerId}...`;
-
-                    setupConnectionEventHandlers(pName);
-                });
-
-                playerPeer.on('error', (err) => {
-                    console.error('Player PeerJS error:', err);
-                    alert(`Verbindungsfehler: ${err.message}. Bitte überprüfe die Host-ID und versuche es erneut.`);
-                    if(joinForm) joinForm.classList.remove('hidden');
-                    if(waitingRoom) waitingRoom.classList.add('hidden');
-                    if (playerPeer) {
-                        playerPeer.destroy();
-                        playerPeer = null;
-                    }
-                    if (hostConnection) {
-                        hostConnection.close();
-                        hostConnection = null;
-                    }
-                });
-
-                playerPeer.on('disconnected', () => {
-                    console.log('Player PeerJS disconnected.');
-                    waitingMessage.textContent = 'Verbindung getrennt. Versuche erneut zu verbinden...';
-                });
-
-                playerPeer.on('close', () => {
-                    console.log('Player PeerJS closed.');
-                    if(!playerFinalResultView.classList.contains('active')) {
-                        alert("Verbindung verloren.");
+                    if (roomError || !room) {
+                        alert('Raum nicht gefunden oder Fehler beim Abrufen des Raums. Bitte überprüfen Sie den Code.');
                         resetPlayerStateAndUI();
+                        return;
                     }
-                });
-            }
 
-            /**
-             * Sets up event handlers for the data connection to the host.
-             * @param {string} pName - The player's name.
-             */
-            function setupConnectionEventHandlers(pName) {
-                if (!hostConnection) return;
+                    // Insert player into Supabase
+                    const { data: playerData, error: playerInsertError } = await supabaseClient
+                        .from('players')
+                        .insert([
+                            {
+                                id: playerCurrentId,
+                                room_id: playerRoomId,
+                                name: pName,
+                                score: 0,
+                                is_connected: true
+                            }
+                        ]);
 
-                hostConnection.on('open', () => {
-                    console.log('Connected to host:', hostConnection.peer);
-                    hostConnection.send({ type: 'join', name: pName });
-                    waitingMessage.textContent = 'Verbunden! Warte auf Host...';
-                });
+                    if (playerInsertError) throw playerInsertError;
+                    console.log('Player joined Supabase:', playerData);
 
-                hostConnection.on('data', handleHostData);
+                    // Subscribe to broadcast channel for this room
+                    playerSupabaseChannel = supabaseClient.channel(`quiz_room_${playerRoomId}`);
+                    playerSupabaseChannel.on('broadcast', { event: 'quiz_event' }, (payload) => {
+                        handleHostData(payload.payload); // Process messages from host
+                    }).subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            console.log('Player subscribed to broadcast channel:', `quiz_room_${playerRoomId}`);
+                            waitingMessage.textContent = 'Verbunden! Warte auf Host...';
+                        } else if (status === 'CHANNEL_ERROR') {
+                            console.error('Player channel error:', status);
+                            alert('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuchen Sie es erneut.');
+                            resetPlayerStateAndUI();
+                        }
+                    });
 
-                hostConnection.on('close', () => {
-                    console.log('Connection to host closed.');
-                    if (!playerFinalResultView.classList.contains('active')) {
-                        alert('Verbindung zum Host verloren.');
-                        resetPlayerStateAndUI();
-                    }
-                });
-
-                hostConnection.on('error', (err) => {
-                    console.error('Error in host connection:', err);
-                    alert(`Fehler mit Host: ${err.message}.`);
+                } catch (error) {
+                    console.error('Error initializing player Supabase:', error);
+                    alert(`Fehler beim Beitreten des Quiz: ${error.message}.`);
                     resetPlayerStateAndUI();
-                });
+                }
             }
 
             /**
-             * Handles data received from the host.
+             * Handles data received from the host (via Supabase Broadcast).
              * @param {Object} data - The data received from the host.
              */
             function handleHostData(data) {
                 console.log('Player received data from host:', data);
 
                 switch (data.type) {
-                    case 'welcome':
-                        waitingMessage.textContent = data.message;
-                        break;
-                    case 'joined':
-                        waitingMessage.textContent = data.message + " Warte auf Quiz...";
-                        break;
                     case 'question':
                         playerCurrentQuestionOptions = data.options; // These are already shuffled
                         selectedAnswers = [];
@@ -1304,11 +1774,15 @@
                         break;
                     case 'result':
                         displayResult(data);
-                        playerScore = data.score;
+                        playerScore = data.score; // Update player's score from broadcast
                         playerScoreEl.textContent = playerScore;
-                        waitingForNext.textContent = data.isFinal ? 'Warten auf finales Ergebnis...' : 'Warten auf nächste Frage...';
+                        waitingForNext.textContent = data.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
+                        if (data.isFinal) {
+                            displayFinalResult(data);
+                        }
                         break;
                     case 'final':
+                        // This case might be redundant if 'result' already handles final, but kept for clarity
                         displayFinalResult(data);
                         break;
                     case 'quiz_terminated':
@@ -1342,8 +1816,8 @@
                         optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
                         console.log("Player timer up.");
                          // Automatically send an empty answer if time runs out and no answer was selected
-                         if (selectedAnswers.length === 0 && hostConnection && hostConnection.open) {
-                             hostConnection.send({ type: 'answer', answer: [] });
+                         if (selectedAnswers.length === 0) { // No need to check hostConnection, just update own DB entry
+                             supabaseClient.from('players').update({ last_answer_data: [], last_answer_time: new Date().toISOString() }).eq('id', playerCurrentId);
                              console.log("Player sent empty answer due to timeout.");
                          }
                     }
@@ -1406,7 +1880,7 @@
                 playerQuestionView.classList.add('hidden');
                 playerResultView.classList.remove('hidden');
 
-                let resultHtml = 'Deine Antwort war ';
+                let resultHtml = 'Ihre Antwort war ';
                 // rData.playerAnswer and rData.correct are based on the shuffled indices
                 const playerAnsSet = new Set(rData.playerAnswer || []);
                 const correctSet = new Set(rData.correct);
@@ -1416,7 +1890,7 @@
                                            [...playerAnsSet].every(item => correctSet.has(item));
 
                 if (!rData.playerAnswer || rData.playerAnswer.length === 0) {
-                    resultHtml = "Du hast nicht geantwortet. ";
+                    resultHtml = "Sie haben nicht geantwortet. ";
                 } else if (isCompletelyCorrect) {
                     resultHtml += '<strong class="correct">RICHTIG!</strong> ';
                     triggerConfetti(); // Trigger confetti for correct answers
@@ -1476,7 +1950,7 @@
 
                 if (frData.leaderboard) {
                     const lbDiv = document.createElement('div');
-                    lbDiv.innerHTML = '<h4>Finale Rangliste:</h4>';
+                    lbDiv.innerHTML = '<h4>Endgültige Rangliste:</h4>';
                     const ol = document.createElement('ol');
                     frData.leaderboard.forEach((p, idx) => { // Added idx for rank highlighting
                         const li = document.createElement('li');
@@ -1496,25 +1970,22 @@
             /**
              * Resets the player's state and UI to the initial join form.
              */
-            function resetPlayerStateAndUI() {
-                if (hostConnection) {
-                    hostConnection.close();
-                    hostConnection = null;
+            async function resetPlayerStateAndUI() {
+                if (playerSupabaseChannel) {
+                    await supabaseClient.removeChannel(playerSupabaseChannel);
+                    playerSupabaseChannel = null;
                 }
-                if (playerPeer) {
-                    playerPeer.destroy();
-                    playerPeer = null;
-                }
-
-                if (playerTimerInterval) {
-                    clearInterval(playerTimerInterval);
-                    playerTimerInterval = null;
+                // Mark player as disconnected in DB
+                if (playerCurrentId) {
+                    await supabaseClient.from('players').update({ is_connected: false }).eq('id', playerCurrentId);
                 }
 
                 playerScore = 0;
                 selectedAnswers = [];
                 playerCurrentQuestionOptions = [];
                 playerQuestionStartTime = null;
+                playerRoomId = null;
+                playerCurrentId = null;
 
                 roomCodeInput.value = '';
                 playerNameInput.value = '';
