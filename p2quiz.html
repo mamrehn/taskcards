@@ -6,7 +6,7 @@
     <title>P2P Quiz Spiel</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <link rel="stylesheet" href="p2quiz.css">
+    <link rel="stylesheet" href="moquiz.css">
     <style>
         /* General body and font size for better readability and mobile friendliness */
         body {
@@ -529,8 +529,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize Supabase client here, after the DOM is loaded
             // This ensures the Supabase global object is available
-            if (typeof supabase !== 'undefined' && supabase.createClient) { // Changed from Supabase to supabase
-                const { createClient } = supabase; // Destructure createClient
+            if (typeof supabase !== 'undefined' && supabase.createClient) { 
+                const { createClient } = supabase; 
                 supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             } else {
                 console.error("Supabase library not loaded or 'supabase.createClient' is undefined. Please check network and script loading.");
@@ -769,7 +769,7 @@
 
                 // Event listener for starting questions (after players join)
                 startQuestionsBtn.addEventListener('click', async () => {
-                    if (Object.keys(quizState.players).length === 0) {
+                    if (Object.keys(quizState.players).filter(pId => pId !== hostPlayerId).length === 0) { // Check only non-host players
                         alert("Es sind noch keine Spieler beigetreten!");
                         return;
                     }
@@ -869,7 +869,7 @@
                     displayHostOptions(currentQuestion.shuffledOptions || currentQuestion.options, []); // Use shuffled if available
                     questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
                     answersCount.textContent = quizState.answersReceived.toString();
-                    totalPlayers.textContent = Object.keys(quizState.players).length.toString();
+                    totalPlayers.textContent = Object.values(quizState.players).filter(p => p.id !== hostPlayerId).length.toString(); // Only count non-host players
                     if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) showNextBtn.classList.remove('hidden');
                     else showResultsBtn.classList.remove('hidden');
                 } else if (hostResults.classList.contains('active')) {
@@ -958,7 +958,7 @@
                     if (roomError) throw roomError;
                     console.log('Room created in Supabase:', roomData);
 
-                    // Insert host as a player
+                    // Insert host as a player (for internal state management, not for display in player list)
                     const { data: hostPlayerData, error: hostPlayerError } = await supabaseClient
                         .from('players')
                         .insert([
@@ -1014,7 +1014,8 @@
                                 if (quizState.players[payload.old.id]) {
                                     delete quizState.players[payload.old.id];
                                     updatePlayersList();
-                                    if (quizState.isQuestionActive && quizState.answersReceived >= Object.keys(quizState.players).length) {
+                                    const nonHostPlayers = Object.values(quizState.players).filter(p => p.id !== hostPlayerId);
+                                    if (quizState.isQuestionActive && quizState.answersReceived >= nonHostPlayers.length) {
                                         endQuestion();
                                     }
                                 }
@@ -1032,7 +1033,7 @@
 
                     if (initialPlayersError) throw initialPlayersError;
                     initialPlayers.forEach(p => {
-                        if (p.id !== hostPlayerId) {
+                        if (p.id !== hostPlayerId) { // Ensure host is not added to quizState.players from initial fetch
                             quizState.players[p.id] = {
                                 id: p.id,
                                 name: p.name,
@@ -1080,7 +1081,7 @@
                 // Ensure the player exists in our local state and the quiz is active
                 if (!quizState.players[playerId] || !quizState.isQuestionActive) {
                     // If player is new or reconnected, add them to local state
-                    if (!quizState.players[playerId]) {
+                    if (playerId !== hostPlayerId && !quizState.players[playerId]) { // Only add if not host and not already present
                         quizState.players[playerId] = {
                             id: playerId,
                             name: playerData.name,
@@ -1091,9 +1092,11 @@
                         updatePlayersList(); // Update UI to show new player
                     }
                     // If quiz is not active, just update player's score and connection status
-                    quizState.players[playerId].score = playerData.score || 0;
-                    quizState.players[playerId].is_connected = playerData.is_connected;
-                    updatePlayersList(); // Update connected players count
+                    if (playerId !== hostPlayerId) { // Only update non-host players
+                        quizState.players[playerId].score = playerData.score || 0;
+                        quizState.players[playerId].is_connected = playerData.is_connected;
+                        updatePlayersList(); // Update connected players count
+                    }
                     return;
                 }
 
@@ -1111,7 +1114,9 @@
                     quizState.players[playerId].currentAnswer = playerData.last_answer_data; // Store the new answer
                     answersCount.textContent = quizState.answersReceived.toString();
 
-                    if (quizState.answersReceived >= Object.keys(quizState.players).length) {
+                    // Check if all *non-host* players have answered
+                    const nonHostPlayers = Object.values(quizState.players).filter(p => p.id !== hostPlayerId);
+                    if (quizState.answersReceived >= nonHostPlayers.length) {
                         endQuestion();
                     }
                 }
@@ -1130,9 +1135,12 @@
 
                     if (error) throw error;
 
-                    // Update local quizState.players based on fetched data
+                    // Filter out the host from the list of players for display
+                    const nonHostPlayers = players.filter(p => p.id !== hostPlayerId);
+
+                    // Update local quizState.players based on fetched data, ensuring host is only added once for internal state
                     const currentConnectedPlayers = {};
-                    players.forEach(p => {
+                    nonHostPlayers.forEach(p => {
                         currentConnectedPlayers[p.id] = {
                             id: p.id,
                             name: p.name,
@@ -1141,20 +1149,19 @@
                             answerTime: quizState.players[p.id]?.answerTime || null
                         };
                     });
-                    // Add host back if it was filtered out by the select query
+                    // Ensure the host's player object is in quizState.players for scoring/internal logic, but not iterated for display
                     if (quizState.players[hostPlayerId]) {
                         currentConnectedPlayers[hostPlayerId] = quizState.players[hostPlayerId];
                     }
                     quizState.players = currentConnectedPlayers;
 
-
-                    const playerCount = Object.keys(quizState.players).length;
+                    const playerCount = nonHostPlayers.length; // Count only non-host players
                     playerCountElement.textContent = playerCount.toString();
-                    totalPlayers.textContent = playerCount.toString();
+                    totalPlayers.textContent = playerCount.toString(); // Total players for answers count is also non-host
 
                     playersList.innerHTML = '';
 
-                    Object.values(quizState.players).forEach(p => {
+                    nonHostPlayers.forEach(p => { // Iterate only non-host players for display
                         const i = document.createElement('div');
                         i.className = 'player-item';
                         i.textContent = p.name;
@@ -1258,7 +1265,8 @@
                 displayHostOptions(shuffledOptions, []); // Use shuffled options for display
                 questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
                 answersCount.textContent = '0';
-                totalPlayers.textContent = Object.keys(quizState.players).length.toString();
+                const nonHostPlayersCount = Object.values(quizState.players).filter(p => p.id !== hostPlayerId).length;
+                totalPlayers.textContent = nonHostPlayersCount.toString();
 
                 showNextBtn.classList.add('hidden');
                 showResultsBtn.classList.add('hidden');
@@ -1388,6 +1396,8 @@
                 const totalQuestionTime = quizState.questionDuration; // Use host-defined duration
 
                 Object.values(quizState.players).forEach(p => {
+                    if (p.id === hostPlayerId) return; // Skip host for scoring
+
                     if (p.currentAnswer && p.currentAnswer.length > 0) {
                         const playerAnsSet = new Set(p.currentAnswer);
 
@@ -1416,6 +1426,8 @@
                 const leaderboardData = getLeaderboardData(); // Get latest leaderboard for results
 
                 for (const p of Object.values(quizState.players)) {
+                    if (p.id === hostPlayerId) continue; // Don't update host's score in DB for players
+
                     // Update player score in DB
                     try {
                         await supabaseClient
@@ -1431,9 +1443,6 @@
                 const resData = {
                     type: 'result',
                     correct: currentQ.shuffledCorrect, // Send shuffled correct indices
-                    // playerAnswer is specific to each player, so we'll send a generic result here.
-                    // Players will check their own last_answer_data from DB or local state.
-                    score: null, // Player will update their own score from DB or local state
                     isFinal: isFinalQ,
                     options: currentQ.shuffledOptions, // Send shuffled options to player for result display
                     leaderboard: leaderboardData // Include leaderboard for final results
@@ -1456,7 +1465,7 @@
               * Displays the current scoreboard (top 10) on the host side.
               */
             function displayCurrentScoreboard() {
-                const sortedPlayers = getLeaderboardData();
+                const sortedPlayers = getLeaderboardData(); // This function already filters out the host
                 scoreboardListEl.innerHTML = '';
                 hostScoreboardEl.classList.remove('hidden');
 
@@ -1498,6 +1507,7 @@
              */
             function getLeaderboardData() {
                 return Object.values(quizState.players)
+                    .filter(p => p.id !== hostPlayerId) // Filter out the host
                     .map(p => ({ name: p.name, score: p.score }))
                     .sort((a, b) => b.score - a.score);
             }
@@ -1506,7 +1516,7 @@
              * Displays the final leaderboard on the host side.
              */
             function displayLeaderboard() {
-                const sortedPlayers = getLeaderboardData();
+                const sortedPlayers = getLeaderboardData(); // This function already filters out the host
                 leaderboard.innerHTML = '';
 
                 sortedPlayers.forEach((p, idx) => {
@@ -1558,7 +1568,7 @@
         let isPlayerInitialized = false;
         let playerTimerInterval = null;
         let playerCurrentQuestionOptions = [];
-        let selectedAnswers = [];
+        let selectedAnswers = []; // This will hold the player's selected answers for the current question
         let playerScore = 0;
         let playerQuestionStartTime = null;
 
@@ -1761,28 +1771,41 @@
              * Handles data received from the host (via Supabase Broadcast).
              * @param {Object} data - The data received from the host.
              */
-            function handleHostData(data) {
+            async function handleHostData(data) { // Made async to allow await for DB fetch
                 console.log('Player received data from host:', data);
 
                 switch (data.type) {
                     case 'question':
                         playerCurrentQuestionOptions = data.options; // These are already shuffled
-                        selectedAnswers = [];
+                        selectedAnswers = []; // Reset selected answers for new question
                         playerQuestionStartTime = Date.now();
                         displayQuestion(data);
                         startPlayerTimer(data.duration); // Use duration received from host
                         break;
                     case 'result':
-                        displayResult(data);
-                        playerScore = data.score; // Update player's score from broadcast
-                        playerScoreEl.textContent = playerScore;
+                        // Fetch the player's most recent score and answer data from DB
+                        const { data: currentPlayerDbData, error: fetchError } = await supabaseClient
+                            .from('players')
+                            .select('score, last_answer_data')
+                            .eq('id', playerCurrentId)
+                            .single();
+
+                        if (fetchError) {
+                            console.error('Error fetching player data for result display:', fetchError);
+                            // Fallback to previous score if fetch fails
+                            displayResult(data, selectedAnswers, playerScore);
+                        } else {
+                            playerScore = currentPlayerDbData.score || 0;
+                            const playerAnswerFromDb = currentPlayerDbData.last_answer_data || [];
+                            displayResult(data, playerAnswerFromDb, playerScore);
+                        }
+                        
                         waitingForNext.textContent = data.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
                         if (data.isFinal) {
                             displayFinalResult(data);
                         }
                         break;
                     case 'final':
-                        // This case might be redundant if 'result' already handles final, but kept for clarity
                         displayFinalResult(data);
                         break;
                     case 'quiz_terminated':
@@ -1837,7 +1860,7 @@
                 playerQuestionCounterEl.textContent = `Frage ${qData.index + 1} von ${qData.total}`;
 
                 optionsContainer.innerHTML = '';
-                selectedAnswers = [];
+                selectedAnswers = []; // Ensure selectedAnswers is reset for a new question
 
                 // qData.options are already shuffled from the host
                 qData.options.forEach((option, index) => {
@@ -1875,21 +1898,23 @@
             /**
              * Displays the result of the just-answered question for the player.
              * @param {Object} rData - The result data received from the host.
+             * @param {Array<number>} playerAnswer - The player's actual answer for this question (fetched from DB or local).
+             * @param {number} currentScore - The player's current score (fetched from DB).
              */
-            function displayResult(rData) {
+            function displayResult(rData, playerAnswer, currentScore) {
                 playerQuestionView.classList.add('hidden');
                 playerResultView.classList.remove('hidden');
 
                 let resultHtml = 'Ihre Antwort war ';
-                // rData.playerAnswer and rData.correct are based on the shuffled indices
-                const playerAnsSet = new Set(rData.playerAnswer || []);
+                // Use the actual playerAnswer passed to the function
+                const playerAnsSet = new Set(playerAnswer || []); 
                 const correctSet = new Set(rData.correct);
                 const options = rData.options; // These are the shuffled options from the host
 
                 let isCompletelyCorrect = correctSet.size === playerAnsSet.size &&
                                            [...playerAnsSet].every(item => correctSet.has(item));
 
-                if (!rData.playerAnswer || rData.playerAnswer.length === 0) {
+                if (!playerAnswer || playerAnswer.length === 0) { // Check playerAnswer directly
                     resultHtml = "Sie haben nicht geantwortet. ";
                 } else if (isCompletelyCorrect) {
                     resultHtml += '<strong class="correct">RICHTIG!</strong> ';
@@ -1914,7 +1939,7 @@
 
 
                 resultDisplay.innerHTML = resultHtml;
-                playerScoreEl.textContent = rData.score;
+                playerScoreEl.textContent = Math.round(currentScore); // Use currentScore passed to the function
 
                 // Update player option buttons to show correct/incorrect after result
                 optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
@@ -1944,7 +1969,7 @@
                 waitingRoom.classList.add('hidden');
                 playerFinalResultView.classList.remove('hidden'); // Ensure this view is shown
 
-                finalScoreEl.textContent = frData.score;
+                finalScoreEl.textContent = Math.round(playerScore); // Use the global playerScore for final display
 
                 playerLeaderboardContainer.innerHTML = '';
 
