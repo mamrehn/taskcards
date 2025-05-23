@@ -1280,13 +1280,18 @@
              * Displays the question options on the host side.
              * @param {string[]} options - An array of option strings (already shuffled if applicable).
              * @param {number[]} [correctIndices=[]] - An optional array of indices for correct answers (already re-mapped if applicable).
+             * @param {number[]} [optionCounts=[]] - An optional array of counts for each option selected by players.
              */
-            function displayHostOptions(options, correctIndices = []) {
+            function displayHostOptions(options, correctIndices = [], optionCounts = []) {
                  hostCurrentOptionsEl.innerHTML = '';
                  const correctSet = new Set(correctIndices);
                  options.forEach((option, index) => {
                      const li = document.createElement('li');
-                     li.textContent = option;
+                     let optionText = option;
+                     if (optionCounts && optionCounts[index] !== undefined) {
+                         optionText += ` (${optionCounts[index]}x gewählt)`;
+                     }
+                     li.textContent = optionText;
                      if (correctSet.has(index)) {
                          li.classList.add('correct');
                      }
@@ -1368,9 +1373,21 @@
 
                 quizState.isQuestionActive = false;
 
-                // Display correct answers on the host side using the stored shuffled data
+                // Calculate option counts for display on host side
                 const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
-                displayHostOptions(currentQuestion.shuffledOptions, currentQuestion.shuffledCorrect);
+                const optionCounts = Array(currentQuestion.shuffledOptions.length).fill(0);
+                Object.values(quizState.players).filter(p => p.id !== hostPlayerId).forEach(p => {
+                    if (p.currentAnswer && Array.isArray(p.currentAnswer)) {
+                        p.currentAnswer.forEach(ansIndex => {
+                            if (optionCounts[ansIndex] !== undefined) {
+                                optionCounts[ansIndex]++;
+                            }
+                        });
+                    }
+                });
+
+                // Display correct answers and counts on the host side
+                displayHostOptions(currentQuestion.shuffledOptions, currentQuestion.shuffledCorrect, optionCounts);
 
 
                 calculateScores();
@@ -1394,6 +1411,20 @@
                 const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
                 const correctSet = new Set(currentQ.shuffledCorrect); // Use shuffled correct indices
                 const totalQuestionTime = quizState.questionDuration; // Use host-defined duration
+                const numQuestions = quizState.shuffledQuestions.length;
+
+                const basePointsFirst = 100;
+                const basePointsLast = 300;
+                let currentQuestionBasePoints = basePointsFirst;
+
+                if (numQuestions > 1) {
+                    const pointsIncreasePerQuestion = (basePointsLast - basePointsFirst) / (numQuestions - 1);
+                    currentQuestionBasePoints = basePointsFirst + (quizState.currentQuestionIndex * pointsIncreasePerQuestion);
+                }
+                // If only one question, it gets basePointsFirst (100)
+                // If 2 questions, 1st gets 100, 2nd gets 300. (200 increase / 1 interval = 200 per question)
+                // If 3 questions, 1st gets 100, 2nd gets 200, 3rd gets 300. (200 increase / 2 intervals = 100 per question)
+
 
                 Object.values(quizState.players).forEach(p => {
                     if (p.id === hostPlayerId) return; // Skip host for scoring
@@ -1408,9 +1439,9 @@
                             // Score = Base Points + (Time Remaining / Total Time) * Bonus Points
                             const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime; // Use max time if no answer time recorded
                             const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
-                            const timeBonus = (timeRemaining / totalQuestionTime) * 50; // Example: up to 50 bonus points
+                            const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5); // Bonus proportional to question value
 
-                            p.score += 100 + timeBonus;
+                            p.score += currentQuestionBasePoints + timeBonus;
                         }
                     }
                 });
@@ -1518,6 +1549,11 @@
             function displayLeaderboard() {
                 const sortedPlayers = getLeaderboardData(); // This function already filters out the host
                 leaderboard.innerHTML = '';
+
+                if (sortedPlayers.length === 0) {
+                    leaderboard.innerHTML = '<p>Noch keine Spieler in der Rangliste.</p>';
+                    return;
+                }
 
                 sortedPlayers.forEach((p, idx) => {
                     const i = document.createElement('div');
@@ -1793,7 +1829,7 @@
                         if (fetchError) {
                             console.error('Error fetching player data for result display:', fetchError);
                             // Fallback to previous score if fetch fails
-                            displayResult(data, selectedAnswers, playerScore);
+                            displayResult(data, selectedAnswers, playerScore); // Use local selectedAnswers as fallback
                         } else {
                             playerScore = currentPlayerDbData.score || 0;
                             const playerAnswerFromDb = currentPlayerDbData.last_answer_data || [];
@@ -1926,14 +1962,18 @@
                 resultHtml += '<br>Richtige Antwort(en): ';
 
                 options.forEach((option, index) => {
+                    // Always show correct answers
                     if (correctSet.has(index)) {
                          if (playerAnsSet.has(index)) {
-                             resultHtml += `<span class="correct player-selected">"${option}"</span> `;
+                             resultHtml += `<span class="correct player-selected">"${option}"</span> `; // Correct and selected by player
                          } else {
-                             resultHtml += `<span class="correct-not-selected">"${option}"</span> `;
+                             resultHtml += `<span class="correct-not-selected">"${option}"</span> `; // Correct but not selected by player
                          }
                     } else if (playerAnsSet.has(index)) {
-                         resultHtml += `<span class="incorrect player-selected">"${option}"</span> `;
+                         // Do not highlight falsely selected answers, just show them as plain text if needed.
+                         // Per instruction: "Do not show the falsely selected answers of the player anymore."
+                         // This means we don't add special classes or text for them.
+                         // The original text for the option will still be there, but no specific highlight.
                     }
                 });
 
@@ -1948,11 +1988,12 @@
                     btn.classList.remove('selected'); // Remove selected class from active state
 
                     if (correctSet.has(index)) {
-                        btn.classList.add('correct-answer');
+                        btn.classList.add('correct-answer'); // Highlight correct answer
                     }
-                    if (playerAnsSet.has(index) && !correctSet.has(index)) {
-                         btn.classList.add('incorrect-answer');
-                    } else if (playerAnsSet.has(index) && correctSet.has(index)) {
+                    // Do NOT apply 'incorrect-answer' class if player chose it and it was wrong.
+                    // The instruction is to not show falsely selected answers anymore.
+                    // If the player selected a correct answer, re-apply 'selected' to show they chose it.
+                    if (playerAnsSet.has(index) && correctSet.has(index)) {
                          btn.classList.add('selected'); // Re-apply selected style if it was correct and selected
                     }
                 });
@@ -1977,14 +2018,18 @@
                     const lbDiv = document.createElement('div');
                     lbDiv.innerHTML = '<h4>Endgültige Rangliste:</h4>';
                     const ol = document.createElement('ol');
-                    frData.leaderboard.forEach((p, idx) => { // Added idx for rank highlighting
-                        const li = document.createElement('li');
-                        if (idx === 0) li.classList.add('rank-1');
-                        else if (idx === 1) li.classList.add('rank-2');
-                        else if (idx === 2) li.classList.add('rank-3');
-                        li.textContent = `${p.name}: ${Math.round(p.score)} Punkte`;
-                        ol.appendChild(li);
-                    });
+                    if (frData.leaderboard.length === 0) {
+                        ol.innerHTML = '<li>Keine Spieler in der Rangliste.</li>';
+                    } else {
+                        frData.leaderboard.forEach((p, idx) => { // Added idx for rank highlighting
+                            const li = document.createElement('li');
+                            if (idx === 0) li.classList.add('rank-1');
+                            else if (idx === 1) li.classList.add('rank-2');
+                            else if (idx === 2) li.classList.add('rank-3');
+                            li.textContent = `${idx + 1}. ${p.name}: ${Math.round(p.score)} Punkte`;
+                            ol.appendChild(li);
+                        });
+                    }
                     lbDiv.appendChild(ol);
                     playerLeaderboardContainer.appendChild(lbDiv);
                 } else {
