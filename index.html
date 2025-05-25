@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wählen Sie Ihren Modus</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <style>
+        /* General body and font size for better readability and mobile friendliness */
+        body {
+            font-family: sans-serif;
+            font-size: 18px;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--light-color, #f7f7f7); /* Fallback for light color */
+            color: var(--dark-color, #333); /* Fallback for dark color */
+        }
+
+        /* Root colors for the Multiplayer Quiz app style */
+        :root {
+            --primary-color: #46178f;
+            --secondary-color: #5e22b2;
+            --accent-color: #ff3355;
+            --light-color: #f7f7f7;
+            --dark-color: #333;
+            --correct-color: #00c853;
+            --wrong-color: #ff3d00;
+        }
+
+        /* Root colors for the Taskcards app style */
+        .taskcard-colors {
+            --primary: #4a6fa5;
+            --secondary: #166088;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+        }
+
+        .container {
+            text-align: center;
+            padding: 20px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        header {
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: var(--primary-color, #46178f);
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.2em;
+            color: var(--dark-color, #333);
+        }
+
+        .button-container {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+            justify-content: center;
+            gap: 30px; /* Space between buttons */
+            margin-top: 50px;
+        }
+
+        .choice-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: white;
+            padding: 30px 40px;
+            border-radius: 15px; /* More rounded corners */
+            font-size: 1.5em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+            min-width: 280px; /* Ensure buttons are large enough */
+            max-width: 40%; /* Responsive width */
+            flex-grow: 1; /* Allow buttons to grow */
+        }
+
+        .choice-button i {
+            font-size: 3em; /* Large icon size */
+            margin-bottom: 15px;
+        }
+
+        /* Style for the Multiplayer Quiz button */
+        .quiz-button {
+            background: linear-gradient(45deg, var(--primary-color, #46178f), var(--secondary-color, #5e22b2));
+            border: 2px solid var(--accent-color, #ff3355);
+        }
+
+        .quiz-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(45deg, var(--secondary-color, #5e22b2), var(--primary-color, #46178f));
+        }
+
+        /* Style for the Study Alone / Taskcards button */
+        .study-button {
+            /* Using taskcard colors */
+            background: linear-gradient(45deg, var(--primary, #4a6fa5), var(--secondary, #166088));
+            border: 2px solid var(--warning, #ffc107); /* Using warning color as an accent */
+        }
+
+        .study-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(45deg, var(--secondary, #166088), var(--primary, #4a6fa5));
+        }
+
+        footer {
+            margin-top: 50px;
+            font-size: 0.9em;
+        }
+
+        footer a {
+            color: var(--primary-color, #007bff); /* Using quiz primary for consistency */
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5em;
+            }
+            .choice-button {
+                font-size: 1.3em;
+                padding: 25px 30px;
+                max-width: 90%; /* Take more width on smaller screens */
+            }
+            .choice-button i {
+                font-size: 2.5em;
+            }
+            .button-container {
+                flex-direction: column; /* Stack buttons vertically */
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 2em;
+            }
+            p {
+                font-size: 1em;
+            }
+            .choice-button {
+                font-size: 1.1em;
+                padding: 20px 25px;
+            }
+            .choice-button i {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Willkommen!</h1>
+            <p>Wählen Sie, wie Sie lernen oder spielen möchten:</p>
+        </header>
+
+        <div class="button-container">
+            <a href="cards.html" class="choice-button study-button">
+                <i class="fas fa-book-open"></i>
+                <span>Alleine lernen (Aufgabenkarten)</span>
+            </a>
+            <a href="qlash.html" class="choice-button quiz-button">
+                <i class="fas fa-gamepad"></i>
+                <span>Wissen testen (Multiplayer Quiz)</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
