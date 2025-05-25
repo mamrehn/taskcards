@@ -25,13 +25,13 @@ body {
 
 /* Headings font size adjustments */
 h1 {
-    font-size: 2.5rem; /* Using rem for better scaling */
+    font-size: 2rem; /* Using rem for better scaling */
 }
 h2 {
-    font-size: 2em;
+    font-size: 1.7em;
 }
 h3 {
-    font-size: 1.7em;
+    font-size: 1.5em;
 }
 
 /* Main container for content */
