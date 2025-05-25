@@ -16,7 +16,7 @@
         </header>
 
         <div id="role-selection" class="view active card">
-            <h2>Wählen Sie Ihre Rolle</h2>
+            <h2>Wählen deine Rolle</h2>
             <button id="host-btn" class="btn">Quiz hosten</button>
             <button id="player-btn" class="btn">Quiz beitreten</button>
         </div>
@@ -41,7 +41,7 @@
                 <form id="question-form">
                     <div>
                         <label for="question-text">Frage:</label>
-                        <input type="text" id="question-text" placeholder="Geben Sie Ihre Frage ein">
+                        <input type="text" id="question-text" placeholder="Gib deine Frage ein">
                     </div>
                     <div class="option-group">
                         <input type="text" class="option-input" placeholder="Option 1">
@@ -102,14 +102,14 @@
             <div id="join-form">
                 <h2>Einem Quiz beitreten</h2>
                  <input type="text" id="room-code-input" placeholder="Host-ID eingeben oder QR scannen">
-                <input type="text" id="player-name-input" placeholder="Ihr Name">
+                <input type="text" id="player-name-input" placeholder="Dein Name">
                 <button id="join-btn" class="btn">Quiz beitreten</button>
-                <p>Oder scannen Sie den vom Host bereitgestellten QR-Code</p>
+                <p>Oder scanne den vom Host bereitgestellten QR-Code</p>
             </div>
 
             <div id="waiting-room" class="hidden">
                 <h2>Warten auf den Quizstart</h2>
-                <p id="waiting-message">Sie sind dem Raum erfolgreich beigetreten!</p>
+                <p id="waiting-message">Du bist dem Raum erfolgreich beigetreten!</p>
                 <div class="loader"></div>
                 <p>Der Host wird das Quiz bald starten...</p>
             </div>
@@ -126,14 +126,14 @@
 
             <div id="player-result" class="hidden">
                 <div id="result-display"></div>
-                <div class="score-display">Ihre Punktzahl: <span id="player-score">0</span></div>
+                <div class="score-display">Deine Punktzahl: <span id="player-score">0</span></div>
                 <p id="waiting-for-next">Warten auf nächste Frage...</p>
             </div>
 
             <div id="player-final-result" class="view card hidden">
                 <h2>Quiz beendet!</h2>
                 <div id="player-leaderboard-container" style="margin-bottom: 15px;"></div>
-                <div class="score-display">Ihre Endpunktzahl: <span id="final-score">0</span></div>
+                <div class="score-display">Deine Endpunktzahl: <span id="final-score">0</span></div>
                 <p>Vielen Dank fürs Mitspielen!</p>
                 <button id="play-again-btn" class="btn">Nochmal spielen</button>
             </div>
@@ -233,7 +233,7 @@
                 supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             } else {
                 console.error("Supabase library not loaded or 'supabase.createClient' is undefined. Please check network and script loading.");
-                showMessage("Fehler: Die Supabase-Bibliothek konnte nicht geladen werden. Bitte überprüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut.", 'error');
+                showMessage("Fehler: Die Supabase-Bibliothek konnte nicht geladen werden. Bitte überprüfe deine Internetverbindung oder versuche es später erneut.", 'error');
                 return; // Prevent further execution if Supabase is not available
             }
 
@@ -405,7 +405,7 @@
                     e.preventDefault();
                     const question = questionText.value.trim();
                     if (!question) {
-                        showMessage('Bitte geben Sie eine Frage ein', 'error');
+                        showMessage('Bitte gebe eine Frage ein', 'error');
                         return;
                     }
 
@@ -426,11 +426,11 @@
                     });
 
                     if (options.length < 2) {
-                        showMessage('Bitte fügen Sie mindestens zwei gültige Optionen hinzu', 'error');
+                        showMessage('Bitte füge mindestens zwei gültige Optionen hinzu', 'error');
                         return;
                     }
                     if (correct.length === 0) {
-                        showMessage('Bitte wählen Sie mindestens eine richtige Antwort aus', 'error');
+                        showMessage('Bitte wähle mindestens eine richtige Antwort aus', 'error');
                         return;
                     }
 
@@ -452,12 +452,12 @@
                 // Event listener for starting the quiz
                 startQuizBtn.addEventListener('click', async () => {
                     if (quizState.questions.length === 0) {
-                        showMessage('Bitte fügen Sie mindestens eine Frage hinzu.', 'error');
+                        showMessage('Bitte füge mindestens eine Frage hinzu.', 'error');
                         return;
                     }
                     const duration = parseInt(questionDurationInput.value, 10);
                     if (isNaN(duration) || duration < 5 || duration > 60) {
-                        showMessage('Bitte geben Sie eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.', 'error');
+                        showMessage('Bitte gebe eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.', 'error');
                         return;
                     }
                     quizState.questionDuration = duration;
@@ -767,14 +767,14 @@
                             if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
                         } else if (status === 'CHANNEL_ERROR') {
                             console.error('Host channel error:', status);
-                            showMessage('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuchen Sie es erneut.', 'error');
+                            showMessage('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuche es erneut.', 'error');
                             resetHostStateAndUI();
                         }
                     });
 
                 } catch (error) {
                     console.error('Error initializing host Supabase:', error);
-                    showMessage(`Fehler beim Starten des Hosts: ${error.message}. Bitte überprüfen Sie Ihre Supabase-Konfiguration und versuchen Sie es erneut.`, 'error');
+                    showMessage(`Fehler beim Starten des Hosts: ${error.message}. Bitte überprüfe deine Supabase-Konfiguration und versuche es erneut.`, 'error');
                     resetHostStateAndUI();
                 }
             }
@@ -1044,7 +1044,7 @@
                     console.log('Question broadcasted:', qData);
                 } catch (error) {
                     console.error('Error sending question via Supabase:', error);
-                    showMessage('Fehler beim Senden der Frage. Bitte überprüfen Sie Ihre Supabase-Verbindung.', 'error');
+                    showMessage('Fehler beim Senden der Frage. Bitte überprüfe deine Supabase-Verbindung.', 'error');
                 }
             }
 
@@ -1198,7 +1198,7 @@
                     console.log('Results broadcasted.');
                 } catch (error) {
                     console.error('Error broadcasting results via Supabase:', error);
-                    showMessage('Fehler beim Senden der Ergebnisse. Bitte überprüfen Sie Ihre Supabase-Verbindung.', 'error');
+                    showMessage('Fehler beim Senden der Ergebnisse. Bitte überprüfe deine Supabase-Verbindung.', 'error');
                 }
             }
 
@@ -1387,7 +1387,7 @@
                     const finalPlayerName = playerName || 'Spieler ' + generateAlphanumericId(4);
 
                     if (!roomCode) {
-                        showMessage('Bitte geben Sie einen Raum-Code ein.', 'error');
+                        showMessage('Bitte gib einen Raum-Code ein.', 'error');
                         return;
                     }
                     await initPlayerSupabase(roomCode, finalPlayerName);
@@ -1395,7 +1395,7 @@
 
                 submitAnswerBtn.addEventListener('click', async () => {
                     if (selectedAnswers.length === 0) {
-                        showMessage('Bitte wählen Sie mindestens eine Antwort aus.', 'info');
+                        showMessage('Bitte wähle mindestens eine Antwort aus.', 'info');
                         return;
                     }
 
@@ -1420,7 +1420,7 @@
                         console.log('Player answer updated in Supabase.');
                     } catch (error) {
                         console.error('Error updating player answer in Supabase:', error);
-                        showMessage('Fehler beim Absenden der Antwort. Bitte versuchen Sie es erneut.', 'error');
+                        showMessage('Fehler beim Absenden der Antwort. Bitte versuche es erneut.', 'error');
                     }
                 });
 
@@ -1474,7 +1474,7 @@
                         .single();
 
                     if (roomError || !room) {
-                        showMessage('Raum nicht gefunden oder Fehler beim Abrufen des Raums. Bitte überprüfen Sie den Code.', 'error');
+                        showMessage('Raum nicht gefunden oder Fehler beim Abrufen des Raums. Bitte überprüfe den Code.', 'error');
                         resetPlayerStateAndUI();
                         return;
                     }
@@ -1505,7 +1505,7 @@
                             waitingMessage.textContent = 'Verbunden! Warte auf Host...';
                         } else if (status === 'CHANNEL_ERROR') {
                             console.error('Player channel error:', status);
-                            showMessage('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuchen Sie es erneut.', 'error');
+                            showMessage('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuche es erneut.', 'error');
                             resetPlayerStateAndUI();
                         }
                     });
@@ -1657,7 +1657,7 @@
                 playerQuestionView.classList.add('hidden');
                 playerResultView.classList.remove('hidden');
 
-                let resultHtml = 'Ihre Antwort war ';
+                let resultHtml = 'Deine Antwort war ';
                 // Use the actual playerAnswer passed to the function
                 const playerAnsSet = new Set(playerAnswer || []); 
                 const correctSet = new Set(rData.correct);
@@ -1667,7 +1667,7 @@
                                            [...playerAnsSet].every(item => correctSet.has(item));
 
                 if (!playerAnswer || playerAnswer.length === 0) { // Check playerAnswer directly
-                    resultHtml = "Sie haben nicht geantwortet. ";
+                    resultHtml = "Du hast nicht geantwortet. ";
                 } else if (isCompletelyCorrect) {
                     resultHtml += '<strong class="correct">RICHTIG!</strong> ';
                     triggerConfetti(); // Trigger confetti for correct answers
