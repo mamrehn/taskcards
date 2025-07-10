@@ -551,3 +551,8 @@ input, select {
         height: 250px;
     }
 }
+
+.player-item.disconnected {
+    opacity: 0.5;
+    font-style: italic;
+}
