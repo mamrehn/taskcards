@@ -32,7 +32,9 @@ jobs:
      #   run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
       
       - name: Minify CSS
-        run: csso style.css -o style.css
+        run: |
+          csso cards.css -o cards.css
+          csso qlash.css -o qlash.css
 
       - name: Patch HTML to add inline attributes
         run: |
