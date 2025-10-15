@@ -29,12 +29,39 @@ jobs:
           npm install -g terser csso-cli html-minifier inline-source-cli
       
       - name: Inject Supabase credentials from secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          sed -i "s|'__SUPABASE_URL__'|'${{ secrets.SUPABASE_URL }}'|g" qlash.js
-          sed -i "s|'__SUPABASE_ANON_KEY__'|'${{ secrets.SUPABASE_ANON_KEY }}'|g" qlash.js
+          echo "🔍 Checking if secrets are available..."
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "❌ SUPABASE_URL is empty or not set!"
+          else
+            echo "✅ SUPABASE_URL is set (length: ${#SUPABASE_URL})"
+          fi
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "❌ SUPABASE_ANON_KEY is empty or not set!"
+          else
+            echo "✅ SUPABASE_ANON_KEY is set (length: ${#SUPABASE_ANON_KEY})"
+          fi
+          
+          echo "🔄 Injecting credentials..."
+          sed -i "s|'__SUPABASE_URL__'|'$SUPABASE_URL'|g" qlash.js
+          sed -i "s|'__SUPABASE_ANON_KEY__'|'$SUPABASE_ANON_KEY'|g" qlash.js
+          
           echo "✅ Credentials injected. Verifying..."
-          grep "SUPABASE_URL = 'https://" qlash.js || echo "⚠️ URL injection may have failed"
-          grep "SUPABASE_ANON_KEY = 'eyJ" qlash.js || echo "⚠️ Key injection may have failed"
+          if grep -q "SUPABASE_URL = 'https://" qlash.js; then
+            echo "✅ URL injection successful"
+          else
+            echo "⚠️ URL injection may have failed"
+            grep "SUPABASE_URL" qlash.js | head -1
+          fi
+          if grep -q "SUPABASE_ANON_KEY = 'eyJ" qlash.js; then
+            echo "✅ Key injection successful"
+          else
+            echo "⚠️ Key injection may have failed"
+            grep "SUPABASE_ANON_KEY" qlash.js | head -1
+          fi
       
       - name: Minify JavaScript files
         run: |
