@@ -831,25 +831,23 @@ function showAnswer() {
         selectedOptionsContainer.classList.add('hidden');
         mcCorrectAnswerContainer.classList.add('hidden');
         
+        // Automatically evaluate the answer
+        let isCorrect;
         if (selectedOptionIndices.length > 0) {
             // Check if the answer is correct
-            const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-            
-            // Auto-evaluate the answer
-            markAnswer(isCorrect);
-            
-            // For multiple choice with selections, directly show Next button only
-            markCorrectBtn.style.display = 'none';
-            markIncorrectBtn.style.display = 'none';
-            nextCardBtn.style.display = 'inline-block';
+            isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
         } else {
-            // No selection was made, still let user decide if they knew answer
-            
-            // Show the evaluation buttons for no selection case
-            markCorrectBtn.style.display = 'inline-block';
-            markIncorrectBtn.style.display = 'inline-block';
-            nextCardBtn.style.display = 'none';
+            // No selection was made - treat as incorrect (unless there are no correct answers)
+            isCorrect = card.correct.length === 0;
         }
+        
+        // Auto-evaluate the answer
+        markAnswer(isCorrect);
+        
+        // For multiple choice, always hide Richtig/Falsch buttons and show Next button
+        markCorrectBtn.style.display = 'none';
+        markIncorrectBtn.style.display = 'none';
+        nextCardBtn.style.display = 'inline-block';
     } else {
         // Handle standard text answer display
         const userAnswer = userAnswerInput.value.trim();
