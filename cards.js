@@ -862,12 +862,15 @@ function showAnswer() {
         if (selectedOptionIndices.length > 0) {
             // Check if the answer is correct
             isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
+            console.log('MC Question - Selected:', selectedOptionIndices.sort(), 'Correct:', card.correct.sort(), 'isCorrect:', isCorrect);
         } else {
             // No selection was made - treat as incorrect (unless there are no correct answers)
             isCorrect = card.correct.length === 0;
+            console.log('No selection made, isCorrect:', isCorrect);
         }
         
         // Auto-evaluate the answer
+        console.log('About to call markAnswer with isCorrect:', isCorrect);
         markAnswer(isCorrect);
         
         // For multiple choice, always hide Richtig/Falsch buttons and show Next button
@@ -910,7 +913,12 @@ function arraysEqual(a, b) {
  * @param {boolean} isCorrect - Whether the answer was correct
  */
 function markAnswer(isCorrect) {
-    if (isAnswered) return;
+    console.log('markAnswer called with isCorrect:', isCorrect);
+    
+    if (isAnswered) {
+        console.log('Answer already marked, returning');
+        return;
+    }
 
     isAnswered = true;
     answeredCards[currentCardIndex] = isCorrect;
@@ -923,11 +931,17 @@ function markAnswer(isCorrect) {
     }
 
     if (isCorrect) {
+        console.log('Answer is correct! Incrementing correctCount and triggering confetti');
         correctCount++;
         if (deckStats[deckName]) {
             deckStats[deckName].correct++;
         }
+        
+        // Trigger confetti animation for correct answers
+        triggerConfetti();
     } else {
+        console.log('Answer is incorrect');
+
         incorrectCount++;
         if (deckStats[deckName]) {
             deckStats[deckName].incorrect++;
@@ -1302,4 +1316,91 @@ function showMessage(message) {
             document.body.removeChild(messageEl);
         }, 300);
     }, 3000);
+}
+
+// ============================================================================
+// Confetti Animation
+// ============================================================================
+
+/**
+ * Trigger an improved confetti animation for correct answers
+ */
+function triggerConfetti() {
+    const confettiContainer = document.getElementById('confetti-container');
+    if (!confettiContainer) {
+        console.error('❌ Confetti container not found!');
+        return;
+    }
+
+    console.log('🎉 Triggering confetti animation - container found!');
+
+    // Vibrant color palette
+    const colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+        '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52D17C',
+        '#FF8ED4', '#6C5CE7', '#FD79A8', '#FDCB6E', '#00B894'
+    ];
+    
+    const numConfetti = 80;
+
+    for (let i = 0; i < numConfetti; i++) {
+        const piece = document.createElement('div');
+        
+        // Random starting position (spread across top)
+        const startX = Math.random() * 100;
+        const startY = -20 - Math.random() * 50;
+        
+        // Random color
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        // Random size variation
+        const size = 10 + Math.random() * 6;
+        
+        // Random shape
+        const shapeRand = Math.random();
+        let borderRadius = '0';
+        let clipPath = 'none';
+        if (shapeRand > 0.66) {
+            borderRadius = '50%';
+        } else if (shapeRand > 0.33) {
+            clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
+        }
+        
+        // Animation properties
+        const duration = 1 + Math.random() * 0.5; // 1-1.5 seconds (very fast)
+        const delay = Math.random() * 0.15;
+        const horizontalDrift = (Math.random() - 0.5) * 200;
+        const rotation = 360 + Math.random() * 720;
+        
+        // Set all styles inline
+        piece.style.cssText = `
+            position: absolute;
+            left: ${startX}vw;
+            top: ${startY}px;
+            width: ${size}px;
+            height: ${size}px;
+            background-color: ${color};
+            border-radius: ${borderRadius};
+            clip-path: ${clipPath};
+            opacity: 1;
+            z-index: 10000;
+            pointer-events: none;
+            --confetti-x: ${horizontalDrift}px;
+            --confetti-rotate: ${rotation}deg;
+            animation: confetti-fall ${duration}s ease-in forwards;
+            animation-delay: ${delay}s;
+        `;
+        
+        // Add to DOM
+        confettiContainer.appendChild(piece);
+
+        // Remove piece after animation completes
+        setTimeout(() => {
+            if (piece.parentNode) {
+                piece.remove();
+            }
+        }, (duration + delay) * 1000 + 100);
+    }
+    
+    console.log(`✅ Added ${numConfetti} confetti pieces to container`);
 }
