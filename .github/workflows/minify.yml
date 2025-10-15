@@ -28,52 +28,100 @@ jobs:
         run: |
           npm install -g terser csso-cli html-minifier inline-source-cli
       
-     # - name: Minify JavaScript
-     #   run: terser ./js/spotilist.js --compress --mangle -o ./js/spotilist.js
+      - name: Minify JavaScript files
+        run: |
+          terser index.js --compress --mangle -o index.js
+          terser cards.js --compress --mangle -o cards.js
+          terser qlash.js --compress --mangle -o qlash.js
       
-      - name: Minify CSS
+      - name: Minify CSS files
         run: |
           csso cards.css -o cards.css
           csso qlash.css -o qlash.css
 
-      - name: Patch HTML to add inline attributes
+      - name: Add inline attributes to HTML files for inlining
         run: |
-          sed -i 's/<link rel="stylesheet" href="\(.*\.css\)">/<link inline rel="stylesheet" href="\1">/' index.html
-          sed -i 's/<link href="\(.*\.css\)" rel="stylesheet">/<link inline href="\1" rel="stylesheet">/' index.html
-          sed -i 's/<script src="\(.*\.js\)"><\/script>/<script inline src="\1"><\/script>/' index.html
+          # index.html
+          sed -i 's|<script src="index\.js"></script>|<script inline src="index.js"></script>|g' index.html
+          
+          # cards.html
+          sed -i 's|<link rel="stylesheet" href="cards\.css">|<link inline rel="stylesheet" href="cards.css">|g' cards.html
+          sed -i 's|<script src="cards\.js"></script>|<script inline src="cards.js"></script>|g' cards.html
+          
+          # qlash.html - need to handle external CDN scripts differently
+          sed -i 's|<link rel="stylesheet" href="qlash\.css">|<link inline rel="stylesheet" href="qlash.css">|g' qlash.html
+          sed -i 's|<script src="qlash\.js"></script>|<script inline src="qlash.js"></script>|g' qlash.html
 
-      - name: Inline JS and CSS into HTML
+      - name: Inline CSS and JS into HTML files
         run: |
-          inline-source index.html --compress false --root ./ > ./index.inline.html
+          # Inline index.html
+          inline-source index.html --compress false --root ./ > index.inline.html
+          mv index.inline.html index.html
+          
+          # Inline cards.html
+          inline-source cards.html --compress false --root ./ > cards.inline.html
+          mv cards.inline.html cards.html
+          
+          # Inline qlash.html
+          inline-source qlash.html --compress false --root ./ > qlash.inline.html
+          mv qlash.inline.html qlash.html
 
-      - name: Minify inlined HTML
+      - name: Minify inlined HTML files
         run: |
           html-minifier \
             --collapse-boolean-attributes \
             --collapse-whitespace \
-            --minify-css \
-            --minify-js \
-            --minify-urls \
-            --remove-attribute-quotes \
+            --minify-css true \
+            --minify-js true \
             --remove-comments \
-            --remove-empty-attributes \
-            --remove-optional-tags \
             --remove-redundant-attributes \
             --remove-script-type-attributes \
             --remove-style-link-type-attributes \
-            --remove-tag-whitespace \
             --use-short-doctype \
-            -o index.html index.inline.html
+            index.html -o index.html
+          
+          html-minifier \
+            --collapse-boolean-attributes \
+            --collapse-whitespace \
+            --minify-css true \
+            --minify-js true \
+            --remove-comments \
+            --remove-redundant-attributes \
+            --remove-script-type-attributes \
+            --remove-style-link-type-attributes \
+            --use-short-doctype \
+            cards.html -o cards.html
+          
+          html-minifier \
+            --collapse-boolean-attributes \
+            --collapse-whitespace \
+            --minify-css true \
+            --minify-js true \
+            --remove-comments \
+            --remove-redundant-attributes \
+            --remove-script-type-attributes \
+            --remove-style-link-type-attributes \
+            --use-short-doctype \
+            qlash.html -o qlash.html
+          
+          html-minifier \
+            --collapse-boolean-attributes \
+            --collapse-whitespace \
+            --minify-css true \
+            --remove-comments \
+            --remove-redundant-attributes \
+            --use-short-doctype \
+            datenschutz.html -o datenschutz.html
 
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit minified files
+      - name: Commit minified and inlined files
         run: |
-          git add index.html  # -A
-          git diff --quiet && git diff --staged --quiet || git commit -m "Minify for deployment (SHA: ${{ github.sha }})"
+          git add *.html qlash/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Minify and inline for deployment (SHA: ${{ github.sha }})"
 
       - name: Deploy to gh-pages
         run: |
