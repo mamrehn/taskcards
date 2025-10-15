@@ -580,6 +580,9 @@ function initializeQuiz(loadedCards) {
     incorrectCount = 0;
     answeredCards = new Array(cards.length).fill(null);
 
+    // Randomize initial card order
+    shuffleArray(cards);
+
     // Prioritize incorrectly answered cards if available
     prioritizeIncorrectCards();
 
@@ -1164,14 +1167,27 @@ function handleStudyModeChange(event) {
  * Reorganize cards based on selected study mode
  */
 function reorganizeCardsByStudyMode() {
+    // First, randomize the card order
+    shuffleArray(cards);
+    
     switch (studyMode) {
         case 'incorrect-first':
-            // Show incorrect cards first, then correct/unanswered
+            // Show incorrect cards first (current session + previous sessions), then correct/unanswered
             cards.sort((a, b) => {
                 const aIndex = cards.indexOf(a);
                 const bIndex = cards.indexOf(b);
-                const aIncorrect = answeredCards[aIndex] === false;
-                const bIncorrect = answeredCards[bIndex] === false;
+                
+                // Check if answered incorrectly in current session
+                const aIncorrectNow = answeredCards[aIndex] === false;
+                const bIncorrectNow = answeredCards[bIndex] === false;
+                
+                // Check if was incorrect in previous session
+                const aIncorrectBefore = isCardIncorrectFromPreviousSession(a);
+                const bIncorrectBefore = isCardIncorrectFromPreviousSession(b);
+                
+                // Combine both: incorrect in current session OR incorrect in previous session
+                const aIncorrect = aIncorrectNow || aIncorrectBefore;
+                const bIncorrect = bIncorrectNow || bIncorrectBefore;
                 
                 // Incorrect cards come first (1), then others (0)
                 return bIncorrect - aIncorrect;
@@ -1179,11 +1195,14 @@ function reorganizeCardsByStudyMode() {
             break;
 
         case 'incorrect-only':
-            // Filter to show only incorrect cards
+            // Filter to show only incorrect cards (current session + previous sessions)
             const incorrectCards = [];
             const incorrectAnswers = [];
             cards.forEach((card, index) => {
-                if (answeredCards[index] === false) {
+                const incorrectNow = answeredCards[index] === false;
+                const incorrectBefore = isCardIncorrectFromPreviousSession(card);
+                
+                if (incorrectNow || incorrectBefore) {
                     incorrectCards.push(card);
                     incorrectAnswers.push(answeredCards[index]);
                 }
@@ -1207,6 +1226,30 @@ function reorganizeCardsByStudyMode() {
             });
             break;
     }
+}
+
+/**
+ * Check if a card was answered incorrectly in a previous session
+ * @param {Object} card - Card object
+ * @returns {boolean} True if card was incorrect in previous session
+ */
+function isCardIncorrectFromPreviousSession(card) {
+    const deckName = card.sourceDeck;
+    if (!deckName || !previousIncorrectIndices[deckName] || previousIncorrectIndices[deckName].length === 0) {
+        return false;
+    }
+    
+    // Find the original index of this card in its source deck
+    if (!savedDecks[deckName]) return false;
+    
+    const originalIndex = savedDecks[deckName].cards.findIndex(c => 
+        c.question === card.question && 
+        (c.answer === card.answer || 
+         (Array.isArray(c.options) && Array.isArray(card.options) && 
+          JSON.stringify(c.options) === JSON.stringify(card.options)))
+    );
+    
+    return originalIndex !== -1 && previousIncorrectIndices[deckName].includes(originalIndex);
 }
 
 /**
