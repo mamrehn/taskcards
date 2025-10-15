@@ -30,8 +30,11 @@ jobs:
       
       - name: Inject Supabase credentials from secrets
         run: |
-          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" qlash.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" qlash.js
+          sed -i "s|'__SUPABASE_URL__'|'${{ secrets.SUPABASE_URL }}'|g" qlash.js
+          sed -i "s|'__SUPABASE_ANON_KEY__'|'${{ secrets.SUPABASE_ANON_KEY }}'|g" qlash.js
+          echo "✅ Credentials injected. Verifying..."
+          grep "SUPABASE_URL = 'https://" qlash.js || echo "⚠️ URL injection may have failed"
+          grep "SUPABASE_ANON_KEY = 'eyJ" qlash.js || echo "⚠️ Key injection may have failed"
       
       - name: Minify JavaScript files
         run: |
