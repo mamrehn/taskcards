@@ -98,7 +98,6 @@
                         </div>
                         <div class="controls">
                             <button class="btn btn-primary" id="show-answer">Antwort zeigen</button>
-                            <button class="btn btn-primary hidden" id="check-mc-answer">Antwort prüfen</button>
                         </div>
                     </div>
                     <div class="card-back">
@@ -197,7 +196,6 @@
         const mcCorrectAnswerText = document.getElementById('mc-correct-answer-text');
         const standardAnswerContainer = document.getElementById('standard-answer-container');
         const showAnswerBtn = document.getElementById('show-answer');
-        const checkMcAnswerBtn = document.getElementById('check-mc-answer');
         const markCorrectBtn = document.getElementById('mark-correct');
         const markIncorrectBtn = document.getElementById('mark-incorrect');
         const nextCardBtn = document.getElementById('next-card');
@@ -647,7 +645,6 @@
                 userAnswerInput.classList.add('hidden');
                 optionsContainer.classList.remove('hidden');
                 showAnswerBtn.classList.remove('hidden');
-                checkMcAnswerBtn.classList.add('hidden');
 
                 // Clear previous options
                 optionsContainer.innerHTML = '';
@@ -720,7 +717,6 @@
                 userAnswerInput.classList.remove('hidden');
                 optionsContainer.classList.add('hidden');
                 showAnswerBtn.classList.remove('hidden');
-                checkMcAnswerBtn.classList.add('hidden');
 
                 // Reset user answer input
                 userAnswerInput.value = '';
