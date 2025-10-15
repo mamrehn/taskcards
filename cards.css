@@ -448,3 +448,53 @@ body {
         font-size: 0.9rem;
     }
 }
+
+/* ============================================================================
+   UX Enhancements
+   ============================================================================ */
+
+/* Study Mode Controls */
+.study-mode-controls {
+    padding: 1rem;
+    background-color: white;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.study-mode-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background-color: white;
+    cursor: pointer;
+}
+
+/* Deck Search */
+.deck-search-container {
+    margin-bottom: 1rem;
+}
+
+.deck-search-input {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+
+.deck-search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .study-mode-select {
+        width: 100%;
+    }
+}

@@ -40,6 +40,12 @@ let selectedOptionIndices = [];
 /** @type {Object<string, {correct: number, incorrect: number, total: number}>} Statistics per deck */
 let deckStats = {};
 
+/** @type {string} Current study mode: 'normal', 'new-first', 'incorrect-only', 'spaced-repetition' */
+let studyMode = 'normal';
+
+/** @type {Object<string, {interval: number, easeFactor: number, repetitions: number, nextReview: Date}>} Spaced repetition data per card */
+let spacedRepetitionData = {};
+
 // ============================================================================
 // DOM Elements Cache
 // ============================================================================
@@ -83,6 +89,8 @@ let savedDecksContainer;
 let startSelectedDecksBtn;
 let selectAllDecksBtn;
 let deselectAllDecksBtn;
+let studyModeSelect;
+let deckSearchInput;
 
 // ============================================================================
 // Initialization
@@ -133,6 +141,8 @@ function initializeApp() {
     startSelectedDecksBtn = document.getElementById('start-selected-decks');
     selectAllDecksBtn = document.getElementById('select-all-decks');
     deselectAllDecksBtn = document.getElementById('deselect-all-decks');
+    studyModeSelect = document.getElementById('study-mode');
+    deckSearchInput = document.getElementById('deck-search');
 
     // Set up event listeners
     fileInput.addEventListener('change', handleFileUpload);
@@ -146,6 +156,8 @@ function initializeApp() {
     startSelectedDecksBtn.addEventListener('click', startSelectedDecks);
     selectAllDecksBtn.addEventListener('click', selectAllDecks);
     deselectAllDecksBtn.addEventListener('click', deselectAllDecks);
+    studyModeSelect.addEventListener('change', handleStudyModeChange);
+    deckSearchInput.addEventListener('input', handleDeckSearch);
 
     // Hide the next button initially
     nextCardBtn.style.display = 'none';
@@ -153,6 +165,7 @@ function initializeApp() {
     // Load saved decks from localStorage
     loadSavedDecks();
     displaySavedDecks();
+    loadSpacedRepetitionData();
 }
 
 // Initialize when DOM is ready
@@ -336,9 +349,9 @@ function validateCards(cards) {
  */
 function updateAppTitle(deckNames) {
     if (deckNames.length === 1) {
-        appTitle.textContent = `Lernkarten App - ${deckNames[0]}`;
+        appTitle.textContent = `Lernkarten - ${deckNames[0]}`;
     } else {
-        appTitle.textContent = `Lernkarten App - ${deckNames.length} Decks kombiniert`;
+        appTitle.textContent = `Lernkarten - ${deckNames.length} Decks kombiniert`;
     }
     // Hide the subtitle when a deck is active
     appSubtitle.style.display = 'none';
@@ -395,7 +408,7 @@ function updateIncorrectIndices() {
 /**
  * Display all saved decks in the UI with checkboxes
  */
-function displaySavedDecks() {
+function displaySavedDecks(searchTerm = '') {
     const savedDecksDiv = document.getElementById('saved-decks');
     savedDecksDiv.innerHTML = '';
 
@@ -407,7 +420,20 @@ function displaySavedDecks() {
         return;
     }
 
-    for (const deckName in savedDecks) {
+    // Filter decks by search term
+    const filteredDeckNames = Object.keys(savedDecks).filter(deckName =>
+        deckName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (filteredDeckNames.length === 0 && searchTerm) {
+        const noResultsMessage = document.createElement('p');
+        noResultsMessage.textContent = 'Keine Decks gefunden.';
+        savedDecksDiv.appendChild(noResultsMessage);
+        startSelectedDecksBtn.disabled = true;
+        return;
+    }
+
+    for (const deckName of filteredDeckNames) {
         const deckElement = document.createElement('div');
         deckElement.className = 'saved-deck';
 
@@ -839,6 +865,11 @@ function markAnswer(isCorrect) {
     const card = cards[currentCardIndex];
     const deckName = card.sourceDeck;
 
+    // Update spaced repetition data
+    if (studyMode === 'spaced-repetition') {
+        updateSpacedRepetition(card, isCorrect);
+    }
+
     if (isCorrect) {
         correctCount++;
         if (deckStats[deckName]) {
@@ -1017,7 +1048,7 @@ function resetAndUpload() {
     zipInput.value = '';
 
     // Reset the app title
-    appTitle.textContent = 'Lernkarten App';
+    appTitle.textContent = 'Lernkarten';
     appSubtitle.style.display = 'block';
 
     // Clear any error messages
@@ -1042,6 +1073,162 @@ function showError(message) {
     setTimeout(() => {
         errorMessageElement.classList.add('hidden');
     }, 5000);
+}
+
+// ============================================================================
+// UX Enhancements
+// ============================================================================
+
+/**
+ * Handle study mode change
+ * @param {Event} event - Change event from select element
+ */
+function handleStudyModeChange(event) {
+    studyMode = event.target.value;
+    
+    // Reorganize cards based on study mode
+    reorganizeCardsByStudyMode();
+    
+    // Reset to first card
+    currentCardIndex = 0;
+    showCurrentCard();
+}
+
+/**
+ * Reorganize cards based on selected study mode
+ */
+function reorganizeCardsByStudyMode() {
+    switch (studyMode) {
+        case 'new-first':
+            // Show unanswered cards first
+            cards.sort((a, b) => {
+                const aAnswered = answeredCards[cards.indexOf(a)] !== null;
+                const bAnswered = answeredCards[cards.indexOf(b)] !== null;
+                return aAnswered - bAnswered;
+            });
+            break;
+
+        case 'incorrect-only':
+            // Filter to show only incorrect cards
+            const incorrectCards = [];
+            const incorrectAnswers = [];
+            cards.forEach((card, index) => {
+                if (answeredCards[index] === false) {
+                    incorrectCards.push(card);
+                    incorrectAnswers.push(answeredCards[index]);
+                }
+            });
+            if (incorrectCards.length > 0) {
+                cards = incorrectCards;
+                answeredCards = incorrectAnswers;
+            } else {
+                showError('Keine falsch beantworteten Karten gefunden.');
+            }
+            break;
+
+        case 'spaced-repetition':
+            // Sort by next review date
+            cards.sort((a, b) => {
+                const aKey = getCardKey(a);
+                const bKey = getCardKey(b);
+                const aData = spacedRepetitionData[aKey] || { nextReview: new Date() };
+                const bData = spacedRepetitionData[bKey] || { nextReview: new Date() };
+                return new Date(aData.nextReview) - new Date(bData.nextReview);
+            });
+            break;
+
+        case 'normal':
+        default:
+            // No special ordering, keep original
+            break;
+    }
+}
+
+/**
+ * Get unique key for a card (for spaced repetition tracking)
+ * @param {Object} card - Card object
+ * @returns {string} Unique card key
+ */
+function getCardKey(card) {
+    return `${card.sourceDeck || 'unknown'}_${card.question}`;
+}
+
+/**
+ * Update spaced repetition data after answering
+ * @param {Object} card - Card object
+ * @param {boolean} wasCorrect - Whether answer was correct
+ */
+function updateSpacedRepetition(card, wasCorrect) {
+    const key = getCardKey(card);
+    let data = spacedRepetitionData[key] || {
+        interval: 1,
+        easeFactor: 2.5,
+        repetitions: 0,
+        nextReview: new Date()
+    };
+
+    if (wasCorrect) {
+        if (data.repetitions === 0) {
+            data.interval = 1;
+        } else if (data.repetitions === 1) {
+            data.interval = 6;
+        } else {
+            data.interval = Math.round(data.interval * data.easeFactor);
+        }
+        data.repetitions++;
+        data.easeFactor = Math.max(1.3, data.easeFactor + 0.1);
+    } else {
+        data.repetitions = 0;
+        data.interval = 1;
+        data.easeFactor = Math.max(1.3, data.easeFactor - 0.2);
+    }
+
+    // Calculate next review date
+    const nextReview = new Date();
+    nextReview.setDate(nextReview.getDate() + data.interval);
+    data.nextReview = nextReview;
+
+    spacedRepetitionData[key] = data;
+    saveSpacedRepetitionData();
+}
+
+/**
+ * Save spaced repetition data to localStorage
+ */
+function saveSpacedRepetitionData() {
+    try {
+        localStorage.setItem('spacedRepetitionData', JSON.stringify(spacedRepetitionData));
+    } catch (error) {
+        console.error('Error saving spaced repetition data:', error);
+    }
+}
+
+/**
+ * Load spaced repetition data from localStorage
+ */
+function loadSpacedRepetitionData() {
+    try {
+        const data = localStorage.getItem('spacedRepetitionData');
+        if (data) {
+            spacedRepetitionData = JSON.parse(data);
+            // Convert date strings back to Date objects
+            Object.keys(spacedRepetitionData).forEach(key => {
+                spacedRepetitionData[key].nextReview = new Date(spacedRepetitionData[key].nextReview);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading spaced repetition data:', error);
+        spacedRepetitionData = {};
+    }
+}
+
+/**
+ * Handle deck search input
+ * @param {Event} event - Input event
+ */
+function handleDeckSearch(event) {
+    const searchTerm = event.target.value.trim();
+    displaySavedDecks(searchTerm);
 }
 
 /**

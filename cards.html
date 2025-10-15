@@ -50,6 +50,9 @@
 
             <div id="saved-decks-container">
                 <h3>Gespeicherte Decks</h3>
+                <div class="deck-search-container">
+                    <input type="text" id="deck-search" class="deck-search-input" placeholder="🔍 Decks durchsuchen...">
+                </div>
                 <div id="deck-selection-controls">
                     <button id="start-selected-decks" class="btn btn-primary" disabled>Mit ausgewählten Decks starten</button>
                     <button id="select-all-decks" class="btn btn-secondary">Alle auswählen</button>
@@ -62,6 +65,15 @@
         </div>
 
         <div id="app-content" class="hidden">
+            <div class="study-mode-controls">
+                <select id="study-mode" class="study-mode-select">
+                    <option value="spaced-repetition">Spaced Repetition</option>
+                    <option value="normal">Normaler Modus</option>
+                    <option value="new-first">Neue Karten zuerst</option>
+                    <option value="incorrect-only">Nur falsche wiederholen</option>
+                </select>
+            </div>
+
             <div class="stats">
                 <div class="stat-item">
                     <div class="stat-value" id="cards-remaining">0</div>
