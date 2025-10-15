@@ -40,7 +40,7 @@ let selectedOptionIndices = [];
 /** @type {Object<string, {correct: number, incorrect: number, total: number}>} Statistics per deck */
 let deckStats = {};
 
-/** @type {string} Current study mode: 'new-first', 'incorrect-only', 'spaced-repetition' */
+/** @type {string} Current study mode: 'spaced-repetition', 'incorrect-first', 'incorrect-only' */
 let studyMode = 'spaced-repetition';
 
 /** @type {Object<string, {interval: number, easeFactor: number, repetitions: number, nextReview: Date}>} Spaced repetition data per card */
@@ -1099,12 +1099,16 @@ function handleStudyModeChange(event) {
  */
 function reorganizeCardsByStudyMode() {
     switch (studyMode) {
-        case 'new-first':
-            // Show unanswered cards first
+        case 'incorrect-first':
+            // Show incorrect cards first, then correct/unanswered
             cards.sort((a, b) => {
-                const aAnswered = answeredCards[cards.indexOf(a)] !== null;
-                const bAnswered = answeredCards[cards.indexOf(b)] !== null;
-                return aAnswered - bAnswered;
+                const aIndex = cards.indexOf(a);
+                const bIndex = cards.indexOf(b);
+                const aIncorrect = answeredCards[aIndex] === false;
+                const bIncorrect = answeredCards[bIndex] === false;
+                
+                // Incorrect cards come first (1), then others (0)
+                return bIncorrect - aIncorrect;
             });
             break;
 
