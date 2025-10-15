@@ -669,8 +669,34 @@ function showCurrentCard() {
     selectedOptionIndices = []; // Reset selected options
     const card = cards[currentCardIndex];
 
-    // Make sure the card is not flipped when showing a new card
-    flipCard.classList.remove('flipped');
+    // Check if we're currently showing the back side
+    const isShowingBack = flipCard.classList.contains('flipped');
+    
+    if (isShowingBack) {
+        // Reset to front side and animate fly-in from bottom
+        flipCard.classList.remove('flipped');
+        
+        // Update card content immediately (while transitioning to front)
+        updateCardContent(card);
+        
+        // Start fly-in animation from bottom
+        flipCard.classList.add('fly-in-bottom');
+        
+        // Clean up animation class after animation completes
+        setTimeout(() => {
+            flipCard.classList.remove('fly-in-bottom');
+        }, 600);
+    } else {
+        // Normal case: just update content (first card or already on front)
+        updateCardContent(card);
+    }
+}
+
+/**
+ * Update the card content with new question data
+ * @param {Object} card - The card object to display
+ */
+function updateCardContent(card) {
     
     // Set question on both sides
     questionText.textContent = card.question;
