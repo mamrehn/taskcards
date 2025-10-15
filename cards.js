@@ -40,8 +40,8 @@ let selectedOptionIndices = [];
 /** @type {Object<string, {correct: number, incorrect: number, total: number}>} Statistics per deck */
 let deckStats = {};
 
-/** @type {string} Current study mode: 'normal', 'new-first', 'incorrect-only', 'spaced-repetition' */
-let studyMode = 'normal';
+/** @type {string} Current study mode: 'new-first', 'incorrect-only', 'spaced-repetition' */
+let studyMode = 'spaced-repetition';
 
 /** @type {Object<string, {interval: number, easeFactor: number, repetitions: number, nextReview: Date}>} Spaced repetition data per card */
 let spacedRepetitionData = {};
@@ -1135,11 +1135,6 @@ function reorganizeCardsByStudyMode() {
                 const bData = spacedRepetitionData[bKey] || { nextReview: new Date() };
                 return new Date(aData.nextReview) - new Date(bData.nextReview);
             });
-            break;
-
-        case 'normal':
-        default:
-            // No special ordering, keep original
             break;
     }
 }
