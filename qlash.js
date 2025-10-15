@@ -1,9 +1,19 @@
-﻿        // Supabase Konfiguration
-        const SUPABASE_URL = 'https://psjanfchvdsefvzxqtac.supabase.co'; // ERSETZEN SIE DIES MIT IHRER SUPABASE PROJECT URL
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzamFuZmNodmRzZWZ2enhxdGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5ODYxMjMsImV4cCI6MjA2MzU2MjEyM30._VlPXwOCbwmG0ilFhNIJanPOEyDoOUY16PUyhswyMYY'; // ERSETZEN SIE DIES MIT IHREM SUPABASE ANON PUBLIC KEY
+﻿/**
+ * Supabase Configuration
+ * 
+ * SECURITY NOTE: 
+ * - These values are replaced by environment variables during deployment
+ * - The anon key is designed for public use but should be protected with RLS policies
+ * - Enable Row-Level Security (RLS) on all Supabase tables
+ * - Configure rate limiting in Supabase project settings
+ */
 
-        // Declare supabaseClient globally
-        let supabaseClient; 
+// These placeholders are replaced during build/deployment
+const SUPABASE_URL = '__SUPABASE_URL__';
+const SUPABASE_ANON_KEY = '__SUPABASE_ANON_KEY__';
+
+// Declare supabaseClient globally
+let supabaseClient; 
 
         // --- Utility functions ---
         /**

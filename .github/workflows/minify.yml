@@ -28,11 +28,17 @@ jobs:
         run: |
           npm install -g terser csso-cli html-minifier inline-source-cli
       
+      - name: Inject Supabase credentials from secrets
+        run: |
+          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" qlash.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" qlash.js
+      
       - name: Minify JavaScript files
         run: |
           terser index.js --compress --mangle -o index.js
           terser cards.js --compress --mangle -o cards.js
           terser qlash.js --compress --mangle -o qlash.js
+          terser sanitize.js --compress --mangle -o sanitize.js
       
       - name: Minify CSS files
         run: |
@@ -46,10 +52,12 @@ jobs:
           
           # cards.html
           sed -i 's|<link rel="stylesheet" href="cards\.css">|<link inline rel="stylesheet" href="cards.css">|g' cards.html
+          sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' cards.html
           sed -i 's|<script src="cards\.js"></script>|<script inline src="cards.js"></script>|g' cards.html
           
           # qlash.html - need to handle external CDN scripts differently
           sed -i 's|<link rel="stylesheet" href="qlash\.css">|<link inline rel="stylesheet" href="qlash.css">|g' qlash.html
+          sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' qlash.html
           sed -i 's|<script src="qlash\.js"></script>|<script inline src="qlash.js"></script>|g' qlash.html
 
       - name: Inline CSS and JS into HTML files
