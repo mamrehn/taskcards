@@ -84,7 +84,7 @@ let supabaseClient;
                 supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             } else {
                 console.error("Supabase library not loaded or 'supabase.createClient' is undefined. Please check network and script loading.");
-                showMessage("Fehler: Die Supabase-Bibliothek konnte nicht geladen werden. Bitte Ã¼berprÃ¼fe deine Internetverbindung oder versuche es spÃ¤ter erneut.", 'error');
+                showMessage("Fehler: Die Supabase-Bibliothek konnte nicht geladen werden. Bitte überprüfe deine Internetverbindung oder versuche es später erneut.", 'error');
                 return; // Prevent further execution if Supabase is not available
             }
 
@@ -226,14 +226,14 @@ let supabaseClient;
                             } else if (data && data.cards && Array.isArray(data.cards)) {
                                 quizState.questions = data.cards;
                             } else {
-                                fileStatus.textContent = 'UngÃ¼ltiges JSON. Erwartet wird ein Array von Fragen oder eine "Karten"-Struktur.';
+                                fileStatus.textContent = 'Ungültiges JSON. Erwartet wird ein Array von Fragen oder eine "Karten"-Struktur.';
                                 quizState.questions = [];
                             }
                             fileStatus.textContent = quizState.questions.length > 0 ? `Importiert ${quizState.questions.length} Fragen.` : (fileStatus.textContent || 'Keine Fragen im JSON gefunden.');
                             renderQuestionsList();
                         } catch (error) {
                             console.error('Error parsing JSON:', error);
-                            fileStatus.textContent = 'Fehler beim Parsen des JSON. Format Ã¼berprÃ¼fen.';
+                            fileStatus.textContent = 'Fehler beim Parsen des JSON. Format überprüfen.';
                             quizState.questions = [];
                             renderQuestionsList();
                         }
@@ -277,11 +277,11 @@ let supabaseClient;
                     });
 
                     if (options.length < 2) {
-                        showMessage('Bitte fÃ¼ge mindestens zwei gÃ¼ltige Optionen hinzu', 'error');
+                        showMessage('Bitte füge mindestens zwei gültige Optionen hinzu', 'error');
                         return;
                     }
                     if (correct.length === 0) {
-                        showMessage('Bitte wÃ¤hle mindestens eine richtige Antwort aus', 'error');
+                        showMessage('Bitte wähle mindestens eine richtige Antwort aus', 'error');
                         return;
                     }
 
@@ -303,12 +303,12 @@ let supabaseClient;
                 // Event listener for starting the quiz
                 startQuizBtn.addEventListener('click', async () => {
                     if (quizState.questions.length === 0) {
-                        showMessage('Bitte fÃ¼ge mindestens eine Frage hinzu.', 'error');
+                        showMessage('Bitte füge mindestens eine Frage hinzu.', 'error');
                         return;
                     }
                     const duration = parseInt(questionDurationInput.value, 10);
                     if (isNaN(duration) || duration < 5 || duration > 60) {
-                        showMessage('Bitte gebe eine gÃ¼ltige Fragedauer zwischen 5 und 60 Sekunden ein.', 'error');
+                        showMessage('Bitte gebe eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.', 'error');
                         return;
                     }
                     quizState.questionDuration = duration;
@@ -458,7 +458,7 @@ let supabaseClient;
             function renderQuestionsList() {
                 questionsContainer.innerHTML = '';
                 if (quizState.questions.length === 0) {
-                    questionsContainer.innerHTML = '<p>Noch keine Fragen hinzugefÃ¼gt</p>';
+                    questionsContainer.innerHTML = '<p>Noch keine Fragen hinzugefügt</p>';
                     startQuizBtn.classList.add('hidden');
                     return;
                 }
@@ -625,7 +625,7 @@ let supabaseClient;
 
                 } catch (error) {
                     console.error('Error initializing host Supabase:', error);
-                    showMessage(`Fehler beim Starten des Hosts: ${error.message}. Bitte Ã¼berprÃ¼fe deine Supabase-Konfiguration und versuche es erneut.`, 'error');
+                    showMessage(`Fehler beim Starten des Hosts: ${error.message}. Bitte überprüfe deine Supabase-Konfiguration und versuche es erneut.`, 'error');
                     resetHostStateAndUI();
                 }
             }
@@ -850,7 +850,7 @@ let supabaseClient;
                      const li = document.createElement('li');
                      let optionText = option;
                      if (optionCounts && optionCounts[index] !== undefined) {
-                         optionText += ` (${optionCounts[index]}x gewÃ¤hlt)`;
+                         optionText += ` (${optionCounts[index]}x gewählt)`;
                      }
                      li.textContent = optionText;
                      if (correctSet.has(index)) {
@@ -895,7 +895,7 @@ let supabaseClient;
                     console.log('Question broadcasted:', qData);
                 } catch (error) {
                     console.error('Error sending question via Supabase:', error);
-                    showMessage('Fehler beim Senden der Frage. Bitte Ã¼berprÃ¼fe deine Supabase-Verbindung.', 'error');
+                    showMessage('Fehler beim Senden der Frage. Bitte überprüfe deine Supabase-Verbindung.', 'error');
                 }
             }
 
@@ -1049,7 +1049,7 @@ let supabaseClient;
                     console.log('Results broadcasted.');
                 } catch (error) {
                     console.error('Error broadcasting results via Supabase:', error);
-                    showMessage('Fehler beim Senden der Ergebnisse. Bitte Ã¼berprÃ¼fe deine Supabase-Verbindung.', 'error');
+                    showMessage('Fehler beim Senden der Ergebnisse. Bitte überprüfe deine Supabase-Verbindung.', 'error');
                 }
             }
 
@@ -1246,7 +1246,7 @@ let supabaseClient;
 
                 submitAnswerBtn.addEventListener('click', async () => {
                     if (selectedAnswers.length === 0) {
-                        showMessage('Bitte wÃ¤hle mindestens eine Antwort aus.', 'info');
+                        showMessage('Bitte wähle mindestens eine Antwort aus.', 'info');
                         return;
                     }
 
@@ -1325,7 +1325,7 @@ let supabaseClient;
                         .single();
 
                     if (roomError || !room) {
-                        showMessage('Raum nicht gefunden oder Fehler beim Abrufen des Raums. Bitte Ã¼berprÃ¼fe den Code.', 'error');
+                        showMessage('Raum nicht gefunden oder Fehler beim Abrufen des Raums. Bitte überprüfe den Code.', 'error');
                         resetPlayerStateAndUI();
                         return;
                     }
@@ -1401,7 +1401,7 @@ let supabaseClient;
                             displayResult(data, playerAnswerFromDb, playerScore);
                         }
                         
-                        waitingForNext.textContent = data.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nÃ¤chste Frage...';
+                        waitingForNext.textContent = data.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
                         if (data.isFinal) {
                             displayFinalResult(data);
                         }
@@ -1580,7 +1580,7 @@ let supabaseClient;
 
                 if (frData.leaderboard) {
                     const lbDiv = document.createElement('div');
-                    lbDiv.innerHTML = '<h4>EndgÃ¼ltige Rangliste:</h4>';
+                    lbDiv.innerHTML = '<h4>Endgültige Rangliste:</h4>';
                     const ol = document.createElement('ol');
                     if (frData.leaderboard.length === 0) {
                         ol.innerHTML = '<li>Keine Spieler in der Rangliste.</li>';
@@ -1597,7 +1597,7 @@ let supabaseClient;
                     lbDiv.appendChild(ol);
                     playerLeaderboardContainer.appendChild(lbDiv);
                 } else {
-                    playerLeaderboardContainer.innerHTML = '<p>Keine Ranglistendaten verfÃ¼gbar.</p>'; // Fallback
+                    playerLeaderboardContainer.innerHTML = '<p>Keine Ranglistendaten verfügbar.</p>'; // Fallback
                 }
             }
 
