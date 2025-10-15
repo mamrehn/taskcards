@@ -63,6 +63,7 @@ let userAnswerInput;
 let userAnswerContainer;
 let userAnswerDisplay;
 let optionsContainer;
+let optionsContainerBack;
 let selectedOptionsContainer;
 let selectedOptionsDisplay;
 let mcCorrectAnswerContainer;
@@ -115,6 +116,7 @@ function initializeApp() {
     userAnswerContainer = document.getElementById('user-answer-container');
     userAnswerDisplay = document.getElementById('user-answer-display');
     optionsContainer = document.getElementById('options-container');
+    optionsContainerBack = document.getElementById('options-container-back');
     selectedOptionsContainer = document.getElementById('selected-options-container');
     selectedOptionsDisplay = document.getElementById('selected-options-display');
     mcCorrectAnswerContainer = document.getElementById('mc-correct-answer-container');
@@ -746,11 +748,9 @@ function showCurrentCard() {
         standardAnswerContainer.classList.add('hidden');
         mcCorrectAnswerContainer.classList.remove('hidden');
 
-        // Display correct answers
+        // Display all options with color coding (will be filled when answer is shown)
         const correctIndices = card.correct;
-        mcCorrectAnswerText.innerHTML = correctIndices.map(index => {
-            return `<div>- ${card.options[index]}</div>`;
-        }).join('');
+        mcCorrectAnswerText.innerHTML = ''; // Will be populated in showAnswer()
 
     } else {
         // Handle standard question
@@ -771,6 +771,7 @@ function showCurrentCard() {
     // Reset containers
     userAnswerContainer.classList.add('hidden');
     selectedOptionsContainer.classList.add('hidden');
+    optionsContainerBack.classList.add('hidden');
 
     // Reset buttons
     markCorrectBtn.style.display = 'inline-block';
@@ -791,20 +792,48 @@ function showAnswer() {
 
     if (isMultipleChoice) {
         // For multiple choice questions
+        // Clone options to back side for color-coded feedback
+        optionsContainerBack.innerHTML = optionsContainer.innerHTML;
+        
+        // Apply color coding to back side option items
+        const backOptionItems = optionsContainerBack.querySelectorAll('.option-item');
+        backOptionItems.forEach((optionItem) => {
+            const originalIndex = parseInt(optionItem.dataset.index);
+            const isCorrectOption = card.correct.includes(originalIndex);
+            const wasSelected = selectedOptionIndices.includes(originalIndex);
+            
+            // Disable further interaction
+            const checkbox = optionItem.querySelector('.option-checkbox');
+            checkbox.disabled = true;
+            optionItem.style.pointerEvents = 'none';
+            
+            // Remove previous selection styling
+            optionItem.classList.remove('selected');
+            
+            // Apply color coding based on correctness
+            if (wasSelected && isCorrectOption) {
+                // Correctly selected
+                optionItem.classList.add('mc-correct-selected');
+            } else if (wasSelected && !isCorrectOption) {
+                // Incorrectly selected (should not have been ticked)
+                optionItem.classList.add('mc-incorrect-selected');
+            } else if (!wasSelected && isCorrectOption) {
+                // Should have been selected but wasn't
+                optionItem.classList.add('mc-missed');
+            } else {
+                // Correctly not selected
+                optionItem.classList.add('mc-neutral');
+            }
+        });
+        
+        // Show back options container and hide other answer displays
+        optionsContainerBack.classList.remove('hidden');
+        selectedOptionsContainer.classList.add('hidden');
+        mcCorrectAnswerContainer.classList.add('hidden');
+        
         if (selectedOptionIndices.length > 0) {
             // Check if the answer is correct
             const isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-            
-            if (isCorrect) {
-                // If correct, don't show user's answer, just keep showing the correct answers
-                selectedOptionsContainer.classList.add('hidden');
-            } else {
-                // If incorrect, show what the user selected
-                selectedOptionsDisplay.innerHTML = selectedOptionIndices.map(index => {
-                    return `<div>- ${card.options[index]}</div>`;
-                }).join('');
-                selectedOptionsContainer.classList.remove('hidden');
-            }
             
             // Auto-evaluate the answer
             markAnswer(isCorrect);
@@ -815,7 +844,6 @@ function showAnswer() {
             nextCardBtn.style.display = 'inline-block';
         } else {
             // No selection was made, still let user decide if they knew answer
-            selectedOptionsContainer.classList.add('hidden');
             
             // Show the evaluation buttons for no selection case
             markCorrectBtn.style.display = 'inline-block';
