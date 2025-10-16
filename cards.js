@@ -4,6 +4,45 @@
  */
 
 // ============================================================================
+// Performance Utilities
+// ============================================================================
+
+/**
+ * Debounce function - delays execution until after wait time has elapsed
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Delay in milliseconds
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+/**
+ * Throttle function - ensures function is called at most once per interval
+ * @param {Function} func - Function to throttle
+ * @param {number} limit - Time limit in milliseconds
+ * @returns {Function} Throttled function
+ */
+function throttle(func, limit) {
+    let inThrottle;
+    return function executedFunction(...args) {
+        if (!inThrottle) {
+            func.apply(this, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// ============================================================================
 // Global State Management
 // ============================================================================
 
@@ -146,20 +185,20 @@ function initializeApp() {
     studyModeSelect = document.getElementById('study-mode');
     deckSearchInput = document.getElementById('deck-search');
 
-    // Set up event listeners
+    // Set up event listeners with debouncing/throttling for performance
     fileInput.addEventListener('change', handleFileUpload);
     zipInput.addEventListener('change', handleZipUpload);
-    showAnswerBtn.addEventListener('click', showAnswer);
-    markCorrectBtn.addEventListener('click', () => markAnswer(true));
-    markIncorrectBtn.addEventListener('click', () => markAnswer(false));
-    nextCardBtn.addEventListener('click', showNextCard);
-    restartBtn.addEventListener('click', restartQuiz);
-    uploadNewBtn.addEventListener('click', resetAndUpload);
-    startSelectedDecksBtn.addEventListener('click', startSelectedDecks);
-    selectAllDecksBtn.addEventListener('click', selectAllDecks);
-    deselectAllDecksBtn.addEventListener('click', deselectAllDecks);
-    studyModeSelect.addEventListener('change', handleStudyModeChange);
-    deckSearchInput.addEventListener('input', handleDeckSearch);
+    showAnswerBtn.addEventListener('click', throttle(showAnswer, 300));
+    markCorrectBtn.addEventListener('click', throttle(() => markAnswer(true), 300));
+    markIncorrectBtn.addEventListener('click', throttle(() => markAnswer(false), 300));
+    nextCardBtn.addEventListener('click', throttle(showNextCard, 300));
+    restartBtn.addEventListener('click', throttle(restartQuiz, 500));
+    uploadNewBtn.addEventListener('click', throttle(resetAndUpload, 500));
+    startSelectedDecksBtn.addEventListener('click', throttle(startSelectedDecks, 500));
+    selectAllDecksBtn.addEventListener('click', debounce(selectAllDecks, 200));
+    deselectAllDecksBtn.addEventListener('click', debounce(deselectAllDecks, 200));
+    studyModeSelect.addEventListener('change', throttle(handleStudyModeChange, 300));
+    deckSearchInput.addEventListener('input', debounce(handleDeckSearch, 250));
 
     // Hide the next button initially
     nextCardBtn.style.display = 'none';

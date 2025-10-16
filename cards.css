@@ -123,6 +123,7 @@ body {
     text-align: center;
     transition: transform 0.8s;
     transform-style: preserve-3d;
+    will-change: transform;
 }
 
 .card.flipped {
