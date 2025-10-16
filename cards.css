@@ -28,12 +28,20 @@ body {
 }
 
 .header {
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
     margin-bottom: 0;
-    padding: 0.5rem;
+    padding: 0.75rem 1rem;
     background-color: white;
     border-radius: 8px 8px 0 0;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    flex: 1;
+    text-align: center;
 }
 
 .header h1 {
@@ -507,23 +515,26 @@ body {
    UX Enhancements
    ============================================================================ */
 
-/* Study Mode Controls */
-.study-mode-controls {
-    padding: 1rem;
-    background-color: white;
-    border-radius: 8px;
-    margin-bottom: 1rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    text-align: center;
-}
-
+/* Study Mode Select */
 .study-mode-select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 6px;
     font-size: 0.9rem;
     background-color: white;
     cursor: pointer;
+    transition: border-color 0.3s;
+    min-width: 200px;
+}
+
+.study-mode-select:hover {
+    border-color: var(--primary);
+}
+
+.study-mode-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
 /* Deck Search */
@@ -581,7 +592,23 @@ body {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+    
+    .header h1 {
+        font-size: 1.1rem;
+    }
+    
+    .header p {
+        font-size: 0.9rem;
+    }
+    
     .study-mode-select {
         width: 100%;
+        min-width: unset;
     }
 }

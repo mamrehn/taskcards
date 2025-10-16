@@ -19,8 +19,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 id="app-title">Lernkarten App</h1>
-            <p id="app-subtitle">Lade eine JSON-Datei oder ein ZIP Archiv von JSON-Dateien hoch - oder wähle ein gespeichertes Deck</p>
+            <div class="header-content">
+                <h1 id="app-title">Lernkarten App</h1>
+                <p id="app-subtitle">Lade eine JSON-Datei oder ein ZIP Archiv von JSON-Dateien hoch - oder wähle ein gespeichertes Deck</p>
+            </div>
+            <select id="study-mode" class="study-mode-select">
+                <option value="spaced-repetition">Spaced Repetition</option>
+                <option value="incorrect-first">Falsche zuerst</option>
+                <option value="incorrect-only">Nur falsche wiederholen</option>
+            </select>
         </div>
 
         <div id="file-input-container">
@@ -72,14 +79,6 @@
         </div>
 
         <div id="app-content" class="hidden">
-            <div class="study-mode-controls">
-                <select id="study-mode" class="study-mode-select">
-                    <option value="spaced-repetition">Spaced Repetition</option>
-                    <option value="incorrect-first">Falsche zuerst</option>
-                    <option value="incorrect-only">Nur falsche wiederholen</option>
-                </select>
-            </div>
-
             <div class="stats">
                 <div class="stat-item">
                     <div class="stat-value" id="cards-remaining">0</div>
