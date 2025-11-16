@@ -90,7 +90,6 @@ let spacedRepetitionData = {};
 // ============================================================================
 
 let fileInput;
-let zipInput;
 let appContent;
 let appTitle;
 let appSubtitle;
@@ -143,7 +142,6 @@ let deckSearchInput;
 function initializeApp() {
     // Cache DOM elements
     fileInput = document.getElementById('file-input');
-    zipInput = document.getElementById('zip-input');
     appContent = document.getElementById('app-content');
     appTitle = document.getElementById('app-title');
     appSubtitle = document.getElementById('app-subtitle');
@@ -187,7 +185,6 @@ function initializeApp() {
 
     // Set up event listeners with debouncing/throttling for performance
     fileInput.addEventListener('change', handleFileUpload);
-    zipInput.addEventListener('change', handleZipUpload);
     showAnswerBtn.addEventListener('click', throttle(showAnswer, 300));
     markCorrectBtn.addEventListener('click', throttle(() => markAnswer(true), 300));
     markIncorrectBtn.addEventListener('click', throttle(() => markAnswer(false), 300));
@@ -228,12 +225,23 @@ function toggleJsonSample() {
  * Handle single JSON file upload
  * @param {Event} event - File input change event
  */
+/**
+ * Handle file upload - supports both JSON and ZIP files
+ * @param {Event} event - File input change event
+ */
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Check if it's a ZIP file
+    if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
+        handleZipUpload(event);
+        return;
+    }
+
+    // Otherwise, treat it as JSON
     if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-        showError('Bitte lade eine gültige JSON-Datei hoch.');
+        showError('Bitte lade eine gültige JSON- oder ZIP-Datei hoch.');
         return;
     }
 
@@ -304,7 +312,7 @@ function handleZipUpload(event) {
             }
             
             // Reset the file input
-            zipInput.value = '';
+            event.target.value = '';
         } catch (error) {
             showError('Fehler beim Entpacken der ZIP-Datei.');
             console.error(error);
@@ -1153,7 +1161,6 @@ function resetAndUpload() {
     feedbackElement.classList.add('hidden');
     cardContainer.classList.remove('hidden');
     fileInput.value = '';
-    zipInput.value = '';
 
     // Reset the app title
     appTitle.textContent = 'Lernkarten';
