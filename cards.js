@@ -937,10 +937,23 @@ function showAnswer() {
             userAnswerContainer.classList.add('hidden');
         }
         
-        // For text answers, show the Richtig/Falsch buttons
-        markCorrectBtn.style.display = 'inline-block';
-        markIncorrectBtn.style.display = 'inline-block';
-        nextCardBtn.style.display = 'none';
+        // Check if the user's answer exactly matches the correct answer
+        const correctAnswer = card.answer.trim();
+        const isExactMatch = userAnswer.toLowerCase() === correctAnswer.toLowerCase();
+        
+        if (isExactMatch) {
+            // Automatically mark as correct and show only Next button
+            console.log('Exact match detected! Auto-marking as correct.');
+            markAnswer(true);
+            markCorrectBtn.style.display = 'none';
+            markIncorrectBtn.style.display = 'none';
+            nextCardBtn.style.display = 'inline-block';
+        } else {
+            // For text answers that don't match, show the Richtig/Falsch buttons
+            markCorrectBtn.style.display = 'inline-block';
+            markIncorrectBtn.style.display = 'inline-block';
+            nextCardBtn.style.display = 'none';
+        }
     }
 }
 
