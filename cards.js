@@ -107,6 +107,8 @@ let selectedOptionsDisplay;
 let mcCorrectAnswerContainer;
 let mcCorrectAnswerText;
 let standardAnswerContainer;
+let textExplanationContainer;
+let textExplanationContent;
 let showAnswerBtn;
 let markCorrectBtn;
 let markIncorrectBtn;
@@ -159,6 +161,8 @@ function initializeApp() {
     mcCorrectAnswerContainer = document.getElementById('mc-correct-answer-container');
     mcCorrectAnswerText = document.getElementById('mc-correct-answer-text');
     standardAnswerContainer = document.getElementById('standard-answer-container');
+    textExplanationContainer = document.getElementById('text-explanation-container');
+    textExplanationContent = document.getElementById('text-explanation-content');
     showAnswerBtn = document.getElementById('show-answer');
     markCorrectBtn = document.getElementById('mark-correct');
     markIncorrectBtn = document.getElementById('mark-incorrect');
@@ -196,6 +200,9 @@ function initializeApp() {
     deselectAllDecksBtn.addEventListener('click', debounce(deselectAllDecks, 200));
     studyModeSelect.addEventListener('change', throttle(handleStudyModeChange, 300));
     deckSearchInput.addEventListener('input', debounce(handleDeckSearch, 250));
+
+    // Add event listener for text explanation toggle
+    textExplanationContainer.addEventListener('click', toggleTextExplanation);
 
     // Hide the next button initially
     nextCardBtn.style.display = 'none';
@@ -848,6 +855,23 @@ function updateCardContent(card) {
     userAnswerContainer.classList.add('hidden');
     selectedOptionsContainer.classList.add('hidden');
     optionsContainerBack.classList.add('hidden');
+    textExplanationContainer.classList.add('hidden');
+    textExplanationContent.classList.add('hidden');
+    
+    // Reset explanation label and animation
+    const explanationLabel = document.querySelector('.explanation-label');
+    const explanationIcon = document.querySelector('.explanation-icon');
+    if (explanationLabel) {
+        explanationLabel.style.display = 'inline';
+    }
+    if (explanationIcon) {
+        explanationIcon.style.animation = '';
+    }
+    
+    // Clean up any existing tooltips from previous cards
+    document.querySelectorAll('.option-explanation-tooltip').forEach(tooltip => {
+        tooltip.remove();
+    });
 
     // Reset buttons
     markCorrectBtn.style.display = 'inline-block';
@@ -855,6 +879,146 @@ function updateCardContent(card) {
     nextCardBtn.style.display = 'none';
 
     updateStatistics();
+}
+
+/**
+ * Add explanation indicator to a multiple choice option
+ * @param {HTMLElement} optionItem - The option element
+ * @param {number} index - The option index
+ * @param {Object} card - The card object
+ */
+function addExplanationToOption(optionItem, index, card) {
+    // Check if explanations exist for this card and this specific option
+    if (card.explanations && card.explanations[index.toString()]) {
+        const explanation = card.explanations[index.toString()];
+        
+        // Create explanation indicator
+        const indicator = document.createElement('span');
+        indicator.className = 'option-explanation-indicator';
+        indicator.setAttribute('tabindex', '0');
+        indicator.setAttribute('role', 'button');
+        indicator.setAttribute('aria-label', 'Erklärung anzeigen');
+        
+        // Create tooltip
+        const tooltip = document.createElement('span');
+        tooltip.className = 'option-explanation-tooltip';
+        tooltip.textContent = explanation;
+        
+        // Append tooltip to body instead of indicator for better positioning
+        document.body.appendChild(tooltip);
+        
+        // Store reference to tooltip on indicator for cleanup
+        indicator._tooltip = tooltip;
+        
+        optionItem.appendChild(indicator);
+        
+        // Re-enable pointer events for the indicator only
+        indicator.style.pointerEvents = 'auto';
+        
+        // Add event listeners for tooltip positioning
+        let isHovering = false;
+        
+        const showTooltip = () => {
+            isHovering = true;
+            console.log('Showing tooltip for option', index);
+            const rect = indicator.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            console.log('Indicator position:', rect, 'Viewport:', viewportWidth, 'x', viewportHeight);
+            
+            // Calculate available space
+            const spaceAbove = rect.top;
+            const spaceBelow = viewportHeight - rect.bottom;
+            
+            // Position vertically (prefer above, but use below if not enough space)
+            if (spaceAbove > 120 || spaceAbove > spaceBelow) {
+                // Position above
+                tooltip.style.bottom = (viewportHeight - rect.top + 8) + 'px';
+                tooltip.style.top = 'auto';
+                tooltip.setAttribute('data-arrow', 'down');
+                console.log('Positioning above');
+            } else {
+                // Position below
+                tooltip.style.top = (rect.bottom + 8) + 'px';
+                tooltip.style.bottom = 'auto';
+                tooltip.setAttribute('data-arrow', 'up');
+                console.log('Positioning below');
+            }
+            
+            // Position horizontally (ensure it stays in viewport)
+            const tooltipWidth = 250; // Approximate max-width
+            if (rect.left + tooltipWidth > viewportWidth - 16) {
+                // Align to right edge
+                tooltip.style.right = '1rem';
+                tooltip.style.left = 'auto';
+                console.log('Aligning to right');
+            } else {
+                // Align to left of indicator
+                tooltip.style.left = Math.max(rect.left, 16) + 'px';
+                tooltip.style.right = 'auto';
+                console.log('Aligning to left at', rect.left);
+            }
+            
+            tooltip.style.display = 'block';
+            console.log('Tooltip display set to block');
+        };
+        
+        const hideTooltip = () => {
+            isHovering = false;
+            // Delay hiding to allow mouse to move to tooltip
+            setTimeout(() => {
+                if (!isHovering) {
+                    console.log('Hiding tooltip for option', index);
+                    tooltip.style.display = 'none';
+                }
+            }, 100);
+        };
+        
+        // Allow hovering over the tooltip itself
+        tooltip.addEventListener('mouseenter', () => {
+            isHovering = true;
+        });
+        
+        tooltip.addEventListener('mouseleave', () => {
+            isHovering = false;
+            hideTooltip();
+        });
+        
+        indicator.addEventListener('mouseenter', showTooltip);
+        indicator.addEventListener('mouseleave', hideTooltip);
+        indicator.addEventListener('focus', showTooltip);
+        indicator.addEventListener('blur', hideTooltip);
+        
+        console.log('Added explanation indicator for option', index);
+    }
+}
+
+/**
+ * Toggle the visibility of text explanation content
+ */
+function toggleTextExplanation() {
+    const isHidden = textExplanationContent.classList.contains('hidden');
+    textExplanationContent.classList.toggle('hidden');
+    
+    // Stop pulsating animation after first click
+    const icon = textExplanationContainer.querySelector('.explanation-icon');
+    const label = textExplanationContainer.querySelector('.explanation-label');
+    
+    if (icon) {
+        icon.style.animation = 'none';
+    }
+    
+    // Toggle label visibility based on explanation visibility
+    if (label) {
+        if (isHidden) {
+            // Explanation is now shown, hide the label
+            label.style.display = 'none';
+        } else {
+            // Explanation is now hidden, show the label
+            label.style.display = 'inline';
+        }
+    }
 }
 
 /**
@@ -893,9 +1057,13 @@ function showAnswer() {
             } else if (wasSelected && !isCorrectOption) {
                 // Incorrectly selected (should not have been ticked)
                 optionItem.classList.add('mc-incorrect-selected');
+                // Add explanation indicator if available
+                addExplanationToOption(optionItem, originalIndex, card);
             } else if (!wasSelected && isCorrectOption) {
                 // Should have been selected but wasn't
                 optionItem.classList.add('mc-missed');
+                // Add explanation indicator if available
+                addExplanationToOption(optionItem, originalIndex, card);
             } else {
                 // Correctly not selected
                 optionItem.classList.add('mc-neutral');
@@ -1008,6 +1176,13 @@ function markAnswer(isCorrect) {
         incorrectCount++;
         if (deckStats[deckName]) {
             deckStats[deckName].incorrect++;
+        }
+        
+        // Show explanation for text answers if available
+        const isMultipleChoice = Array.isArray(card.options) && Array.isArray(card.correct);
+        if (!isMultipleChoice && card.explanation) {
+            textExplanationContent.textContent = card.explanation;
+            textExplanationContainer.classList.remove('hidden');
         }
         
         // Store the incorrect card in the source deck's incorrect indices

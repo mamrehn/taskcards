@@ -43,7 +43,8 @@
   "cards": [
     {
       "question": "Was ist die Hauptstadt von Deutschland?",
-      "answer": "Berlin"
+      "answer": "Berlin",
+      "explanation": "Berlin ist seit 1990 die Hauptstadt. Zuvor war es Bonn."
     },
     {
       "question": "Was ist 2+2?",
@@ -52,7 +53,14 @@
     {
       "question": "Welche sind Primzahlen?",
       "options": ["2", "4", "7", "9", "11"],
-      "correct": [0, 2, 4]
+      "correct": [0, 2, 4],
+      "explanations": {
+        "0": "2 ist die einzige gerade Primzahl.",
+        "1": "4 = 2×2, also nicht prim.",
+        "2": "7 ist nur durch 1 und 7 teilbar.",
+        "3": "9 = 3×3, also nicht prim.",
+        "4": "11 ist nur durch 1 und 11 teilbar."
+      }
     }
   ]
 }
@@ -145,6 +153,15 @@
                             <!-- Standard answer display -->
                             <div id="standard-answer-container">
                                 <div class="answer" id="answer-text">Antwort erscheint hier</div>
+                            </div>
+
+                            <!-- Explanation for text answers (shown only when marked incorrect) -->
+                            <div id="text-explanation-container" class="hidden">
+                                <div class="explanation-box">
+                                    <span class="explanation-icon" title="Klicke für Erklärung">ℹ️</span>
+                                    <span class="explanation-label">Erklärung verfügbar</span>
+                                    <div class="explanation-content hidden" id="text-explanation-content"></div>
+                                </div>
                             </div>
 
                             <!-- Multiple choice correct answer display -->

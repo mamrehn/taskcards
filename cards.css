@@ -612,3 +612,153 @@ body {
         min-width: unset;
     }
 }
+
+/* ============================================================================
+   Explanation Styles
+   ============================================================================ */
+
+/* Text answer explanation container */
+#text-explanation-container {
+    margin-top: 1rem;
+}
+
+.explanation-box {
+    background-color: #e7f3ff;
+    border: 2px solid #2196F3;
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.explanation-box:hover {
+    background-color: #d0e9ff;
+    border-color: #1976D2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.explanation-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.explanation-label {
+    font-weight: 600;
+    color: #1565C0;
+    flex-grow: 1;
+}
+
+.explanation-content {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #90CAF9;
+    color: #0d47a1;
+    line-height: 1.5;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* MC option explanation indicator */
+.option-explanation-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 0.5rem;
+    background-color: #2196F3;
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.option-explanation-indicator:hover {
+    background-color: #1976D2;
+    transform: scale(1.15);
+}
+
+.option-explanation-indicator::before {
+    content: 'ℹ';
+}
+
+/* Tooltip for option explanations */
+.option-explanation-tooltip {
+    display: none;
+    position: fixed;
+    padding: 0.75rem;
+    background-color: #1565C0;
+    color: white;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    white-space: normal;
+    min-width: 200px;
+    max-width: min(300px, calc(100vw - 2rem));
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.2s ease;
+    pointer-events: auto;
+}
+
+/* Arrow pointing down (tooltip is above) */
+.option-explanation-tooltip[data-arrow="down"]::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 12px;
+    border: 6px solid transparent;
+    border-top-color: #1565C0;
+}
+
+/* Arrow pointing up (tooltip is below) */
+.option-explanation-tooltip[data-arrow="up"]::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 12px;
+    border: 6px solid transparent;
+    border-bottom-color: #1565C0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Ensure option items have relative positioning for tooltip positioning */
+.option-item {
+    position: relative;
+}
