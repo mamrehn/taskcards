@@ -463,7 +463,20 @@ body {
     border-radius: 4px;
     border: 1px solid #dee2e6;
     font-family: monospace;
-    white-space: pre-wrap;
+    font-size: 0.9rem;
+    text-align: left;
+}
+
+#sample-json pre {
+    margin: 0;
+    padding: 0;
+    white-space: pre;
+    overflow-x: auto;
+    text-align: left;
+}
+
+#sample-json code {
+    font-family: 'Courier New', Courier, monospace;
     font-size: 0.9rem;
 }
 
