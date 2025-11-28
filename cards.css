@@ -1,18 +1,9 @@
-:root {
-    --primary: #4a6fa5;
-    --secondary: #166088;
-    --light: #f8f9fa;
-    --dark: #343a40;
-    --success: #28a745;
-    --danger: #dc3545;
-    --warning: #ffc107;
-}
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
-    color: var(--dark);
-    background-color: #f5f7fa;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
     margin: 0;
     padding: 0;
     display: flex;
@@ -34,9 +25,9 @@ body {
     gap: 1rem;
     margin-bottom: 0;
     padding: 0.75rem 1rem;
-    background-color: white;
+    background-color: var(--bg-card);
     border-radius: 8px 8px 0 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
 }
 
 .header-content {
@@ -87,14 +78,14 @@ body {
 }
 
 .saved-deck {
-    background-color: white;
+    background-color: var(--bg-card);
     padding: 0.5rem;
     margin-bottom: 0.5rem;
     border-radius: 4px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
 }
 
 .deck-title {
@@ -162,16 +153,16 @@ body {
     height: 100%;
     backface-visibility: hidden;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
     padding: 1rem;
     box-sizing: border-box;
-    background-color: white;
+    background-color: var(--bg-card);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     top: 0;
     left: 0;
-    transition: opacity 0.4s ease;
+    transition: opacity 0.4s ease, background-color 0.3s ease;
 }
 
 .card-front {
@@ -219,10 +210,11 @@ body {
 
 .answer {
     padding: 0.75rem;
-    background-color: var(--light);
-    border-left: 4px solid var(--primary);
+    background-color: var(--answer-bg);
+    border-left: 4px solid var(--answer-border);
     margin-top: 0.5rem;
     text-align: left;
+    color: var(--text-primary);
 }
 
 /* User answer input styling */
@@ -230,25 +222,28 @@ body {
     width: 90%;
     padding: 0.75rem;
     margin: 1rem 0;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--input-border);
     border-radius: 4px;
     font-size: 1rem;
-    transition: border-color 0.15s ease-in-out;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease-in-out, background-color 0.3s ease;
 }
 
 .user-answer-input:focus {
-    border-color: var(--primary);
+    border-color: var(--input-focus-border);
     outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(74, 111, 165, 0.25);
+    box-shadow: 0 0 0 0.2rem var(--input-focus-shadow);
 }
 
 .user-answer-display {
     padding: 0.75rem;
     margin-top: 0.5rem;
-    background-color: #e9f2ff;
-    border-left: 4px solid #92b5e3;
+    background-color: var(--user-answer-bg);
+    border-left: 4px solid var(--user-answer-border);
     text-align: left;
     border-radius: 4px;
+    color: var(--text-primary);
 }
 
 /* Multiple Choice Options Styling */
@@ -263,23 +258,25 @@ body {
 .option-item {
     position: relative;
     padding: 0.3rem;
-    border: 2px solid #ced4da;
+    border: 2px solid var(--input-border);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     text-align: left;
+    background-color: var(--option-bg);
+    color: var(--text-primary);
 }
 
 .option-item:hover {
     border-color: var(--primary);
-    background-color: #f0f5ff;
+    background-color: var(--option-hover-bg);
 }
 
 .option-item.selected {
     border-color: var(--primary);
-    background-color: rgba(74, 111, 165, 0.1);
+    background-color: var(--option-selected-bg);
 }
 
 .option-item.correct {
@@ -294,38 +291,38 @@ body {
 
 /* Multiple Choice Feedback Styling */
 .option-item.mc-correct-selected {
-    background-color: #d4edda;
-    border-color: #28a745;
+    background-color: var(--mc-correct-bg);
+    border-color: var(--mc-correct-border);
     border-left-width: 4px;
 }
 
 .option-item.mc-correct-selected .option-checkbox {
-    accent-color: #28a745;
+    accent-color: var(--success);
 }
 
 .option-item.mc-incorrect-selected {
-    background-color: #f8d7da;
-    border-color: #dc3545;
+    background-color: var(--mc-incorrect-bg);
+    border-color: var(--mc-incorrect-border);
     border-left-width: 4px;
 }
 
 .option-item.mc-incorrect-selected .option-checkbox {
-    accent-color: #dc3545;
+    accent-color: var(--danger);
 }
 
 .option-item.mc-missed {
-    background-color: #fff3cd;
-    border-color: #ffc107;
+    background-color: var(--mc-missed-bg);
+    border-color: var(--mc-missed-border);
     border-left-width: 4px;
 }
 
 .option-item.mc-missed .option-checkbox {
-    accent-color: #ffc107;
+    accent-color: var(--warning);
 }
 
 .option-item.mc-neutral {
-    background-color: #f8f9fa;
-    border-color: #e9ecef;
+    background-color: var(--mc-neutral-bg);
+    border-color: var(--mc-neutral-border);
     opacity: 0.7;
 }
 
@@ -338,10 +335,11 @@ body {
 .selected-options-display {
     padding: 0.75rem;
     margin-top: 0.5rem;
-    background-color: #e9f2ff;
-    border-left: 4px solid #92b5e3;
+    background-color: var(--user-answer-bg);
+    border-left: 4px solid var(--user-answer-border);
     text-align: left;
     border-radius: 4px;
+    color: var(--text-primary);
 }
 
 .controls {
@@ -405,9 +403,9 @@ body {
     justify-content: space-around;
     margin: 0 0 0.5rem 0;
     padding: 0 0 0.5rem 0;
-    background-color: white;
+    background-color: var(--bg-card);
     border-radius: 0 0 8px 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
 }
 
 .stat-item {
@@ -422,12 +420,12 @@ body {
 
 .stat-label {
     font-size: 0.9rem;
-    color: #6c757d;
+    color: var(--text-secondary);
 }
 
 .progress-bar {
     height: 6px;
-    background-color: #e9ecef;
+    background-color: var(--progress-bg);
     border-radius: 4px;
     margin: 0.5rem 0;
     overflow: hidden;
@@ -443,7 +441,11 @@ body {
     font-size: 1.0rem;
     text-align: center;
     margin-top: 1rem;
-    color: #6c757d;
+    color: var(--text-secondary);
+    background-color: var(--bg-card);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
 }
 
 .error-message {
@@ -459,12 +461,13 @@ body {
 #sample-json {
     margin-top: 1rem;
     padding: 0.75rem;
-    background-color: #f8f9fa;
+    background-color: var(--code-bg);
     border-radius: 4px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--code-border);
     font-family: monospace;
     font-size: 0.9rem;
     text-align: left;
+    color: var(--text-primary);
 }
 
 #sample-json pre {
@@ -531,12 +534,13 @@ body {
 /* Study Mode Select */
 .study-mode-select {
     padding: 0.5rem 0.75rem;
-    border: 2px solid #ddd;
+    border: 2px solid var(--border-color);
     border-radius: 6px;
     font-size: 0.9rem;
-    background-color: white;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
     cursor: pointer;
-    transition: border-color 0.3s;
+    transition: border-color 0.3s, background-color 0.3s;
     min-width: 200px;
 }
 
@@ -547,7 +551,7 @@ body {
 .study-mode-select:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    box-shadow: 0 0 0 3px var(--input-focus-shadow);
 }
 
 /* Deck Search */
@@ -559,15 +563,21 @@ body {
     width: 100%;
     padding: 0.75rem;
     font-size: 1rem;
-    border: 2px solid #ddd;
+    border: 2px solid var(--border-color);
     border-radius: 6px;
     box-sizing: border-box;
-    transition: border-color 0.3s;
+    transition: border-color 0.3s, background-color 0.3s;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
 }
 
 .deck-search-input:focus {
     outline: none;
     border-color: var(--primary);
+}
+
+.deck-search-input::placeholder {
+    color: var(--text-muted);
 }
 
 /* Confetti Animation Styles */
@@ -636,8 +646,8 @@ body {
 }
 
 .explanation-box {
-    background-color: #e7f3ff;
-    border: 2px solid #2196F3;
+    background-color: var(--explanation-bg);
+    border: 2px solid var(--explanation-border);
     border-radius: 8px;
     padding: 0.75rem;
     cursor: pointer;
@@ -648,10 +658,10 @@ body {
 }
 
 .explanation-box:hover {
-    background-color: #d0e9ff;
-    border-color: #1976D2;
+    background-color: var(--explanation-hover-bg);
+    border-color: var(--primary);
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .explanation-icon {
@@ -671,7 +681,7 @@ body {
 
 .explanation-label {
     font-weight: 600;
-    color: #1565C0;
+    color: var(--explanation-text);
     flex-grow: 1;
 }
 
@@ -679,8 +689,8 @@ body {
     width: 100%;
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: 1px solid #90CAF9;
-    color: #0d47a1;
+    border-top: 1px solid var(--explanation-border);
+    color: var(--explanation-text);
     line-height: 1.5;
     animation: slideDown 0.3s ease;
 }
@@ -728,8 +738,8 @@ body {
     display: none;
     position: fixed;
     padding: 0.75rem;
-    background-color: #1565C0;
-    color: white;
+    background-color: var(--qlash-primary, #46178f);
+    color: var(--text-inverse);
     border-radius: 6px;
     font-size: 0.9rem;
     line-height: 1.4;
@@ -737,7 +747,7 @@ body {
     min-width: 200px;
     max-width: min(300px, calc(100vw - 2rem));
     z-index: 10000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px var(--shadow-strong);
     animation: fadeIn 0.2s ease;
     pointer-events: auto;
 }
@@ -749,7 +759,7 @@ body {
     top: 100%;
     left: 12px;
     border: 6px solid transparent;
-    border-top-color: #1565C0;
+    border-top-color: var(--qlash-primary, #46178f);
 }
 
 /* Arrow pointing up (tooltip is below) */
@@ -759,7 +769,7 @@ body {
     bottom: 100%;
     left: 12px;
     border: 6px solid transparent;
-    border-bottom-color: #1565C0;
+    border-bottom-color: var(--qlash-primary, #46178f);
 }
 
 @keyframes fadeIn {

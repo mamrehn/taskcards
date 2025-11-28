@@ -1,0 +1,294 @@
+/* ============================================================================
+   Theme Toggle Button
+   ============================================================================ */
+
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 2rem;
+  background-color: var(--theme-toggle-bg, #e0e0e0);
+  color: var(--theme-toggle-color, #333);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle:focus {
+  outline: 2px solid var(--primary, #4a6fa5);
+  outline-offset: 2px;
+}
+
+.theme-toggle .theme-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.theme-toggle .theme-label {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .theme-toggle .theme-label {
+    display: inline;
+  }
+}
+
+/* ============================================================================
+   Light Theme (Default)
+   ============================================================================ */
+
+:root {
+  /* Core colors */
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f8f9fa;
+  --bg-card: #ffffff;
+
+  /* Text colors */
+  --text-primary: #343a40;
+  --text-secondary: #6c757d;
+  --text-muted: #868e96;
+  --text-inverse: #121212;
+  --text-on-brand: #ffffff;
+
+  /* Brand colors */
+  --primary: #4a6fa5;
+  --secondary: #166088;
+  --success: #28a745;
+  --danger: #dc3545;
+  --warning: #ffc107;
+
+  /* UI elements */
+  --border-color: #dee2e6;
+  --border-light: #e9ecef;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-strong: rgba(0, 0, 0, 0.15);
+
+  /* Interactive elements */
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
+  --input-focus-border: var(--primary);
+  --input-focus-shadow: rgba(74, 111, 165, 0.25);
+
+  /* Card specific */
+  --card-bg: #ffffff;
+  --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  /* Answer feedback */
+  --answer-bg: #f8f9fa;
+  --answer-border: var(--primary);
+  --user-answer-bg: #e9f2ff;
+  --user-answer-border: #92b5e3;
+
+  /* Multiple choice feedback */
+  --mc-correct-bg: #d4edda;
+  --mc-correct-border: #28a745;
+  --mc-incorrect-bg: #f8d7da;
+  --mc-incorrect-border: #dc3545;
+  --mc-missed-bg: #fff3cd;
+  --mc-missed-border: #ffc107;
+  --mc-neutral-bg: #f8f9fa;
+  --mc-neutral-border: #e9ecef;
+
+  /* Option items */
+  --option-bg: #ffffff;
+  --option-hover-bg: #f0f5ff;
+  --option-selected-bg: rgba(74, 111, 165, 0.1);
+
+  /* Explanation box */
+  --explanation-bg: #e7f3ff;
+  --explanation-border: #2196f3;
+  --explanation-text: #0d47a1;
+  --explanation-hover-bg: #d0e9ff;
+
+  /* Progress bar */
+  --progress-bg: #e9ecef;
+  --progress-fill: var(--primary);
+
+  /* Code/sample blocks */
+  --code-bg: #f8f9fa;
+  --code-border: #dee2e6;
+
+  /* Theme toggle */
+  --theme-toggle-bg: #e0e0e0;
+  --theme-toggle-color: #333;
+
+  /* Qlash specific */
+  --qlash-primary: #46178f;
+  --qlash-secondary: #5e22b2;
+  --qlash-accent: #ff3355;
+  --qlash-correct: #00c853;
+  --qlash-wrong: #ff3d00;
+  --qlash-light: #f7f7f7;
+
+  /* Header gradient for qlash */
+  --header-gradient: linear-gradient(
+    135deg,
+    var(--qlash-primary),
+    var(--qlash-secondary)
+  );
+
+  /* Scoreboard ranks */
+  --rank-gold: #ffeb3b;
+  --rank-silver: #e0e0e0;
+  --rank-bronze: #ffccbc;
+
+  /* Modal overlay */
+  --modal-overlay: rgba(0, 0, 0, 0.8);
+  --modal-bg: #ffffff;
+
+  /* Links */
+  --link-color: var(--primary);
+  --link-hover: var(--secondary);
+}
+
+/* ============================================================================
+   Dark Theme
+   ============================================================================ */
+
+[data-theme="dark"],
+:root[data-theme="dark"],
+html[data-theme="dark"] {
+  /* Core colors */
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2d2d2d;
+  --bg-card: #1e1e1e;
+
+  /* Text colors */
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-inverse: #121212;
+  --text-on-brand: #ffffff;
+
+  /* Brand colors */
+  --primary: #6b8fc7;
+  --secondary: #3a8fb7;
+  --success: #4ade80;
+  --danger: #f87171;
+  --warning: #fbbf24;
+
+  /* UI elements */
+  --border-color: #3f3f46;
+  --border-light: #27272a;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+
+  /* Interactive elements */
+  --input-bg: #27272a;
+  --input-border: #3f3f46;
+  --input-focus-border: var(--primary);
+  --input-focus-shadow: rgba(107, 143, 199, 0.3);
+
+  /* Card specific */
+  --card-bg: #1e1e1e;
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* Answer feedback */
+  --answer-bg: #27272a;
+  --answer-border: var(--primary);
+  --user-answer-bg: #1e3a5f;
+  --user-answer-border: #4a7ab3;
+
+  /* Multiple choice feedback */
+  --mc-correct-bg: #14532d;
+  --mc-correct-border: #22c55e;
+  --mc-incorrect-bg: #450a0a;
+  --mc-incorrect-border: #ef4444;
+  --mc-missed-bg: #422006;
+  --mc-missed-border: #f59e0b;
+  --mc-neutral-bg: #27272a;
+  --mc-neutral-border: #3f3f46;
+
+  /* Option items */
+  --option-bg: #27272a;
+  --option-hover-bg: #2a3a4d;
+  --option-selected-bg: rgba(107, 143, 199, 0.2);
+
+  /* Explanation box */
+  --explanation-bg: #1e3a5f;
+  --explanation-border: #3b82f6;
+  --explanation-text: #93c5fd;
+  --explanation-hover-bg: #1e4a7f;
+
+  /* Progress bar */
+  --progress-bg: #3f3f46;
+  --progress-fill: var(--primary);
+
+  /* Code/sample blocks */
+  --code-bg: #27272a;
+  --code-border: #3f3f46;
+
+  /* Theme toggle */
+  --theme-toggle-bg: #3f3f46;
+  --theme-toggle-color: #e4e4e7;
+
+  /* Qlash specific */
+  --qlash-primary: #5a1faf;
+  --qlash-secondary: #7c3aed;
+  --qlash-accent: #ff6b8a;
+  --qlash-correct: #22c55e;
+  --qlash-wrong: #ef4444;
+  --qlash-light: #27272a;
+
+  /* Header gradient for qlash */
+  --header-gradient: linear-gradient(135deg, #2d1b4e, #4c2889);
+
+  /* Scoreboard ranks */
+  --rank-gold: #ca8a04;
+  --rank-silver: #52525b;
+  --rank-bronze: #c2410c;
+
+  /* Modal overlay */
+  --modal-overlay: rgba(0, 0, 0, 0.9);
+  --modal-bg: #1e1e1e;
+
+  /* Links */
+  --link-color: #93c5fd;
+  --link-hover: #60a5fa;
+}
+
+/* ============================================================================
+   Transitions for Theme Switching
+   ============================================================================ */
+
+html {
+  transition: background-color 0.3s ease;
+}
+
+body,
+.card,
+.card-front,
+.card-back,
+.saved-deck,
+.option-item,
+.stats,
+.header,
+input,
+select,
+button,
+.btn {
+  transition: background-color 0.3s ease, border-color 0.3s ease,
+    color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Disable transitions on page load to prevent the blinding flash of 2025 */
+.no-transitions,
+.no-transitions * {
+  transition: none !important;
+}

@@ -3,7 +3,7 @@
  * Provides offline functionality and caching
  */
 
-const CACHE_NAME = 'taskcards-v1';
+const CACHE_NAME = 'taskcards-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -11,8 +11,10 @@ const ASSETS_TO_CACHE = [
     './qlash.html',
     './cards.css',
     './qlash.css',
+    './theme.css',
     './cards.js',
     './qlash.js',
+    './theme.js',
     './index.js',
     './sanitize.js'
 ];
