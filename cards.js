@@ -2153,14 +2153,8 @@ function cleanupOrphanedSRData() {
     const orphanedKeys = [];
     
     Object.keys(spacedRepetitionData).forEach(key => {
-        // Extract deck name from key (supports both ||| and legacy _ format)
-        let deckName;
-        if (key.includes('|||')) {
-            deckName = key.split('|||')[0];
-        } else {
-            const separatorIndex = key.indexOf('_');
-            deckName = separatorIndex !== -1 ? key.substring(0, separatorIndex) : 'unknown';
-        }
+        // Extract deck name from key (format: "deckName|||question")
+        const deckName = key.split('|||')[0];
         
         // Check if deck still exists
         if (!savedDecks[deckName]) {
@@ -2188,26 +2182,17 @@ function cleanupOrphanedSRData() {
 
 /**
  * Get card object from SR data key
- * Supports both new format (|||) and legacy format (_)
+ * Key format: "deckName|||question"
  */
 function getCardFromKey(key) {
-    // Key format is: "deckName|||question" (new) or "deckName_question" (legacy)
-    let deckName, question;
-    
-    if (key.includes('|||')) {
-        const parts = key.split('|||');
-        deckName = parts[0];
-        question = parts.slice(1).join('|||'); // Handle ||| in question (unlikely but safe)
-    } else {
-        // Legacy format fallback - split on first underscore
-        const separatorIndex = key.indexOf('_');
-        if (separatorIndex === -1) {
-            console.warn('Invalid key format:', key);
-            return null;
-        }
-        deckName = key.substring(0, separatorIndex);
-        question = key.substring(separatorIndex + 1);
+    const parts = key.split('|||');
+    if (parts.length < 2) {
+        console.warn('Invalid key format:', key);
+        return null;
     }
+    
+    const deckName = parts[0];
+    const question = parts.slice(1).join('|||'); // Handle ||| in question (unlikely but safe)
     
     // Try to find the card in saved decks
     if (savedDecks[deckName]) {
