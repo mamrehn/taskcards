@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; base-uri 'self'; form-action 'self';">
     <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#3498db">
     <title>Wählen Sie Ihren Modus</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="theme.css">
+    <script src="theme.js"></script>
     <style>
         /* General body and font size for better readability and mobile friendliness */
         body {
@@ -19,30 +22,9 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: var(--light-color, #f7f7f7); /* Fallback for light color */
-            color: var(--dark-color, #333); /* Fallback for dark color */
-        }
-
-        /* Root colors for the Multiplayer Quiz app style */
-        :root {
-            --primary-color: #46178f;
-            --secondary-color: #5e22b2;
-            --accent-color: #ff3355;
-            --light-color: #f7f7f7;
-            --dark-color: #333;
-            --correct-color: #00c853;
-            --wrong-color: #ff3d00;
-        }
-
-        /* Root colors for the Taskcards app style */
-        .taskcard-colors {
-            --primary: #4a6fa5;
-            --secondary: #166088;
-            --light: #f8f9fa;
-            --dark: #343a40;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         .container {
@@ -58,13 +40,14 @@
 
         h1 {
             font-size: 3em;
-            color: var(--primary-color, #46178f);
+            color: var(--qlash-primary);
             margin-bottom: 10px;
+            transition: color 0.3s ease;
         }
 
         p {
             font-size: 1.2em;
-            color: var(--dark-color, #333);
+            color: var(--text-primary);
         }
 
         .button-container {
@@ -81,13 +64,13 @@
             align-items: center;
             justify-content: center;
             text-decoration: none;
-            color: white;
+            color: var(--text-on-brand);
             padding: 30px 40px;
             border-radius: 15px; /* More rounded corners */
             font-size: 1.5em;
             font-weight: bold;
             transition: all 0.3s ease;
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 15px var(--shadow-strong);
             min-width: 280px; /* Ensure buttons are large enough */
             max-width: 40%; /* Responsive width */
             flex-grow: 1; /* Allow buttons to grow */
@@ -100,27 +83,26 @@
 
         /* Style for the Multiplayer Quiz button */
         .quiz-button {
-            background: linear-gradient(45deg, var(--primary-color, #46178f), var(--secondary-color, #5e22b2));
-            border: 2px solid var(--accent-color, #ff3355);
+            background: var(--header-gradient);
+            border: 2px solid var(--qlash-accent);
         }
 
         .quiz-button:hover {
             transform: translateY(-5px);
-            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(45deg, var(--secondary-color, #5e22b2), var(--primary-color, #46178f));
+            box-shadow: 0 12px 20px var(--shadow-strong);
+            filter: brightness(1.1);
         }
 
         /* Style for the Study Alone / Taskcards button */
         .study-button {
-            /* Using taskcard colors */
-            background: linear-gradient(45deg, var(--primary, #4a6fa5), var(--secondary, #166088));
-            border: 2px solid var(--warning, #ffc107); /* Using warning color as an accent */
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            border: 2px solid var(--warning);
         }
 
         .study-button:hover {
             transform: translateY(-5px);
-            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(45deg, var(--secondary, #166088), var(--primary, #4a6fa5));
+            box-shadow: 0 12px 20px var(--shadow-strong);
+            filter: brightness(1.1);
         }
 
         footer {
@@ -129,12 +111,14 @@
         }
 
         footer a {
-            color: var(--primary-color, #007bff); /* Using quiz primary for consistency */
+            color: var(--link-color);
             text-decoration: none;
+            transition: color 0.3s ease;
         }
 
         footer a:hover {
             text-decoration: underline;
+            color: var(--link-hover);
         }
 
         /* Responsive adjustments */

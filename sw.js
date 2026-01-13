@@ -12,8 +12,10 @@ const ASSETS_TO_CACHE = [
     './qlash.html',
     './cards.css',
     './qlash.css',
+    './theme.css',
     './cards.js',
     './qlash.js',
+    './theme.js',
     './index.js',
     './sanitize.js'
 ];
