@@ -28,16 +28,21 @@
                 <option value="incorrect-first">Falsche zuerst</option>
                 <option value="incorrect-only">Nur falsche wiederholen</option>
             </select>
+            <button id="open-sr-manager" class="btn btn-secondary sr-manager-btn" title="Spaced Repetition Karten verwalten / Decks anzeigen">
+                📊 Karten verwalten
+            </button>
         </div>
 
         <div id="file-input-container">
-            <div class="upload-options">
-                <div class="upload-option">
-                    <label for="file-input" id="upload-label">JSON oder ZIP hochladen</label>
-                    <input type="file" id="file-input" accept=".json,.zip">
+            <div class="upload-section">
+                <div class="upload-options">
+                    <div class="upload-option">
+                        <label for="file-input" id="upload-label">JSON oder ZIP hochladen</label>
+                        <input type="file" id="file-input" accept=".json,.zip">
+                    </div>
                 </div>
+                <p><span class="json-toggle" onclick="toggleJsonSample()">JSON-Format Beispiel anzeigen</span></p>
             </div>
-            <p><span class="json-toggle" onclick="toggleJsonSample()">JSON-Format Beispiel anzeigen</span></p>
             <div id="sample-json" class="hidden"><pre><code>{
   "cards": [
     {
@@ -71,11 +76,27 @@
                 </div>
                 <div id="deck-selection-controls">
                     <button id="start-selected-decks" class="btn btn-primary" disabled>Mit ausgewählten Decks starten</button>
-                    <button id="select-all-decks" class="btn btn-secondary">Alle auswählen</button>
-                    <button id="deselect-all-decks" class="btn btn-secondary">Alle abwählen</button>
+                    <button id="select-all-decks" class="btn">Alle auswählen</button>
+                    <button id="deselect-all-decks" class="btn">Alle abwählen</button>
                 </div>
                 <div id="saved-decks">
                     <!-- Saved decks will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <div id="spaced-repetition-manager-container" class="hidden">
+                <h3>Spaced Repetition - Kartenverwaltung</h3>
+                <p class="sr-info">Karten sind nach Wiederholungsintervallen gruppiert. Wähle Buckets aus oder verwalte einzelne Karten.</p>
+                
+                <div id="sr-bucket-selection-controls">
+                    <button id="start-selected-buckets" class="btn btn-primary" disabled>Mit ausgewählten Buckets üben</button>
+                    <button id="select-all-buckets" class="btn">Alle auswählen</button>
+                    <button id="deselect-all-buckets" class="btn">Alle abwählen</button>
+                    <button id="cleanup-orphans-btn" class="btn btn-secondary" title="Entfernt SR-Daten für gelöschte Decks">🧹 Aufräumen</button>
+                </div>
+
+                <div id="sr-buckets-display">
+                    <!-- Buckets will be dynamically inserted here -->
                 </div>
             </div>
         </div>
@@ -190,6 +211,7 @@
                 <div style="margin-top: 1rem;">
                     <button class="btn btn-primary" id="restart-btn">Neu starten</button>
                     <button class="btn btn-secondary" id="upload-new-btn">Neues Deck</button>
+                    <button class="btn btn-secondary" id="return-to-sr-btn" style="display: none;">Zurück zur SR-Verwaltung</button>
                 </div>
             </div>
 

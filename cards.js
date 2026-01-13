@@ -123,6 +123,7 @@ let finalScoreElement;
 let deckStatsContainer;
 let restartBtn;
 let uploadNewBtn;
+let returnToSrBtn;
 let errorMessageElement;
 let flipCard;
 let cardContainer;
@@ -132,6 +133,13 @@ let selectAllDecksBtn;
 let deselectAllDecksBtn;
 let studyModeSelect;
 let deckSearchInput;
+let openSrManagerBtn;
+let srManagerContainer;
+let srBucketsDisplay;
+let startSelectedBucketsBtn;
+let selectAllBucketsBtn;
+let deselectAllBucketsBtn;
+let cleanupOrphansBtn;
 
 // ============================================================================
 // Initialization
@@ -177,6 +185,7 @@ function initializeApp() {
     deckStatsContainer = document.getElementById('deck-stats-container');
     restartBtn = document.getElementById('restart-btn');
     uploadNewBtn = document.getElementById('upload-new-btn');
+    returnToSrBtn = document.getElementById('return-to-sr-btn');
     errorMessageElement = document.getElementById('error-message');
     flipCard = document.getElementById('flip-card');
     cardContainer = document.getElementById('card-container');
@@ -186,6 +195,13 @@ function initializeApp() {
     deselectAllDecksBtn = document.getElementById('deselect-all-decks');
     studyModeSelect = document.getElementById('study-mode');
     deckSearchInput = document.getElementById('deck-search');
+    openSrManagerBtn = document.getElementById('open-sr-manager');
+    srManagerContainer = document.getElementById('spaced-repetition-manager-container');
+    srBucketsDisplay = document.getElementById('sr-buckets-display');
+    startSelectedBucketsBtn = document.getElementById('start-selected-buckets');
+    selectAllBucketsBtn = document.getElementById('select-all-buckets');
+    deselectAllBucketsBtn = document.getElementById('deselect-all-buckets');
+    cleanupOrphansBtn = document.getElementById('cleanup-orphans-btn');
 
     // Set up event listeners with debouncing/throttling for performance
     fileInput.addEventListener('change', handleFileUpload);
@@ -195,11 +211,17 @@ function initializeApp() {
     nextCardBtn.addEventListener('click', throttle(showNextCard, 300));
     restartBtn.addEventListener('click', throttle(restartQuiz, 500));
     uploadNewBtn.addEventListener('click', throttle(resetAndUpload, 500));
+    returnToSrBtn.addEventListener('click', throttle(returnToSRManager, 500));
     startSelectedDecksBtn.addEventListener('click', throttle(startSelectedDecks, 500));
     selectAllDecksBtn.addEventListener('click', debounce(selectAllDecks, 200));
     deselectAllDecksBtn.addEventListener('click', debounce(deselectAllDecks, 200));
     studyModeSelect.addEventListener('change', throttle(handleStudyModeChange, 300));
     deckSearchInput.addEventListener('input', debounce(handleDeckSearch, 250));
+    openSrManagerBtn.addEventListener('click', throttle(openSpacedRepetitionManager, 300));
+    startSelectedBucketsBtn.addEventListener('click', throttle(startSelectedBuckets, 500));
+    selectAllBucketsBtn.addEventListener('click', debounce(selectAllSRBuckets, 200));
+    deselectAllBucketsBtn.addEventListener('click', debounce(deselectAllSRBuckets, 200));
+    cleanupOrphansBtn.addEventListener('click', throttle(cleanupOrphanedSRData, 500));
 
     // Add event listener for text explanation toggle
     textExplanationContainer.addEventListener('click', toggleTextExplanation);
@@ -227,6 +249,12 @@ function toggleJsonSample() {
     const sampleJson = document.getElementById('sample-json');
     sampleJson.classList.toggle('hidden');
 }
+
+// Expose SR manager functions to global scope for onclick handlers
+window.toggleBucketExpansion = toggleBucketExpansion;
+window.toggleBucketSelection = toggleBucketSelection;
+window.moveSRCard = moveSRCard;
+window.deleteSRCard = deleteSRCard;
 
 /**
  * Handle single JSON file upload
@@ -634,15 +662,24 @@ function initializeQuiz(loadedCards) {
     incorrectCount = 0;
     answeredCards = new Array(cards.length).fill(null);
 
-    // Randomize initial card order
-    shuffleArray(cards);
+    // Check if this is from SR buckets
+    const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
+    
+    // Only shuffle if not from SR buckets (bucket order should be preserved)
+    if (!isFromSRBuckets) {
+        // Randomize initial card order
+        shuffleArray(cards);
 
-    // Prioritize incorrectly answered cards if available
-    prioritizeIncorrectCards();
+        // Prioritize incorrectly answered cards if available
+        prioritizeIncorrectCards();
+    }
 
     // Show the app content
     document.getElementById('file-input-container').style.display = 'none';
     appContent.classList.remove('hidden');
+    
+    // Hide SR button during active quiz
+    openSrManagerBtn.style.display = 'none';
 
     // Update UI
     updateStatistics();
@@ -1105,6 +1142,12 @@ function showAnswer() {
             userAnswerContainer.classList.add('hidden');
         }
         
+        // Show explanation for text answers if available (always, not just for incorrect answers)
+        if (card.explanation) {
+            textExplanationContent.textContent = card.explanation;
+            textExplanationContainer.classList.remove('hidden');
+        }
+        
         // Check if the user's answer exactly matches the correct answer
         const correctAnswer = card.answer.trim();
         const isExactMatch = userAnswer.toLowerCase() === correctAnswer.toLowerCase();
@@ -1157,7 +1200,8 @@ function markAnswer(isCorrect) {
     const deckName = card.sourceDeck;
 
     // Update spaced repetition data
-    if (studyMode === 'spaced-repetition') {
+    const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
+    if (studyMode === 'spaced-repetition' || isFromSRBuckets) {
         updateSpacedRepetition(card, isCorrect);
     }
 
@@ -1176,13 +1220,6 @@ function markAnswer(isCorrect) {
         incorrectCount++;
         if (deckStats[deckName]) {
             deckStats[deckName].incorrect++;
-        }
-        
-        // Show explanation for text answers if available
-        const isMultipleChoice = Array.isArray(card.options) && Array.isArray(card.correct);
-        if (!isMultipleChoice && card.explanation) {
-            textExplanationContent.textContent = card.explanation;
-            textExplanationContainer.classList.remove('hidden');
         }
         
         // Store the incorrect card in the source deck's incorrect indices
@@ -1279,6 +1316,18 @@ function showFeedback() {
     feedbackElement.classList.remove('hidden');
     cardContainer.classList.add('hidden');
 
+    // Show/hide buttons based on whether we're in SR bucket mode
+    const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
+    if (isFromSRBuckets) {
+        restartBtn.style.display = 'none';
+        uploadNewBtn.style.display = 'none';
+        returnToSrBtn.style.display = 'inline-block';
+    } else {
+        restartBtn.style.display = 'inline-block';
+        uploadNewBtn.style.display = 'inline-block';
+        returnToSrBtn.style.display = 'none';
+    }
+
     // Display per-deck statistics
     deckStatsContainer.innerHTML = '';
     
@@ -1318,6 +1367,13 @@ function showFeedback() {
  * Restart the quiz with the same cards
  */
 function restartQuiz() {
+    // Don't allow restart from SR buckets mode
+    const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
+    if (isFromSRBuckets) {
+        showError('Bitte nutze "Zurück zur SR-Verwaltung" um neue Buckets auszuwählen.');
+        return;
+    }
+
     currentCardIndex = 0;
     correctCount = 0;
     incorrectCount = 0;
@@ -1340,9 +1396,54 @@ function restartQuiz() {
 }
 
 /**
+ * Return to SR Manager after completing a quiz from SR buckets
+ */
+function returnToSRManager() {
+    // Hide quiz content
+    appContent.classList.add('hidden');
+    feedbackElement.classList.add('hidden');
+    
+    // Show file input container and SR manager
+    document.getElementById('file-input-container').style.display = 'block';
+    srManagerContainer.classList.remove('hidden');
+    
+    // Hide saved decks and upload section
+    const savedDecksContainer = document.getElementById('saved-decks-container');
+    const uploadSection = document.querySelector('.upload-section');
+    const subtitle = document.getElementById('app-subtitle');
+    
+    savedDecksContainer.classList.add('hidden');
+    if (uploadSection) uploadSection.classList.add('hidden');
+    if (subtitle) subtitle.classList.add('hidden');
+    
+    // Update button state
+    openSrManagerBtn.textContent = '📚 Decks anzeigen';
+    openSrManagerBtn.classList.add('active');
+    
+    // Hide study mode selector in SR manager
+    studyModeSelect.style.display = 'none';
+    
+    // Refresh SR buckets display
+    displaySpacedRepetitionBuckets();
+    
+    // Reset the app title
+    appTitle.textContent = 'Lernkarten App';
+    
+    // Clear active decks
+    activeDecks = [];
+}
+
+/**
  * Reset the app and return to deck selection
  */
 function resetAndUpload() {
+    // Don't allow upload from SR buckets mode
+    const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
+    if (isFromSRBuckets) {
+        showError('Bitte nutze "Zurück zur SR-Verwaltung" um neue Buckets auszuwählen.');
+        return;
+    }
+
     // Reset everything and show file upload
     document.getElementById('file-input-container').style.display = 'block';
     appContent.classList.add('hidden');
@@ -1353,6 +1454,14 @@ function resetAndUpload() {
     // Reset the app title
     appTitle.textContent = 'Lernkarten';
     appSubtitle.style.display = 'block';
+    studyModeSelect.style.display = 'inline-block';
+    
+    // Show SR button only if in spaced-repetition mode
+    if (studyMode === 'spaced-repetition') {
+        openSrManagerBtn.style.display = 'inline-block';
+    } else {
+        openSrManagerBtn.style.display = 'none';
+    }
 
     // Clear any error messages
     errorMessageElement.classList.add('hidden');
@@ -1388,6 +1497,13 @@ function showError(message) {
  */
 function handleStudyModeChange(event) {
     studyMode = event.target.value;
+    
+    // Show/hide SR button based on mode
+    if (studyMode === 'spaced-repetition') {
+        openSrManagerBtn.style.display = 'inline-block';
+    } else {
+        openSrManagerBtn.style.display = 'none';
+    }
     
     // Reorganize cards based on study mode
     reorganizeCardsByStudyMode();
@@ -1488,11 +1604,12 @@ function isCardIncorrectFromPreviousSession(card) {
 
 /**
  * Get unique key for a card (for spaced repetition tracking)
+ * Uses ||| as separator since it won't appear in normal text
  * @param {Object} card - Card object
  * @returns {string} Unique card key
  */
 function getCardKey(card) {
-    return `${card.sourceDeck || 'unknown'}_${card.question}`;
+    return `${card.sourceDeck || 'unknown'}|||${card.question}`;
 }
 
 /**
@@ -1680,4 +1797,452 @@ function triggerConfetti() {
     }
     
     console.log(`✅ Added ${numConfetti} confetti pieces to container`);
+}
+
+// ============================================================================
+// Spaced Repetition Manager
+// ============================================================================
+
+/**
+ * Toggle the Spaced Repetition Manager interface
+ */
+function openSpacedRepetitionManager() {
+    const savedDecksContainer = document.getElementById('saved-decks-container');
+    const uploadSection = document.querySelector('.upload-section');
+    const subtitle = document.getElementById('app-subtitle');
+    const isCurrentlyOpen = !srManagerContainer.classList.contains('hidden');
+    
+    if (isCurrentlyOpen) {
+        // Close SR manager, show saved decks
+        srManagerContainer.classList.add('hidden');
+        savedDecksContainer.classList.remove('hidden');
+        if (uploadSection) uploadSection.classList.remove('hidden');
+        if (subtitle) subtitle.classList.remove('hidden');
+        studyModeSelect.style.display = 'inline-block';
+        openSrManagerBtn.textContent = '📊 SR verwalten';
+        openSrManagerBtn.classList.remove('active');
+        // Refresh saved decks display
+        displaySavedDecks(deckSearchInput.value);
+    } else {
+        // Open SR manager, hide saved decks
+        srManagerContainer.classList.remove('hidden');
+        savedDecksContainer.classList.add('hidden');
+        if (uploadSection) uploadSection.classList.add('hidden');
+        if (subtitle) subtitle.classList.add('hidden');
+        studyModeSelect.style.display = 'none';
+        openSrManagerBtn.textContent = '📚 Decks anzeigen';
+        openSrManagerBtn.classList.add('active');
+        displaySpacedRepetitionBuckets();
+    }
+}
+
+/**
+ * Display cards grouped by their spaced repetition intervals (buckets)
+ */
+function displaySpacedRepetitionBuckets() {
+    console.log('displaySpacedRepetitionBuckets called');
+    console.log('spacedRepetitionData:', spacedRepetitionData);
+    console.log('savedDecks:', savedDecks);
+    
+    // Check if there are any cards with SR data
+    if (Object.keys(spacedRepetitionData).length === 0) {
+        srBucketsDisplay.innerHTML = '<div class="sr-empty-message">Noch keine Karten im Spaced Repetition System. Beantworte Fragen im Spaced Repetition Modus, um Karten hier zu sehen.</div>';
+        startSelectedBucketsBtn.disabled = true;
+        return;
+    }
+
+    // Group cards by interval
+    const buckets = {};
+    const now = new Date();
+    let cardsNotFound = 0;
+
+    Object.entries(spacedRepetitionData).forEach(([key, data]) => {
+        const intervalKey = data.interval;
+        if (!buckets[intervalKey]) {
+            buckets[intervalKey] = [];
+        }
+        
+        // Parse the card from the key
+        const card = getCardFromKey(key);
+        if (card) {
+            buckets[intervalKey].push({
+                key,
+                card,
+                data,
+                isOverdue: data.nextReview <= now
+            });
+        } else {
+            console.warn('Card not found for key:', key);
+            cardsNotFound++;
+            // Still add it with the key as the question
+            buckets[intervalKey].push({
+                key,
+                card: { question: key.split('|||')[1] || 'Unbekannte Frage', sourceDeck: 'Unbekannt' },
+                data,
+                isOverdue: data.nextReview <= now
+            });
+        }
+    });
+    
+    console.log('Cards not found:', cardsNotFound);
+    console.log('Buckets:', buckets);
+
+    // Sort buckets by interval
+    const sortedIntervals = Object.keys(buckets).map(Number).sort((a, b) => a - b);
+
+    // Build HTML
+    let html = '';
+    sortedIntervals.forEach(interval => {
+        const cards = buckets[interval];
+        const intervalLabel = getIntervalLabel(interval);
+        const overdueCount = cards.filter(c => c.isOverdue).length;
+        
+        html += `
+            <div class="sr-bucket" data-interval="${interval}">
+                <div class="sr-bucket-header" onclick="toggleBucketExpansion(${interval})">
+                    <div class="sr-bucket-info">
+                        <input type="checkbox" class="sr-bucket-checkbox" onclick="event.stopPropagation(); toggleBucketSelection(${interval})" data-interval="${interval}">
+                        <span class="sr-bucket-title">${intervalLabel}</span>
+                        <span class="sr-bucket-count">${cards.length} Karten${overdueCount > 0 ? ` (${overdueCount} fällig)` : ''}</span>
+                    </div>
+                    <span class="sr-bucket-interval">${interval} Tag${interval !== 1 ? 'e' : ''}</span>
+                </div>
+                <div class="sr-bucket-cards" id="bucket-cards-${interval}">
+                    ${cards.map(({ key, card, data, isOverdue }) => `
+                        <div class="sr-card-item" data-card-key="${encodeURIComponent(key)}">
+                            <div class="sr-card-question">${escapeHtml(card.question || 'Unbekannte Frage')}</div>
+                            <div class="sr-card-meta">
+                                <span class="sr-card-next-review" style="color: ${isOverdue ? '#dc3545' : '#28a745'}">
+                                    ${isOverdue ? '⚠️ Fällig' : '✓'} ${formatDate(data.nextReview)}
+                                </span>
+                                <div class="sr-card-actions">
+                                    <button class="sr-move-btn" onclick="handleMoveSRCard(this)" data-interval="${interval}" title="Zu anderem Bucket verschieben">
+                                        Verschieben
+                                    </button>
+                                    <button class="sr-delete-btn" onclick="handleDeleteSRCard(this)" title="Aus SR-System entfernen">
+                                        Löschen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    srBucketsDisplay.innerHTML = html;
+    updateStartBucketButton();
+}
+
+/**
+ * Get human-readable interval label
+ * Maps intervals to 5 semantic learning stages
+ */
+function getIntervalLabel(interval) {
+    if (interval === 1) return 'Neu (Tag 1)';
+    if (interval <= 7) return 'Anfänger (2-7 Tage)';
+    if (interval <= 30) return 'In Übung (8-30 Tage)';
+    if (interval <= 90) return 'Fortgeschritten (1-3 Monate)';
+    return 'Gut gelernt (3+ Monate)';
+}
+
+/**
+ * Toggle bucket expansion
+ */
+function toggleBucketExpansion(interval) {
+    const cardsContainer = document.getElementById(`bucket-cards-${interval}`);
+    cardsContainer.classList.toggle('expanded');
+}
+
+/**
+ * Toggle bucket selection
+ */
+function toggleBucketSelection(interval) {
+    const bucket = document.querySelector(`.sr-bucket[data-interval="${interval}"]`);
+    const checkbox = bucket.querySelector('.sr-bucket-checkbox');
+    bucket.classList.toggle('selected');
+    
+    updateStartBucketButton();
+}
+
+/**
+ * Update the state of the start button based on selected buckets
+ */
+function updateStartBucketButton() {
+    const selectedCount = document.querySelectorAll('.sr-bucket.selected').length;
+    startSelectedBucketsBtn.disabled = selectedCount === 0;
+    startSelectedBucketsBtn.textContent = selectedCount > 0
+        ? `Mit ${selectedCount} Bucket${selectedCount !== 1 ? 's' : ''} üben`
+        : 'Mit ausgewählten Buckets üben';
+}
+
+/**
+ * Select all SR buckets
+ */
+function selectAllSRBuckets() {
+    document.querySelectorAll('.sr-bucket').forEach(bucket => {
+        bucket.classList.add('selected');
+        const checkbox = bucket.querySelector('.sr-bucket-checkbox');
+        if (checkbox) checkbox.checked = true;
+    });
+    updateStartBucketButton();
+}
+
+/**
+ * Deselect all SR buckets
+ */
+function deselectAllSRBuckets() {
+    document.querySelectorAll('.sr-bucket').forEach(bucket => {
+        bucket.classList.remove('selected');
+        const checkbox = bucket.querySelector('.sr-bucket-checkbox');
+        if (checkbox) checkbox.checked = false;
+    });
+    updateStartBucketButton();
+}
+
+/**
+ * Start practice session with selected buckets
+ */
+function startSelectedBuckets() {
+    const selectedBuckets = Array.from(document.querySelectorAll('.sr-bucket.selected'));
+    if (selectedBuckets.length === 0) {
+        showError('Bitte wähle mindestens einen Bucket aus.');
+        return;
+    }
+
+    // Collect all cards from selected buckets
+    const selectedCards = [];
+    selectedBuckets.forEach(bucket => {
+        const interval = parseInt(bucket.dataset.interval);
+        Object.entries(spacedRepetitionData).forEach(([key, data]) => {
+            if (data.interval === interval) {
+                const card = getCardFromKey(key);
+                if (card) {
+                    // Add sourceDeck to maintain compatibility with quiz system
+                    selectedCards.push({
+                        ...card,
+                        sourceDeck: card.sourceDeck || 'SR Practice'
+                    });
+                }
+            }
+        });
+    });
+
+    if (selectedCards.length === 0) {
+        showError('Keine Karten in den ausgewählten Buckets gefunden.');
+        return;
+    }
+
+    // Sort cards by interval (bucket order) then by nextReview date within each bucket
+    selectedCards.sort((a, b) => {
+        const aKey = getCardKey(a);
+        const bKey = getCardKey(b);
+        const aData = spacedRepetitionData[aKey];
+        const bData = spacedRepetitionData[bKey];
+        
+        // First sort by interval (bucket)
+        if (aData.interval !== bData.interval) {
+            return aData.interval - bData.interval;
+        }
+        
+        // Within same interval, sort by nextReview date (most overdue first)
+        return new Date(aData.nextReview) - new Date(bData.nextReview);
+    });
+
+    // Set active decks for title display
+    activeDecks = ['SR Buckets'];
+    
+    // Ensure study mode is set to spaced-repetition and hide selector
+    studyMode = 'spaced-repetition';
+    studyModeSelect.value = 'spaced-repetition';
+    studyModeSelect.style.display = 'none';
+    
+    // Update the app title
+    updateAppTitle(['SR Buckets']);
+
+    // Close SR manager and show quiz
+    const savedDecksContainer = document.getElementById('saved-decks-container');
+    const uploadSection = document.querySelector('.upload-section');
+    const subtitle = document.getElementById('app-subtitle');
+    
+    srManagerContainer.classList.add('hidden');
+    savedDecksContainer.classList.remove('hidden');
+    if (uploadSection) uploadSection.classList.remove('hidden');
+    if (subtitle) subtitle.classList.remove('hidden');
+    openSrManagerBtn.textContent = '📊 SR verwalten';
+    openSrManagerBtn.classList.remove('active');
+
+    // Initialize the quiz with selected cards
+    initializeQuiz(selectedCards);
+}
+
+/**
+ * Handler for move button click - extracts key from data attributes
+ */
+function handleMoveSRCard(button) {
+    const cardItem = button.closest('.sr-card-item');
+    const cardKey = decodeURIComponent(cardItem.dataset.cardKey);
+    const currentInterval = parseInt(button.dataset.interval);
+    moveSRCard(cardKey, currentInterval);
+}
+
+/**
+ * Handler for delete button click - extracts key from data attributes
+ */
+function handleDeleteSRCard(button) {
+    const cardItem = button.closest('.sr-card-item');
+    const cardKey = decodeURIComponent(cardItem.dataset.cardKey);
+    deleteSRCard(cardKey);
+}
+
+/**
+ * Move a card to a different interval bucket
+ */
+function moveSRCard(cardKey, currentInterval) {
+    const newInterval = prompt(`Karte zu welchem Intervall (in Tagen) verschieben?\nAktuell: ${currentInterval} Tag${currentInterval !== 1 ? 'e' : ''}`, currentInterval);
+    
+    if (newInterval === null) return; // Cancelled
+    
+    const trimmed = newInterval.trim();
+    if (trimmed === '') {
+        showError('Bitte gib eine gültige Anzahl von Tagen ein.');
+        return;
+    }
+    
+    const interval = parseInt(trimmed);
+    if (isNaN(interval) || interval < 1 || interval > 365) {
+        showError('Bitte gib eine gültige Anzahl von Tagen ein (1-365).');
+        return;
+    }
+
+    if (spacedRepetitionData[cardKey]) {
+        spacedRepetitionData[cardKey].interval = interval;
+        
+        // Recalculate next review date
+        const nextReview = new Date();
+        nextReview.setDate(nextReview.getDate() + interval);
+        spacedRepetitionData[cardKey].nextReview = nextReview;
+        
+        saveSpacedRepetitionData();
+        displaySpacedRepetitionBuckets();
+        showMessage(`Karte zu ${interval}-Tage-Intervall verschoben.`);
+    } else {
+        showError('Karte wurde nicht gefunden.');
+    }
+}
+
+/**
+ * Delete a card from the SR system
+ */
+function deleteSRCard(cardKey) {
+    if (!confirm('Diese Karte aus dem Spaced Repetition System entfernen?')) {
+        return;
+    }
+
+    delete spacedRepetitionData[cardKey];
+    saveSpacedRepetitionData();
+    displaySpacedRepetitionBuckets();
+    showMessage('Karte aus SR-System entfernt.');
+}
+
+/**
+ * Cleanup orphaned SR data (cards whose decks have been deleted)
+ */
+function cleanupOrphanedSRData() {
+    const orphanedKeys = [];
+    
+    Object.keys(spacedRepetitionData).forEach(key => {
+        // Extract deck name from key (supports both ||| and legacy _ format)
+        let deckName;
+        if (key.includes('|||')) {
+            deckName = key.split('|||')[0];
+        } else {
+            const separatorIndex = key.indexOf('_');
+            deckName = separatorIndex !== -1 ? key.substring(0, separatorIndex) : 'unknown';
+        }
+        
+        // Check if deck still exists
+        if (!savedDecks[deckName]) {
+            orphanedKeys.push(key);
+        }
+    });
+    
+    if (orphanedKeys.length === 0) {
+        showMessage('Keine verwaisten Einträge gefunden. Alles sauber!');
+        return;
+    }
+    
+    if (!confirm(`${orphanedKeys.length} verwaiste Einträge gefunden (Decks wurden gelöscht). Jetzt entfernen?`)) {
+        return;
+    }
+    
+    orphanedKeys.forEach(key => {
+        delete spacedRepetitionData[key];
+    });
+    
+    saveSpacedRepetitionData();
+    displaySpacedRepetitionBuckets();
+    showMessage(`${orphanedKeys.length} verwaiste Einträge entfernt.`);
+}
+
+/**
+ * Get card object from SR data key
+ * Supports both new format (|||) and legacy format (_)
+ */
+function getCardFromKey(key) {
+    // Key format is: "deckName|||question" (new) or "deckName_question" (legacy)
+    let deckName, question;
+    
+    if (key.includes('|||')) {
+        const parts = key.split('|||');
+        deckName = parts[0];
+        question = parts.slice(1).join('|||'); // Handle ||| in question (unlikely but safe)
+    } else {
+        // Legacy format fallback - split on first underscore
+        const separatorIndex = key.indexOf('_');
+        if (separatorIndex === -1) {
+            console.warn('Invalid key format:', key);
+            return null;
+        }
+        deckName = key.substring(0, separatorIndex);
+        question = key.substring(separatorIndex + 1);
+    }
+    
+    // Try to find the card in saved decks
+    if (savedDecks[deckName]) {
+        const found = savedDecks[deckName].cards.find(card => card.question === question);
+        if (found) {
+            return { ...found, sourceDeck: deckName };
+        }
+    }
+    
+    // If deck not found or card not in deck, return a basic card object
+    return {
+        question: question,
+        sourceDeck: deckName,
+        answer: 'Nicht verfügbar'
+    };
+}
+
+/**
+ * Format date for display
+ */
+function formatDate(date) {
+    const now = new Date();
+    const diffDays = Math.floor((date - now) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return 'Überfällig';
+    if (diffDays === 0) return 'Heute';
+    if (diffDays === 1) return 'Morgen';
+    return `in ${diffDays} Tagen`;
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
