@@ -972,3 +972,65 @@ body {
     color: #666;
     font-style: italic;
 }
+
+/* Update Notification Banner */
+#update-notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #4a6fa5 0%, #166088 100%);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 10000;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+#update-notification span {
+    font-weight: 500;
+}
+
+#update-notification button {
+    background: white;
+    color: #166088;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+#update-notification button:hover {
+    background: #e9ecef;
+    transform: scale(1.02);
+}
+
+#update-notification button.dismiss {
+    background: transparent;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    font-size: 1.2rem;
+    opacity: 0.8;
+}
+
+#update-notification button.dismiss:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+}

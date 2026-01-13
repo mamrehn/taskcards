@@ -233,6 +233,57 @@ function initializeApp() {
     loadSavedDecks();
     displaySavedDecks();
     loadSpacedRepetitionData();
+    
+    // Set up service worker update listener
+    setupServiceWorkerUpdates();
+}
+
+/**
+ * Set up listener for service worker updates
+ * Shows notification when new version is available
+ */
+function setupServiceWorkerUpdates() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+                showUpdateNotification();
+            }
+        });
+    }
+}
+
+/**
+ * Show update notification banner
+ */
+function showUpdateNotification() {
+    // Don't show if already showing
+    if (document.getElementById('update-notification')) return;
+    
+    const notification = document.createElement('div');
+    notification.id = 'update-notification';
+    notification.innerHTML = `
+        <span>🔄 Eine neue Version ist verfügbar!</span>
+        <button onclick="applyUpdate()">Jetzt aktualisieren</button>
+        <button onclick="dismissUpdate()" class="dismiss">✕</button>
+    `;
+    document.body.appendChild(notification);
+}
+
+/**
+ * Apply update by reloading the page
+ */
+function applyUpdate() {
+    window.location.reload();
+}
+
+/**
+ * Dismiss update notification
+ */
+function dismissUpdate() {
+    const notification = document.getElementById('update-notification');
+    if (notification) {
+        notification.remove();
+    }
 }
 
 // Initialize when DOM is ready
