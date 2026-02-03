@@ -138,6 +138,33 @@ let supabaseClient;
                  // Otherwise, show the role selection view
                  showView('role-selection');
             }
+
+            // Reconnect Supabase channels when tab becomes visible again (e.g., after sleep/tab switch)
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState !== 'visible') return;
+
+                console.log('Tab became visible, checking connections...');
+
+                // Host reconnection
+                if (hostRoomId && hostPlayerId) {
+                    // Re-mark host as connected
+                    try {
+                        await supabaseClient.from('players').update({ is_connected: true }).eq('id', hostPlayerId);
+                    } catch (e) {
+                        console.error('Error re-marking host as connected:', e);
+                    }
+                }
+
+                // Player reconnection
+                if (playerRoomId && playerCurrentId) {
+                    // Re-mark player as connected
+                    try {
+                        await supabaseClient.from('players').update({ is_connected: true }).eq('id', playerCurrentId);
+                    } catch (e) {
+                        console.error('Error re-marking player as connected:', e);
+                    }
+                }
+            });
         });
 
         // --- Host State & Initialization Flag ---
@@ -151,6 +178,11 @@ let supabaseClient;
         let hostPlayerId = null; // Stores the host's own player ID
         let hostViewHeading = null; // Cached element for "Quiz hosten" heading
         let hostBeforeUnloadHandler = null; // Track beforeunload handler to prevent duplicates
+        let hostBroadcastReconnectAttempts = 0;
+        let hostPlayersReconnectAttempts = 0;
+        let hostHeartbeatInterval = null;
+        const HOST_MAX_RECONNECT_ATTEMPTS = 10;
+        const RECONNECT_DELAY_MS = 2000;
 
         /**
          * Returns an array of non-host players from quizState.
@@ -371,6 +403,12 @@ let supabaseClient;
 
                 // Event listener for starting a new quiz
                 newQuizBtn.addEventListener('click', async () => {
+                    // Stop heartbeat
+                    if (hostHeartbeatInterval) {
+                        clearInterval(hostHeartbeatInterval);
+                        hostHeartbeatInterval = null;
+                    }
+
                     // Clean up Supabase subscriptions
                     if (hostSupabaseChannel) {
                         await supabaseClient.removeChannel(hostSupabaseChannel);
@@ -400,21 +438,35 @@ let supabaseClient;
                     initializeHostFeatures(); // Re-initialize to reset UI fully
                 });
 
-                // Clean up Supabase subscriptions on window unload
+                // Clean up on window unload using sendBeacon for reliable delivery
                 // Remove any existing handler to prevent duplicates
                 if (hostBeforeUnloadHandler) {
                     window.removeEventListener('beforeunload', hostBeforeUnloadHandler);
                 }
-                hostBeforeUnloadHandler = async () => {
+                hostBeforeUnloadHandler = () => {
+                    // Use sendBeacon for reliable delivery during page unload
+                    if (hostPlayerId && SUPABASE_URL && SUPABASE_ANON_KEY) {
+                        const url = `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(hostPlayerId)}`;
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Prefer': 'return=minimal'
+                        };
+                        const body = JSON.stringify({ is_connected: false });
+                        // fetch with keepalive: true is queued by the browser even during unload
+                        try {
+                            fetch(url, { method: 'PATCH', headers, body, keepalive: true });
+                        } catch (e) {
+                            // Best effort - page is unloading
+                        }
+                    }
+                    // Best-effort channel cleanup (synchronous, non-blocking)
                     if (hostSupabaseChannel) {
-                        await supabaseClient.removeChannel(hostSupabaseChannel);
+                        supabaseClient.removeChannel(hostSupabaseChannel);
                     }
                     if (hostPlayersSubscription) {
-                        await supabaseClient.removeChannel(hostPlayersSubscription);
-                    }
-                    // Optional: Mark host's player as disconnected or remove room
-                    if (hostPlayerId) {
-                        await supabaseClient.from('players').update({ is_connected: false }).eq('id', hostPlayerId);
+                        supabaseClient.removeChannel(hostPlayersSubscription);
                     }
                 };
                 window.addEventListener('beforeunload', hostBeforeUnloadHandler);
@@ -574,44 +626,65 @@ let supabaseClient;
                     updatePlayersList();
 
 
-                    // Subscribe to player changes in this room
-                    // This subscription handles both INSERT (new players) and UPDATE (player answers)
-                    hostPlayersSubscription = supabaseClient
-                        .channel(`players_in_room_${hostRoomId}`)
-                        .on('postgres_changes', {
-                            event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
-                            schema: 'public',
-                            table: 'players',
-                            filter: `room_id=eq.${hostRoomId}`
-                        }, payload => {
-                            if (payload.eventType === 'INSERT') {
-                                if (payload.new.id !== hostPlayerId) { // Ignore host's own insert
-                                    console.log('New player joined:', payload.new);
-                                    quizState.players[payload.new.id] = {
-                                        id: payload.new.id,
-                                        name: payload.new.name,
-                                        score: payload.new.score,
-                                        currentAnswer: [],
-                                        answerTime: null
-                                    };
-                                    updatePlayersList();
-                                }
-                            } else if (payload.eventType === 'UPDATE') {
-                                if (payload.new.id !== hostPlayerId) { // Ignore host's own updates
-                                    handlePlayerData(payload.new);
-                                }
-                            } else if (payload.eventType === 'DELETE') {
-                                console.log('Player disconnected (deleted):', payload.old.id);
-                                if (quizState.players[payload.old.id]) {
-                                    delete quizState.players[payload.old.id];
-                                    updatePlayersList();
-                                    if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
-                                        endQuestion();
+                    // Subscribe to player changes in this room with reconnection logic
+                    function subscribeToPlayerChanges() {
+                        hostPlayersSubscription = supabaseClient
+                            .channel(`players_in_room_${hostRoomId}_${Date.now()}`) // Unique channel name for reconnection
+                            .on('postgres_changes', {
+                                event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+                                schema: 'public',
+                                table: 'players',
+                                filter: `room_id=eq.${hostRoomId}`
+                            }, payload => {
+                                if (payload.eventType === 'INSERT') {
+                                    if (payload.new.id !== hostPlayerId) { // Ignore host's own insert
+                                        console.log('New player joined:', payload.new);
+                                        quizState.players[payload.new.id] = {
+                                            id: payload.new.id,
+                                            name: payload.new.name,
+                                            score: payload.new.score,
+                                            currentAnswer: [],
+                                            answerTime: null
+                                        };
+                                        updatePlayersList();
+                                    }
+                                } else if (payload.eventType === 'UPDATE') {
+                                    if (payload.new.id !== hostPlayerId) { // Ignore host's own updates
+                                        handlePlayerData(payload.new);
+                                    }
+                                } else if (payload.eventType === 'DELETE') {
+                                    console.log('Player disconnected (deleted):', payload.old.id);
+                                    if (quizState.players[payload.old.id]) {
+                                        delete quizState.players[payload.old.id];
+                                        updatePlayersList();
+                                        if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
+                                            endQuestion();
+                                        }
                                     }
                                 }
-                            }
-                        })
-                        .subscribe();
+                            })
+                            .subscribe((status) => {
+                                if (status === 'SUBSCRIBED') {
+                                    console.log('Host subscribed to player changes channel');
+                                    hostPlayersReconnectAttempts = 0;
+                                    // Sync players from DB to catch anything missed during reconnection
+                                    updatePlayersList();
+                                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                                    console.error('Host player changes channel status:', status);
+                                    if (hostPlayersReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
+                                        hostPlayersReconnectAttempts++;
+                                        console.log(`Reconnecting player changes (${hostPlayersReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
+                                        if (hostPlayersSubscription) {
+                                            supabaseClient.removeChannel(hostPlayersSubscription);
+                                        }
+                                        setTimeout(subscribeToPlayerChanges, RECONNECT_DELAY_MS);
+                                    } else {
+                                        console.error('Host player changes: max reconnect attempts reached.');
+                                    }
+                                }
+                            });
+                    }
+                    subscribeToPlayerChanges();
 
 
                     // Get initial players list
@@ -636,23 +709,55 @@ let supabaseClient;
                     updatePlayersList();
 
 
-                    // Initialize broadcast channel for this room
-                    hostSupabaseChannel = supabaseClient.channel(`quiz_room_${hostRoomId}`);
-                    hostSupabaseChannel.subscribe((status) => {
-                        if (status === 'SUBSCRIBED') {
-                            console.log('Host subscribed to broadcast channel:', `quiz_room_${hostRoomId}`);
-                            hostSetup.classList.add('hidden');
-                            qrContainer.classList.remove('hidden');
-                            roomIdElement.textContent = quizState.roomId;
-                            const currentJoinUrl = updateJoinLink(hostRoomId);
-                            generateQRCode(currentJoinUrl);
-                            if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
-                        } else if (status === 'CHANNEL_ERROR') {
-                            console.error('Host channel error:', status);
-                            showMessage('Fehler beim Verbinden mit dem Quiz-Raum. Bitte versuche es erneut.', 'error');
-                            resetHostStateAndUI();
+                    // Initialize broadcast channel for this room with reconnection logic
+                    let hostBroadcastInitialConnect = true;
+                    function subscribeToHostBroadcast() {
+                        hostSupabaseChannel = supabaseClient.channel(`quiz_room_${hostRoomId}`);
+                        hostSupabaseChannel.subscribe((status) => {
+                            if (status === 'SUBSCRIBED') {
+                                console.log('Host subscribed to broadcast channel:', `quiz_room_${hostRoomId}`);
+                                hostBroadcastReconnectAttempts = 0;
+                                if (hostBroadcastInitialConnect) {
+                                    hostBroadcastInitialConnect = false;
+                                    hostSetup.classList.add('hidden');
+                                    qrContainer.classList.remove('hidden');
+                                    roomIdElement.textContent = quizState.roomId;
+                                    const currentJoinUrl = updateJoinLink(hostRoomId);
+                                    generateQRCode(currentJoinUrl);
+                                    if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+                                }
+                            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                                console.error('Host broadcast channel status:', status);
+                                if (hostBroadcastReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
+                                    hostBroadcastReconnectAttempts++;
+                                    console.log(`Reconnecting host broadcast (${hostBroadcastReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
+                                    if (hostSupabaseChannel) {
+                                        supabaseClient.removeChannel(hostSupabaseChannel);
+                                    }
+                                    setTimeout(subscribeToHostBroadcast, RECONNECT_DELAY_MS);
+                                } else {
+                                    console.error('Host broadcast: max reconnect attempts reached.');
+                                    showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
+                                    resetHostStateAndUI();
+                                }
+                            }
+                        });
+                    }
+                    subscribeToHostBroadcast();
+
+                    // Start host heartbeat to signal liveness
+                    if (hostHeartbeatInterval) clearInterval(hostHeartbeatInterval);
+                    hostHeartbeatInterval = setInterval(async () => {
+                        if (hostPlayerId) {
+                            try {
+                                await supabaseClient.from('players')
+                                    .update({ is_connected: true })
+                                    .eq('id', hostPlayerId);
+                            } catch (e) {
+                                console.warn('Host heartbeat failed:', e);
+                            }
                         }
-                    });
+                    }, 30000); // Every 30 seconds
 
                 } catch (error) {
                     console.error('Error initializing host Supabase:', error);
@@ -1182,6 +1287,16 @@ let supabaseClient;
              * Resets the host's state and UI to the initial setup form.
              */
             async function resetHostStateAndUI() {
+                // Stop heartbeat
+                if (hostHeartbeatInterval) {
+                    clearInterval(hostHeartbeatInterval);
+                    hostHeartbeatInterval = null;
+                }
+
+                // Reset reconnection counters
+                hostBroadcastReconnectAttempts = 0;
+                hostPlayersReconnectAttempts = 0;
+
                 // Unsubscribe from Supabase channels
                 if (hostSupabaseChannel) {
                     await supabaseClient.removeChannel(hostSupabaseChannel);
@@ -1390,17 +1505,30 @@ let supabaseClient;
                     showView('role-selection');
                 });
 
-                // Remove any existing beforeunload handler to prevent duplicates
+                // Clean up on window unload using fetch+keepalive for reliable delivery
                 if (playerBeforeUnloadHandler) {
                     window.removeEventListener('beforeunload', playerBeforeUnloadHandler);
                 }
-                playerBeforeUnloadHandler = async () => {
-                    if (playerSupabaseChannel) {
-                        await supabaseClient.removeChannel(playerSupabaseChannel);
+                playerBeforeUnloadHandler = () => {
+                    // Use fetch with keepalive for reliable delivery during page unload
+                    if (playerCurrentId && SUPABASE_URL && SUPABASE_ANON_KEY) {
+                        const url = `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(playerCurrentId)}`;
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Prefer': 'return=minimal'
+                        };
+                        const body = JSON.stringify({ is_connected: false });
+                        try {
+                            fetch(url, { method: 'PATCH', headers, body, keepalive: true });
+                        } catch (e) {
+                            // Best effort - page is unloading
+                        }
                     }
-                    // Mark player as disconnected
-                    if (playerCurrentId) {
-                        await supabaseClient.from('players').update({ is_connected: false }).eq('id', playerCurrentId);
+                    // Best-effort channel cleanup
+                    if (playerSupabaseChannel) {
+                        supabaseClient.removeChannel(playerSupabaseChannel);
                     }
                 };
                 window.addEventListener('beforeunload', playerBeforeUnloadHandler);
