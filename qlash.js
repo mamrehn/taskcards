@@ -15,68 +15,66 @@ const SUPABASE_ANON_KEY = '__SUPABASE_ANON_KEY__';
 // Declare supabaseClient globally
 let supabaseClient; 
 
-        // --- Utility functions ---
-        /**
-         * Displays a simple message to the user.
-         * @param {string} message - The message to display.
-         * @param {string} type - 'error' or 'info'.
-         */
-        function showMessage(message, type = 'info') {
-            // For now, using alert for simplicity as a custom modal would add significant code.
-            // In a real application, this would be replaced by a custom, non-blocking modal.
-            console.log(`Message (${type}): ${message}`);
-            alert(message); // Using alert as a temporary simple message box
-        }
+// --- Utility functions ---
+/**
+ * Displays a simple message to the user.
+ * @param {string} message - The message to display.
+ * @param {string} type - 'error' or 'info'.
+ */
+function showMessage(message, type = 'info') {
+    console.log(`Message (${type}): ${message}`);
+    alert(message);
+}
 
-        /**
-         * Shows a specific view and hides all other views.
-         * @param {string} viewToShowId - The ID of the view element to show.
-         */
-        function showView(viewToShowId) {
-            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-            const viewElement = document.getElementById(viewToShowId);
-            if (viewElement) viewElement.classList.add('active');
-            else console.error("View not found:", viewToShowId);
+/**
+ * Shows a specific view and hides all other views.
+ * @param {string} viewToShowId - The ID of the view element to show.
+ */
+function showView(viewToShowId) {
+    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+    const viewElement = document.getElementById(viewToShowId);
+    if (viewElement) viewElement.classList.add('active');
+    else console.error("View not found:", viewToShowId);
 
-            // Hide role selection buttons once a role is chosen
-            if (viewToShowId === 'host-view' || viewToShowId === 'player-view') {
-                document.getElementById('role-selection').classList.add('hidden');
-            }
-        }
+    // Hide role selection buttons once a role is chosen
+    if (viewToShowId === 'host-view' || viewToShowId === 'player-view') {
+        document.getElementById('role-selection').classList.add('hidden');
+    }
+}
 
-        /**
-         * Generates a random alphanumeric ID of a specified length.
-         * @param {number} length - The desired length of the ID.
-         * @returns {string} The generated alphanumeric ID.
-         */
-        function generateAlphanumericId(length) {
-            const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return result;
-        }
+/**
+ * Generates a random alphanumeric ID of a specified length.
+ * @param {number} length - The desired length of the ID.
+ * @returns {string} The generated alphanumeric ID.
+ */
+function generateAlphanumericId(length) {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
 
-        /**
-         * Shuffles an array in place using the Fisher-Yates (Knuth) algorithm.
-         * @param {Array} array - The array to shuffle.
-         */
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]]; // Swap elements
-            }
-        }
+/**
+ * Shuffles an array in place using the Fisher-Yates (Knuth) algorithm.
+ * @param {Array} array - The array to shuffle.
+ */
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
 
-        // --- App initialization ---
-        // QR Code Modal elements (declared globally for early access)
-        let qrModalOverlay = null;
-        let qrModalCloseBtn = null;
-        let largeQrcodeContainer = null;
-        let modalRoomIdSpan = null;
+// --- App initialization ---
+// QR Code Modal elements (declared globally for early access)
+let qrModalOverlay = null;
+let qrModalCloseBtn = null;
+let largeQrcodeContainer = null;
+let modalRoomIdSpan = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
             // Initialize Supabase client here, after the DOM is loaded
             // This ensures the Supabase global object is available
             if (typeof supabase !== 'undefined' && supabase.createClient) { 
@@ -167,52 +165,52 @@ let supabaseClient;
             });
         });
 
-        // --- Host State & Initialization Flag ---
-        let hostGlobalQuizState = null;
-        let hostSupabaseChannel = null; // Supabase Broadcast Channel for host to send messages
-        let hostPlayersSubscription = null; // Supabase Realtime subscription for player changes
-        let isHostInitialized = false;
-        let hostTimerInterval = null;
-        let hostQuestionStartTime = null; // To track time for scoring
-        let hostRoomId = null; // Stores the Supabase room ID
-        let hostPlayerId = null; // Stores the host's own player ID
-        let hostViewHeading = null; // Cached element for "Quiz hosten" heading
-        let hostBeforeUnloadHandler = null; // Track beforeunload handler to prevent duplicates
-        let hostBroadcastReconnectAttempts = 0;
-        let hostPlayersReconnectAttempts = 0;
-        let hostHeartbeatInterval = null;
-        const HOST_MAX_RECONNECT_ATTEMPTS = 10;
-        const RECONNECT_DELAY_MS = 2000;
+// --- Host State & Initialization Flag ---
+let hostGlobalQuizState = null;
+let hostSupabaseChannel = null;
+let hostPlayersSubscription = null;
+let isHostInitialized = false;
+let hostTimerInterval = null;
+let hostQuestionStartTime = null;
+let hostRoomId = null;
+let hostPlayerId = null;
+let hostViewHeading = null;
+let hostBeforeUnloadHandler = null;
+let hostBroadcastReconnectAttempts = 0;
+let hostPlayersReconnectAttempts = 0;
+let hostHeartbeatInterval = null;
+const HOST_MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_DELAY_MS = 2000;
 
-        /**
-         * Returns an array of non-host players from quizState.
-         * @returns {Array<Object>} Array of player objects excluding the host.
-         */
-        function getNonHostPlayers() {
-            if (!hostGlobalQuizState) return [];
-            return Object.values(hostGlobalQuizState.players).filter(p => p.id !== hostPlayerId);
-        }
+/**
+ * Returns an array of non-host players from quizState.
+ * @returns {Array<Object>} Array of player objects excluding the host.
+ */
+function getNonHostPlayers() {
+    if (!hostGlobalQuizState) return [];
+    return Object.values(hostGlobalQuizState.players).filter(p => p.id !== hostPlayerId);
+}
 
-        /**
-         * Returns the count of non-host players.
-         * @returns {number} Number of non-host players.
-         */
-        function getNonHostPlayerCount() {
-            return getNonHostPlayers().length;
-        }
+/**
+ * Returns the count of non-host players.
+ * @returns {number} Number of non-host players.
+ */
+function getNonHostPlayerCount() {
+    return getNonHostPlayers().length;
+}
 
-        /**
-         * Checks if a player ID belongs to the host.
-         * @param {string} playerId - The player ID to check.
-         * @returns {boolean} True if the player is the host.
-         */
-        function isHostPlayer(playerId) {
-            return playerId === hostPlayerId;
-        }
+/**
+ * Checks if a player ID belongs to the host.
+ * @param {string} playerId - The player ID to check.
+ * @returns {boolean} True if the player is the host.
+ */
+function isHostPlayer(playerId) {
+    return playerId === hostPlayerId;
+}
 
-        /**
-         * Initializes all features and event listeners for the host role.
-         */
+/**
+ * Initializes all features and event listeners for the host role.
+ */
         async function initializeHostFeatures() {
             console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
             // Initialize quiz state if not already set
@@ -552,8 +550,8 @@ let supabaseClient;
                     item.className = 'question-item';
                     const correctIndices = q.correct.map(i => i + 1).join(', ');
                     item.innerHTML = `
-                        <p><strong>F${index + 1}:</strong> ${q.question}</p>
-                        <p><strong>Optionen:</strong> ${q.options.join('; ')}</p>
+                        <p><strong>F${index + 1}:</strong> ${sanitizeHTML(q.question)}</p>
+                        <p><strong>Optionen:</strong> ${q.options.map(o => sanitizeHTML(o)).join('; ')}</p>
                         <p><strong>Richtige Option(en):</strong> ${correctIndices}</p>
                         <button class="btn remove-question" data-index="${index}">Entfernen</button>
                     `;
@@ -902,7 +900,7 @@ let supabaseClient;
                 qrcodeElement.innerHTML = ''; // Clear previous QR code
                 if (typeof QRCode === 'undefined') {
                     console.error("QR-Code-Bibliothek nicht geladen.");
-                    qrcodeElement.innerHTML = `<p style="color:red;">QR-Code-Bibliothek nicht geladen. URL: ${url}</p>`;
+                    qrcodeElement.innerHTML = `<p style="color:red;">QR-Code-Bibliothek nicht geladen. URL: ${sanitizeHTML(url)}</p>`;
                     return;
                 }
                 try {
@@ -916,7 +914,7 @@ let supabaseClient;
                     });
                 } catch (e) {
                     console.error("QR Code generation error:", e);
-                    qrcodeElement.innerHTML = `<p style="color:red;">Fehler beim Generieren des QR-Codes. URL: ${url}</p>`;
+                    qrcodeElement.innerHTML = `<p style="color:red;">Fehler beim Generieren des QR-Codes. URL: ${sanitizeHTML(url)}</p>`;
                 }
             }
 
@@ -1230,7 +1228,7 @@ let supabaseClient;
                     if (idx === 0) li.classList.add('rank-1');
                     else if (idx === 1) li.classList.add('rank-2');
                     else if (idx === 2) li.classList.add('rank-3');
-                    li.innerHTML = `<span>${idx + 1}. ${p.name}</span><span>${Math.round(p.score)} Punkte</span>`;
+                    li.innerHTML = `<span>${idx + 1}. ${sanitizeHTML(p.name)}</span><span>${Math.round(p.score)} Punkte</span>`;
                     scoreboardListEl.appendChild(li);
                 });
             }
@@ -1278,7 +1276,7 @@ let supabaseClient;
                     if (idx === 0) i.classList.add('rank-1');
                     else if (idx === 1) i.classList.add('rank-2');
                     else if (idx === 2) i.classList.add('rank-3');
-                    i.innerHTML = `<span>${idx + 1}. ${p.name}</span><span>${Math.round(p.score)} Punkte</span>`;
+                    i.innerHTML = `<span>${idx + 1}. ${sanitizeHTML(p.name)}</span><span>${Math.round(p.score)} Punkte</span>`;
                     leaderboard.appendChild(i);
                 });
             }
@@ -1324,110 +1322,109 @@ let supabaseClient;
             }
         }
 
-        // --- Player State & Initialization Flag ---
-        let playerSupabaseChannel = null; // Supabase Broadcast Channel for player to receive messages
-        let playerRoomId = null;
-        let playerCurrentId = null; // The player's unique ID
-        let isPlayerInitialized = false;
-        let playerTimerInterval = null;
-        let playerCurrentQuestionOptions = [];
-        let selectedAnswers = []; // This will hold the player's selected answers for the current question
-        let playerScore = 0;
-        let playerQuestionStartTime = null;
-        let playerBeforeUnloadHandler = null; // Track beforeunload handler to prevent duplicates
+// --- Player State & Initialization Flag ---
+let playerSupabaseChannel = null;
+let playerRoomId = null;
+let playerCurrentId = null;
+let isPlayerInitialized = false;
+let playerTimerInterval = null;
+let playerCurrentQuestionOptions = [];
+let selectedAnswers = [];
+let playerScore = 0;
+let playerQuestionStartTime = null;
+let playerBeforeUnloadHandler = null;
 
-        // --- Player Persistence Helpers ---
-        /**
-         * Gets the localStorage key for storing player ID for a specific room.
-         * @param {string} roomId - The room ID.
-         * @returns {string} The localStorage key.
-         */
-        function getPlayerStorageKey(roomId) {
-            return `qlash_player_${roomId}`;
+// --- Player Persistence Helpers ---
+/**
+ * Gets the localStorage key for storing player ID for a specific room.
+ * @param {string} roomId - The room ID.
+ * @returns {string} The localStorage key.
+ */
+function getPlayerStorageKey(roomId) {
+    return `qlash_player_${roomId}`;
+}
+
+/**
+ * Saves player session data to localStorage.
+ * @param {string} roomId - The room ID.
+ * @param {string} playerId - The player's unique ID.
+ * @param {string} playerName - The player's name.
+ */
+function savePlayerSession(roomId, playerId, playerName) {
+    const sessionData = {
+        playerId: playerId,
+        playerName: playerName,
+        timestamp: Date.now()
+    };
+    localStorage.setItem(getPlayerStorageKey(roomId), JSON.stringify(sessionData));
+}
+
+/**
+ * Retrieves player session data from localStorage.
+ * @param {string} roomId - The room ID.
+ * @returns {Object|null} The session data or null if not found/expired.
+ */
+function getPlayerSession(roomId) {
+    const key = getPlayerStorageKey(roomId);
+    const data = localStorage.getItem(key);
+    if (!data) return null;
+
+    try {
+        const sessionData = JSON.parse(data);
+        const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+        if (Date.now() - sessionData.timestamp > SESSION_EXPIRY_MS) {
+            localStorage.removeItem(key);
+            return null;
         }
+        return sessionData;
+    } catch (e) {
+        localStorage.removeItem(key);
+        return null;
+    }
+}
 
-        /**
-         * Saves player session data to localStorage.
-         * @param {string} roomId - The room ID.
-         * @param {string} playerId - The player's unique ID.
-         * @param {string} playerName - The player's name.
-         */
-        function savePlayerSession(roomId, playerId, playerName) {
-            const sessionData = {
-                playerId: playerId,
-                playerName: playerName,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(getPlayerStorageKey(roomId), JSON.stringify(sessionData));
-        }
+/**
+ * Clears player session data from localStorage.
+ * @param {string} roomId - The room ID.
+ */
+function clearPlayerSession(roomId) {
+    localStorage.removeItem(getPlayerStorageKey(roomId));
+}
 
-        /**
-         * Retrieves player session data from localStorage.
-         * @param {string} roomId - The room ID.
-         * @returns {Object|null} The session data or null if not found/expired.
-         */
-        function getPlayerSession(roomId) {
-            const key = getPlayerStorageKey(roomId);
-            const data = localStorage.getItem(key);
-            if (!data) return null;
+/**
+ * Triggers confetti animation for correct answers.
+ */
+function triggerConfetti() {
+    const confettiContainer = document.getElementById('confetti-container');
+    if (!confettiContainer) {
+        console.warn("Confetti-Container nicht gefunden.");
+        return;
+    }
 
-            try {
-                const sessionData = JSON.parse(data);
-                // Session expires after 24 hours
-                const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
-                if (Date.now() - sessionData.timestamp > SESSION_EXPIRY_MS) {
-                    localStorage.removeItem(key);
-                    return null;
-                }
-                return sessionData;
-            } catch (e) {
-                localStorage.removeItem(key);
-                return null;
-            }
-        }
+    const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4CAF50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+    const numConfetti = 50;
 
-        /**
-         * Clears player session data from localStorage.
-         * @param {string} roomId - The room ID.
-         */
-        function clearPlayerSession(roomId) {
-            localStorage.removeItem(getPlayerStorageKey(roomId));
-        }
+    for (let i = 0; i < numConfetti; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = `${Math.random() * 100}vw`;
+        piece.style.top = `${-20 - Math.random() * 100}px`;
+        piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDelay = `${Math.random() * 0.5}s`;
+        piece.style.animationDuration = `${2 + Math.random() * 2}s`;
 
-        // Function to trigger confetti animation
-        function triggerConfetti() {
-            const confettiContainer = document.getElementById('confetti-container');
-            if (!confettiContainer) {
-                console.warn("Confetti-Container nicht gefunden.");
-                return;
-            }
+        confettiContainer.appendChild(piece);
 
-            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4CAF50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
-            const numConfetti = 50; // Number of confetti pieces
+        piece.addEventListener('animationend', () => {
+            piece.remove();
+        });
+    }
+}
 
-            for (let i = 0; i < numConfetti; i++) {
-                const piece = document.createElement('div');
-                piece.className = 'confetti-piece';
-                piece.style.left = `${Math.random() * 100}vw`; // Random horizontal position
-                piece.style.top = `${-20 - Math.random() * 100}px`; // Start above viewport
-                piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                piece.style.animationDelay = `${Math.random() * 0.5}s`; // Stagger animation
-                piece.style.animationDuration = `${2 + Math.random() * 2}s`; // Random duration
-
-                confettiContainer.appendChild(piece);
-
-                // Remove the piece after its animation ends
-                piece.addEventListener('animationend', () => {
-                    piece.remove();
-                });
-            }
-        }
-
-
-        /**
-         * Initializes all features and event listeners for the player role.
-         */
-        function initializePlayerFeatures() {
+/**
+ * Initializes all features and event listeners for the player role.
+ */
+function initializePlayerFeatures() {
             console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
 
             // Cache DOM elements for performance
@@ -1840,9 +1837,9 @@ let supabaseClient;
                     // Always show correct answers
                     if (correctSet.has(index)) {
                          if (playerAnsSet.has(index)) {
-                             resultHtml += `<span class="correct player-selected">"${option}"</span> `; // Correct and selected by player
+                             resultHtml += `<span class="correct player-selected">"${sanitizeHTML(option)}"</span> `; // Correct and selected by player
                          } else {
-                             resultHtml += `<span class="correct-not-selected">"${option}"</span> `; // Correct but not selected by player
+                             resultHtml += `<span class="correct-not-selected">"${sanitizeHTML(option)}"</span> `; // Correct but not selected by player
                          }
                     } else if (playerAnsSet.has(index)) {
                          // Per instruction: "Do not show the falsely selected answers of the player anymore."

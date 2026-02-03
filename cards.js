@@ -258,14 +258,25 @@ function setupServiceWorkerUpdates() {
 function showUpdateNotification() {
     // Don't show if already showing
     if (document.getElementById('update-notification')) return;
-    
+
     const notification = document.createElement('div');
     notification.id = 'update-notification';
-    notification.innerHTML = `
-        <span>🔄 Eine neue Version ist verfügbar!</span>
-        <button onclick="applyUpdate()">Jetzt aktualisieren</button>
-        <button onclick="dismissUpdate()" class="dismiss">✕</button>
-    `;
+
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = '\u{1F504} Eine neue Version ist verfügbar!';
+
+    const updateBtn = document.createElement('button');
+    updateBtn.textContent = 'Jetzt aktualisieren';
+    updateBtn.addEventListener('click', applyUpdate);
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.textContent = '\u2715';
+    dismissBtn.className = 'dismiss';
+    dismissBtn.addEventListener('click', dismissUpdate);
+
+    notification.appendChild(messageSpan);
+    notification.appendChild(updateBtn);
+    notification.appendChild(dismissBtn);
     document.body.appendChild(notification);
 }
 
@@ -1008,12 +1019,9 @@ function addExplanationToOption(optionItem, index, card) {
         
         const showTooltip = () => {
             isHovering = true;
-            console.log('Showing tooltip for option', index);
             const rect = indicator.getBoundingClientRect();
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
-            
-            console.log('Indicator position:', rect, 'Viewport:', viewportWidth, 'x', viewportHeight);
             
             // Calculate available space
             const spaceAbove = rect.top;
@@ -1025,13 +1033,11 @@ function addExplanationToOption(optionItem, index, card) {
                 tooltip.style.bottom = (viewportHeight - rect.top + 8) + 'px';
                 tooltip.style.top = 'auto';
                 tooltip.setAttribute('data-arrow', 'down');
-                console.log('Positioning above');
             } else {
                 // Position below
                 tooltip.style.top = (rect.bottom + 8) + 'px';
                 tooltip.style.bottom = 'auto';
                 tooltip.setAttribute('data-arrow', 'up');
-                console.log('Positioning below');
             }
             
             // Position horizontally (ensure it stays in viewport)
@@ -1040,16 +1046,13 @@ function addExplanationToOption(optionItem, index, card) {
                 // Align to right edge
                 tooltip.style.right = '1rem';
                 tooltip.style.left = 'auto';
-                console.log('Aligning to right');
             } else {
                 // Align to left of indicator
                 tooltip.style.left = Math.max(rect.left, 16) + 'px';
                 tooltip.style.right = 'auto';
-                console.log('Aligning to left at', rect.left);
             }
-            
+
             tooltip.style.display = 'block';
-            console.log('Tooltip display set to block');
         };
         
         const hideTooltip = () => {
@@ -1057,7 +1060,6 @@ function addExplanationToOption(optionItem, index, card) {
             // Delay hiding to allow mouse to move to tooltip
             setTimeout(() => {
                 if (!isHovering) {
-                    console.log('Hiding tooltip for option', index);
                     tooltip.style.display = 'none';
                 }
             }, 100);
@@ -1078,7 +1080,6 @@ function addExplanationToOption(optionItem, index, card) {
         indicator.addEventListener('focus', showTooltip);
         indicator.addEventListener('blur', hideTooltip);
         
-        console.log('Added explanation indicator for option', index);
     }
 }
 
@@ -1168,15 +1169,10 @@ function showAnswer() {
         if (selectedOptionIndices.length > 0) {
             // Check if the answer is correct
             isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
-            console.log('MC Question - Selected:', selectedOptionIndices.sort(), 'Correct:', card.correct.sort(), 'isCorrect:', isCorrect);
         } else {
             // No selection was made - treat as incorrect (unless there are no correct answers)
             isCorrect = card.correct.length === 0;
-            console.log('No selection made, isCorrect:', isCorrect);
         }
-        
-        // Auto-evaluate the answer
-        console.log('About to call markAnswer with isCorrect:', isCorrect);
         markAnswer(isCorrect);
         
         // For multiple choice, always hide Richtig/Falsch buttons and show Next button
@@ -1205,7 +1201,6 @@ function showAnswer() {
         
         if (isExactMatch) {
             // Automatically mark as correct and show only Next button
-            console.log('Exact match detected! Auto-marking as correct.');
             markAnswer(true);
             markCorrectBtn.style.display = 'none';
             markIncorrectBtn.style.display = 'none';
@@ -1238,10 +1233,7 @@ function arraysEqual(a, b) {
  * @param {boolean} isCorrect - Whether the answer was correct
  */
 function markAnswer(isCorrect) {
-    console.log('markAnswer called with isCorrect:', isCorrect);
-    
     if (isAnswered) {
-        console.log('Answer already marked, returning');
         return;
     }
 
@@ -1257,7 +1249,6 @@ function markAnswer(isCorrect) {
     }
 
     if (isCorrect) {
-        console.log('Answer is correct! Incrementing correctCount and triggering confetti');
         correctCount++;
         if (deckStats[deckName]) {
             deckStats[deckName].correct++;
@@ -1266,8 +1257,6 @@ function markAnswer(isCorrect) {
         // Trigger confetti animation for correct answers
         triggerConfetti();
     } else {
-        console.log('Answer is incorrect');
-
         incorrectCount++;
         if (deckStats[deckName]) {
             deckStats[deckName].incorrect++;
@@ -1574,22 +1563,26 @@ function reorganizeCardsByStudyMode() {
     switch (studyMode) {
         case 'incorrect-first':
             // Show incorrect cards first (current session + previous sessions), then correct/unanswered
+            // Build index map before sorting to avoid unreliable indexOf during sort
+            const cardIndexMap = new Map();
+            cards.forEach((card, index) => cardIndexMap.set(card, index));
+
             cards.sort((a, b) => {
-                const aIndex = cards.indexOf(a);
-                const bIndex = cards.indexOf(b);
-                
+                const aIndex = cardIndexMap.get(a);
+                const bIndex = cardIndexMap.get(b);
+
                 // Check if answered incorrectly in current session
                 const aIncorrectNow = answeredCards[aIndex] === false;
                 const bIncorrectNow = answeredCards[bIndex] === false;
-                
+
                 // Check if was incorrect in previous session
                 const aIncorrectBefore = isCardIncorrectFromPreviousSession(a);
                 const bIncorrectBefore = isCardIncorrectFromPreviousSession(b);
-                
+
                 // Combine both: incorrect in current session OR incorrect in previous session
                 const aIncorrect = aIncorrectNow || aIncorrectBefore;
                 const bIncorrect = bIncorrectNow || bIncorrectBefore;
-                
+
                 // Incorrect cards come first (1), then others (0)
                 return bIncorrect - aIncorrect;
             });
@@ -1773,11 +1766,10 @@ function showMessage(message) {
 function triggerConfetti() {
     const confettiContainer = document.getElementById('confetti-container');
     if (!confettiContainer) {
-        console.error('❌ Confetti container not found!');
+        console.error('Confetti container not found');
         return;
     }
 
-    console.log('🎉 Triggering confetti animation - container found!');
 
     // Vibrant color palette
     const colors = [
@@ -1847,7 +1839,6 @@ function triggerConfetti() {
         }, (duration + delay) * 1000 + 100);
     }
     
-    console.log(`✅ Added ${numConfetti} confetti pieces to container`);
 }
 
 // ============================================================================
@@ -1891,10 +1882,6 @@ function openSpacedRepetitionManager() {
  * Display cards grouped by their spaced repetition intervals (buckets)
  */
 function displaySpacedRepetitionBuckets() {
-    console.log('displaySpacedRepetitionBuckets called');
-    console.log('spacedRepetitionData:', spacedRepetitionData);
-    console.log('savedDecks:', savedDecks);
-    
     // Check if there are any cards with SR data
     if (Object.keys(spacedRepetitionData).length === 0) {
         srBucketsDisplay.innerHTML = '<div class="sr-empty-message">Noch keine Karten im Spaced Repetition System. Beantworte Fragen im Spaced Repetition Modus, um Karten hier zu sehen.</div>';
@@ -1935,9 +1922,6 @@ function displaySpacedRepetitionBuckets() {
         }
     });
     
-    console.log('Cards not found:', cardsNotFound);
-    console.log('Buckets:', buckets);
-
     // Sort buckets by interval
     const sortedIntervals = Object.keys(buckets).map(Number).sort((a, b) => a - b);
 
@@ -1961,7 +1945,7 @@ function displaySpacedRepetitionBuckets() {
                 <div class="sr-bucket-cards" id="bucket-cards-${interval}">
                     ${cards.map(({ key, card, data, isOverdue }) => `
                         <div class="sr-card-item" data-card-key="${encodeURIComponent(key)}">
-                            <div class="sr-card-question">${escapeHtml(card.question || 'Unbekannte Frage')}</div>
+                            <div class="sr-card-question">${sanitizeHTML(card.question || 'Unbekannte Frage')}</div>
                             <div class="sr-card-meta">
                                 <span class="sr-card-next-review" style="color: ${isOverdue ? '#dc3545' : '#28a745'}">
                                     ${isOverdue ? '⚠️ Fällig' : '✓'} ${formatDate(data.nextReview)}
@@ -2274,11 +2258,3 @@ function formatDate(date) {
     return `in ${diffDays} Tagen`;
 }
 
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
