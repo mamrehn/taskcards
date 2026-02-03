@@ -825,11 +825,12 @@ let supabaseClient;
                 const baseUrl = window.location.origin + window.location.pathname.split('?')[0];
                 const joinUrl = `${baseUrl}?host=${roomId}`;
                 joinLinkElement.href = joinUrl;
-                // Display the full URL in the link text
-                joinLinkElement.textContent = joinUrl;
+                // Display the short URL for easy typing
+                const shortUrl = 'https://bycs.link/karten';
+                joinLinkElement.textContent = shortUrl;
 
                 joinLinkModalElement.href = joinUrl;
-                joinLinkModalElement.textContent = joinUrl; // Also update modal link text
+                joinLinkModalElement.textContent = shortUrl;
 
                 return joinUrl; // Return the URL for QR code generation
             }
