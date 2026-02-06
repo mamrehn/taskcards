@@ -914,7 +914,7 @@ function updateCardContent(card) {
 
             // Add click handler to toggle selection
             optionItem.addEventListener('click', (e) => {
-                if (e.target !== checkbox) {
+                if (e.target !== checkbox && e.target !== label) {
                     checkbox.checked = !checkbox.checked;
                 }
                 optionItem.classList.toggle('selected', checkbox.checked);
