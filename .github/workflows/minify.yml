@@ -69,26 +69,39 @@ jobs:
           terser cards.js --compress --mangle -o cards.js
           terser qlash.js --compress --mangle -o qlash.js
           terser sanitize.js --compress --mangle -o sanitize.js
-      
+          terser theme.js --compress --mangle -o theme.js
+
       - name: Minify CSS files
         run: |
           csso cards.css -o cards.css
           csso qlash.css -o qlash.css
+          csso theme.css -o theme.css
 
       - name: Add inline attributes to HTML files for inlining
         run: |
           # index.html
+          sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' index.html
+          sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' index.html
           sed -i 's|<script src="index\.js"></script>|<script inline src="index.js"></script>|g' index.html
-          
+
           # cards.html
+          sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' cards.html
+          sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' cards.html
           sed -i 's|<link rel="stylesheet" href="cards\.css">|<link inline rel="stylesheet" href="cards.css">|g' cards.html
           sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' cards.html
           sed -i 's|<script src="cards\.js"></script>|<script inline src="cards.js"></script>|g' cards.html
-          
+
           # qlash.html - need to handle external CDN scripts differently
+          sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' qlash.html
+          sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' qlash.html
           sed -i 's|<link rel="stylesheet" href="qlash\.css">|<link inline rel="stylesheet" href="qlash.css">|g' qlash.html
           sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' qlash.html
           sed -i 's|<script src="qlash\.js"></script>|<script inline src="qlash.js"></script>|g' qlash.html
+
+          # datenschutz.html
+          sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' datenschutz.html
+          sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' datenschutz.html
+          sed -i 's|<link rel="stylesheet" href="qlash\.css">|<link inline rel="stylesheet" href="qlash.css">|g' datenschutz.html
 
       - name: Inline CSS and JS into HTML files
         run: |
@@ -103,6 +116,10 @@ jobs:
           # Inline qlash.html
           inline-source qlash.html --compress false --root ./ > qlash.inline.html
           mv qlash.inline.html qlash.html
+
+          # Inline datenschutz.html
+          inline-source datenschutz.html --compress false --root ./ > datenschutz.inline.html
+          mv datenschutz.inline.html datenschutz.html
 
       - name: Minify inlined HTML files
         run: |

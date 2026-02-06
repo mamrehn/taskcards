@@ -4,7 +4,7 @@
  * Strategy: Stale-While-Revalidate for app shell, Cache First for data
  */
 
-const CACHE_NAME = 'taskcards-v3';
+const CACHE_NAME = 'taskcards-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -12,10 +12,12 @@ const ASSETS_TO_CACHE = [
     './qlash.html',
     './cards.css',
     './qlash.css',
+    './theme.css',
     './cards.js',
     './qlash.js',
     './index.js',
-    './sanitize.js'
+    './sanitize.js',
+    './theme.js'
 ];
 
 // Install event - cache assets

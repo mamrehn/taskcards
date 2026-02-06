@@ -1,0 +1,71 @@
+/* ============================================================================
+   Theme Infrastructure - Shared across all pages
+   ============================================================================ */
+
+/* Shared semantic variables for dark mode support */
+:root {
+    --surface-color: #ffffff;
+    --surface-secondary: #f8f9fa;
+    --text-color: #333;
+    --text-muted: #6c757d;
+    --border-color: #dee2e6;
+    --input-border: #ced4da;
+    --input-bg: #ffffff;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+    --surface-color: #1e1e2e;
+    --surface-secondary: #2a2a3c;
+    --text-color: #e0e0e0;
+    --text-muted: #a0a0b0;
+    --border-color: #3a3a4c;
+    --input-border: #4a4a5c;
+    --input-bg: #2a2a3c;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth transition for theme changes - applied momentarily during toggle */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+    transition-delay: 0s !important;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(128, 128, 128, 0.3);
+    background-color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.3s, transform 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+    line-height: 1;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.1);
+}
+
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+[data-theme="dark"] .theme-toggle {
+    background-color: rgba(50, 50, 50, 0.9);
+    border-color: rgba(128, 128, 128, 0.4);
+}

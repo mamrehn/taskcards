@@ -7,6 +7,8 @@
     <meta name="referrer" content="no-referrer">
     <link rel="manifest" href="manifest.json">
     <title>Wählen Sie Ihren Modus</title>
+    <link rel="stylesheet" href="theme.css">
+    <script src="theme.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
         /* General body and font size for better readability and mobile friendliness */
@@ -130,12 +132,29 @@
         }
 
         footer a {
-            color: var(--primary-color, #007bff); /* Using quiz primary for consistency */
+            color: var(--primary-color, #007bff);
             text-decoration: none;
         }
 
         footer a:hover {
             text-decoration: underline;
+        }
+
+        /* Dark Mode Overrides */
+        [data-theme="dark"] {
+            --primary-color: #7b4ec9;
+            --secondary-color: #8e5fd6;
+            --accent-color: #ff6b7f;
+            --light-color: #1e1e2e;
+            --dark-color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .taskcard-colors {
+            --primary: #6b9fd4;
+            --secondary: #4a8ab8;
+            --light: #2a2a3c;
+            --dark: #e0e0e0;
+            --warning: #ffca28;
         }
 
         /* Responsive adjustments */

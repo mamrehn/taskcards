@@ -918,7 +918,7 @@ function isHostPlayer(playerId) {
                 qrcodeElement.innerHTML = ''; // Clear previous QR code
                 if (typeof QRCode === 'undefined') {
                     console.error("QR-Code-Bibliothek nicht geladen.");
-                    qrcodeElement.innerHTML = `<p style="color:red;">QR-Code-Bibliothek nicht geladen. URL: ${sanitizeHTML(url)}</p>`;
+                    qrcodeElement.innerHTML = `<p class="qr-error">QR-Code-Bibliothek nicht geladen. URL: ${sanitizeHTML(url)}</p>`;
                     return;
                 }
                 try {
@@ -932,7 +932,7 @@ function isHostPlayer(playerId) {
                     });
                 } catch (e) {
                     console.error("QR Code generation error:", e);
-                    qrcodeElement.innerHTML = `<p style="color:red;">Fehler beim Generieren des QR-Codes. URL: ${sanitizeHTML(url)}</p>`;
+                    qrcodeElement.innerHTML = `<p class="qr-error">Fehler beim Generieren des QR-Codes. URL: ${sanitizeHTML(url)}</p>`;
                 }
             }
 

@@ -1953,7 +1953,7 @@ function displaySpacedRepetitionBuckets() {
                         <div class="sr-card-item" data-card-key="${encodeURIComponent(key)}">
                             <div class="sr-card-question">${sanitizeHTML(card.question || 'Unbekannte Frage')}</div>
                             <div class="sr-card-meta">
-                                <span class="sr-card-next-review" style="color: ${isOverdue ? '#dc3545' : '#28a745'}">
+                                <span class="sr-card-next-review ${isOverdue ? 'sr-overdue' : 'sr-on-time'}">
                                     ${isOverdue ? '⚠️ Fällig' : '✓'} ${formatDate(data.nextReview)}
                                 </span>
                                 <div class="sr-card-actions">
