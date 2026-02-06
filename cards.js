@@ -234,6 +234,26 @@ function initializeApp() {
         }
     });
 
+    // Global keyboard shortcuts for study flow
+    document.addEventListener('keydown', handleGlobalKeyboard);
+
+    // Keyboard hints toggle
+    const hintsToggle = document.querySelector('.keyboard-hints-toggle');
+    const hintsPanel = document.querySelector('.keyboard-hints-panel');
+    if (hintsToggle && hintsPanel) {
+        hintsToggle.addEventListener('click', () => {
+            hintsPanel.classList.toggle('hidden');
+        });
+    }
+
+    // Keyboard support for explanation box
+    textExplanationContainer.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleTextExplanation();
+        }
+    });
+
     // Hide the next button initially
     nextCardBtn.style.display = 'none';
 
@@ -244,6 +264,168 @@ function initializeApp() {
     
     // Set up service worker update listener
     setupServiceWorkerUpdates();
+}
+
+// ============================================================================
+// Keyboard Navigation
+// ============================================================================
+
+/**
+ * Global keyboard shortcut handler for the study flow.
+ * Delegates to screen-specific sub-handlers.
+ */
+function handleGlobalKeyboard(e) {
+    // Don't intercept when typing in an input, textarea, or select
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+    }
+
+    // Toggle keyboard hints with ?
+    if (e.key === '?') {
+        const hintsPanel = document.querySelector('.keyboard-hints-panel');
+        if (hintsPanel) {
+            hintsPanel.classList.toggle('hidden');
+        }
+        return;
+    }
+
+    // Only handle shortcuts when quiz is active
+    if (appContent.classList.contains('hidden')) {
+        return;
+    }
+
+    // Results/feedback screen
+    if (!feedbackElement.classList.contains('hidden')) {
+        handleFeedbackKeys(e);
+        return;
+    }
+
+    // Card is hidden (shouldn't happen but safety check)
+    if (cardContainer.classList.contains('hidden')) {
+        return;
+    }
+
+    const isCardBack = flipCard.classList.contains('flipped');
+
+    if (isCardBack) {
+        handleCardBackKeys(e);
+    } else {
+        handleCardFrontKeys(e);
+    }
+}
+
+/**
+ * Handle keyboard shortcuts on card front (question side)
+ */
+function handleCardFrontKeys(e) {
+    // Space or Enter: show answer
+    if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        showAnswerBtn.click();
+        return;
+    }
+
+    // Number keys 1-9: toggle MC option by position
+    const num = parseInt(e.key);
+    if (num >= 1 && num <= 9) {
+        const options = optionsContainer.querySelectorAll('.option-item');
+        if (!optionsContainer.classList.contains('hidden') && num <= options.length) {
+            e.preventDefault();
+            const optionItem = options[num - 1];
+            const checkbox = optionItem.querySelector('.option-checkbox');
+            checkbox.checked = !checkbox.checked;
+            optionItem.classList.toggle('selected', checkbox.checked);
+            optionItem.setAttribute('aria-checked', String(checkbox.checked));
+
+            const originalIndex = parseInt(optionItem.dataset.index);
+            if (checkbox.checked) {
+                if (!selectedOptionIndices.includes(originalIndex)) {
+                    selectedOptionIndices.push(originalIndex);
+                }
+            } else {
+                const idx = selectedOptionIndices.indexOf(originalIndex);
+                if (idx !== -1) selectedOptionIndices.splice(idx, 1);
+            }
+        }
+    }
+}
+
+/**
+ * Handle keyboard shortcuts on card back (answer side)
+ */
+function handleCardBackKeys(e) {
+    // Enter or Space: next card (only when next button is visible)
+    if ((e.key === 'Enter' || e.key === ' ') && nextCardBtn.style.display !== 'none') {
+        e.preventDefault();
+        nextCardBtn.click();
+        return;
+    }
+
+    // R: mark correct (Richtig)
+    if (e.key === 'r' && markCorrectBtn.style.display !== 'none') {
+        e.preventDefault();
+        markCorrectBtn.click();
+        return;
+    }
+
+    // F: mark incorrect (Falsch)
+    if (e.key === 'f' && markIncorrectBtn.style.display !== 'none') {
+        e.preventDefault();
+        markIncorrectBtn.click();
+        return;
+    }
+
+    // Arrow keys: cycle focus between Richtig/Falsch buttons
+    if (e.key === 'ArrowRight' && markCorrectBtn.style.display !== 'none') {
+        e.preventDefault();
+        markIncorrectBtn.focus();
+        return;
+    }
+    if (e.key === 'ArrowLeft' && markIncorrectBtn.style.display !== 'none') {
+        e.preventDefault();
+        markCorrectBtn.focus();
+        return;
+    }
+
+    // E: toggle explanation (text answers)
+    if (e.key === 'e' && !textExplanationContainer.classList.contains('hidden')) {
+        e.preventDefault();
+        toggleTextExplanation();
+        return;
+    }
+
+    // Number keys 1-9: toggle MC option explanation tooltip on back side
+    const num = parseInt(e.key);
+    if (num >= 1 && num <= 9) {
+        const backOptions = optionsContainerBack.querySelectorAll('.option-item');
+        if (!optionsContainerBack.classList.contains('hidden') && num <= backOptions.length) {
+            e.preventDefault();
+            const indicator = backOptions[num - 1].querySelector('.option-explanation-indicator');
+            if (indicator) {
+                // If already focused, blur to hide tooltip; otherwise focus to show it
+                if (document.activeElement === indicator) {
+                    indicator.blur();
+                } else {
+                    indicator.focus();
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Handle keyboard shortcuts on the results/feedback screen
+ */
+function handleFeedbackKeys(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        // Click first visible action button
+        if (restartBtn.style.display !== 'none') {
+            restartBtn.click();
+        } else if (returnToSrBtn.style.display !== 'none') {
+            returnToSrBtn.click();
+        }
+    }
 }
 
 /**
@@ -899,27 +1081,28 @@ function updateCardContent(card) {
             const optionItem = document.createElement('div');
             optionItem.className = 'option-item';
             optionItem.dataset.index = originalIndex;
+            optionItem.setAttribute('tabindex', '0');
+            optionItem.setAttribute('role', 'checkbox');
+            optionItem.setAttribute('aria-checked', 'false');
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.className = 'option-checkbox';
             checkbox.id = `option-${index}`;
+            checkbox.setAttribute('tabindex', '-1');
 
             const label = document.createElement('label');
             label.htmlFor = `option-${index}`;
-            label.textContent = option;
+            label.textContent = `${index + 1}. ${option}`;
 
             optionItem.appendChild(checkbox);
             optionItem.appendChild(label);
 
-            // Add click handler to toggle selection
-            optionItem.addEventListener('click', (e) => {
-                if (e.target !== checkbox && e.target !== label) {
-                    checkbox.checked = !checkbox.checked;
-                }
+            // Toggle helper to keep click and keyboard logic in sync
+            const toggleOption = () => {
+                checkbox.checked = !checkbox.checked;
                 optionItem.classList.toggle('selected', checkbox.checked);
-
-                // Update selectedOptionIndices
+                optionItem.setAttribute('aria-checked', String(checkbox.checked));
                 if (checkbox.checked) {
                     if (!selectedOptionIndices.includes(originalIndex)) {
                         selectedOptionIndices.push(originalIndex);
@@ -929,6 +1112,46 @@ function updateCardContent(card) {
                     if (indexToRemove !== -1) {
                         selectedOptionIndices.splice(indexToRemove, 1);
                     }
+                }
+            };
+
+            // Add click handler to toggle selection
+            optionItem.addEventListener('click', (e) => {
+                if (e.target !== checkbox && e.target !== label) {
+                    toggleOption();
+                } else {
+                    // Checkbox/label toggled natively, sync state
+                    optionItem.classList.toggle('selected', checkbox.checked);
+                    optionItem.setAttribute('aria-checked', String(checkbox.checked));
+                    if (checkbox.checked) {
+                        if (!selectedOptionIndices.includes(originalIndex)) {
+                            selectedOptionIndices.push(originalIndex);
+                        }
+                    } else {
+                        const indexToRemove = selectedOptionIndices.indexOf(originalIndex);
+                        if (indexToRemove !== -1) {
+                            selectedOptionIndices.splice(indexToRemove, 1);
+                        }
+                    }
+                }
+            });
+
+            // Keyboard handler for option items: Space/Enter toggle, Arrow navigation
+            optionItem.addEventListener('keydown', (e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleOption();
+                } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const next = optionItem.nextElementSibling;
+                    if (next) next.focus();
+                } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const prev = optionItem.previousElementSibling;
+                    if (prev) prev.focus();
                 }
             });
 
@@ -985,6 +1208,21 @@ function updateCardContent(card) {
     markCorrectBtn.style.display = 'inline-block';
     markIncorrectBtn.style.display = 'inline-block';
     nextCardBtn.style.display = 'none';
+
+    // Tabindex management: prevent tabbing into back-side buttons when front is shown
+    markCorrectBtn.setAttribute('tabindex', '-1');
+    markIncorrectBtn.setAttribute('tabindex', '-1');
+    nextCardBtn.setAttribute('tabindex', '-1');
+    showAnswerBtn.setAttribute('tabindex', '0');
+
+    // Focus management: auto-focus the appropriate element
+    setTimeout(() => {
+        if (!isMultipleChoice && !userAnswerInput.classList.contains('hidden')) {
+            userAnswerInput.focus();
+        } else if (isMultipleChoice) {
+            showAnswerBtn.focus();
+        }
+    }, 100);
 
     updateStatistics();
 }
@@ -1221,6 +1459,22 @@ function showAnswer() {
             nextCardBtn.style.display = 'none';
         }
     }
+
+    // Tabindex: hide front-side from tab, expose back-side
+    showAnswerBtn.setAttribute('tabindex', '-1');
+    userAnswerInput.setAttribute('tabindex', '-1');
+    markCorrectBtn.setAttribute('tabindex', '0');
+    markIncorrectBtn.setAttribute('tabindex', '0');
+    nextCardBtn.setAttribute('tabindex', '0');
+
+    // Focus the first actionable button after flip animation
+    setTimeout(() => {
+        if (nextCardBtn.style.display !== 'none') {
+            nextCardBtn.focus();
+        } else if (markCorrectBtn.style.display !== 'none') {
+            markCorrectBtn.focus();
+        }
+    }, 400);
 }
 
 /**
@@ -1323,6 +1577,11 @@ function markAnswer(isCorrect) {
     }
 
     updateStatistics();
+
+    // Focus the next button after marking
+    if (nextCardBtn.style.display !== 'none') {
+        nextCardBtn.focus();
+    }
 }
 
 /**
@@ -1410,6 +1669,15 @@ function showFeedback() {
         
         deckStatsContainer.appendChild(deckStatsList);
     }
+
+    // Focus first visible action button
+    setTimeout(() => {
+        if (restartBtn.style.display !== 'none') {
+            restartBtn.focus();
+        } else if (returnToSrBtn.style.display !== 'none') {
+            returnToSrBtn.focus();
+        }
+    }, 100);
 }
 
 /**

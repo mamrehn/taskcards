@@ -43,7 +43,7 @@
                         <input type="file" id="file-input" accept=".json,.zip">
                     </div>
                 </div>
-                <p><span class="json-toggle" onclick="toggleJsonSample()">JSON-Format Beispiel anzeigen</span></p>
+                <p><span class="json-toggle" onclick="toggleJsonSample()" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleJsonSample();}">JSON-Format Beispiel anzeigen</span></p>
             </div>
             <div id="sample-json" class="hidden"><pre><code>{
   "cards": [
@@ -178,7 +178,7 @@
 
                             <!-- Explanation for text answers (shown only when marked incorrect) -->
                             <div id="text-explanation-container" class="hidden">
-                                <div class="explanation-box">
+                                <div class="explanation-box" tabindex="0" role="button" aria-label="Erklärung anzeigen">
                                     <span class="explanation-icon" title="Klicke für Erklärung">ℹ️</span>
                                     <span class="explanation-label">Erklärung verfügbar</span>
                                     <div class="explanation-content hidden" id="text-explanation-content"></div>
@@ -199,6 +199,21 @@
                             <button class="btn btn-secondary" id="next-card">Nächste</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div id="keyboard-hints" class="keyboard-hints">
+                <button class="keyboard-hints-toggle" aria-label="Tastaturkürzel anzeigen" title="Tastaturkürzel (?)">
+                    <span>&#x2328;</span>
+                </button>
+                <div class="keyboard-hints-panel hidden">
+                    <div class="keyboard-hints-title">Tastaturkürzel</div>
+                    <div class="keyboard-hint"><kbd>Leertaste</kbd> Antwort zeigen / Weiter</div>
+                    <div class="keyboard-hint"><kbd>1</kbd>–<kbd>9</kbd> MC-Option wählen / Erklärung</div>
+                    <div class="keyboard-hint"><kbd>R</kbd> Richtig</div>
+                    <div class="keyboard-hint"><kbd>F</kbd> Falsch</div>
+                    <div class="keyboard-hint"><kbd>E</kbd> Erklärung ein/aus</div>
+                    <div class="keyboard-hint"><kbd>?</kbd> Diese Hilfe</div>
                 </div>
             </div>
 

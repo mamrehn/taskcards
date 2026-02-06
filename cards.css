@@ -1070,6 +1070,152 @@ body {
 .sr-on-time { color: var(--success); }
 
 /* ============================================================================
+   Keyboard Focus Styles
+   ============================================================================ */
+
+/* Remove default outline for mouse clicks, keep for keyboard */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Universal keyboard focus ring */
+:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Buttons */
+.btn:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(74, 111, 165, 0.3);
+}
+
+.btn-success:focus-visible {
+    outline-color: var(--success);
+    box-shadow: 0 0 0 4px rgba(40, 167, 69, 0.3);
+}
+
+.btn-danger:focus-visible {
+    outline-color: var(--danger);
+    box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.3);
+}
+
+/* MC option items */
+.option-item:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: -1px;
+    border-color: var(--primary);
+    background-color: var(--cards-hover-bg);
+}
+
+/* Theme toggle */
+.theme-toggle:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Explanation box */
+.explanation-box:focus-visible {
+    outline: 3px solid var(--explanation-border);
+    outline-offset: 2px;
+}
+
+/* Upload label (acts as button) */
+#upload-label:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(74, 111, 165, 0.3);
+}
+
+/* Delete deck button */
+.delete-deck:focus-visible {
+    outline: 2px solid var(--danger);
+    outline-offset: 2px;
+}
+
+/* JSON toggle link */
+.json-toggle:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Keyboard shortcut hint kbd styling */
+.keyboard-hint kbd {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.8rem;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-family: inherit;
+    margin-right: 0.25rem;
+}
+
+/* Keyboard hints floating panel */
+.keyboard-hints {
+    position: fixed;
+    bottom: calc(1rem + 44px + 0.75rem);
+    right: 1rem;
+    z-index: 100;
+}
+
+.keyboard-hints-toggle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(128, 128, 128, 0.3);
+    background-color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: background-color 0.3s, transform 0.2s, opacity 0.2s;
+    opacity: 0.6;
+    color: var(--text-color);
+    padding: 0;
+    line-height: 1;
+}
+
+.keyboard-hints-toggle:hover,
+.keyboard-hints-toggle:focus-visible {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+[data-theme="dark"] .keyboard-hints-toggle {
+    background-color: rgba(50, 50, 50, 0.9);
+    border-color: rgba(128, 128, 128, 0.4);
+}
+
+.keyboard-hints-panel {
+    position: absolute;
+    bottom: 3.25rem;
+    right: 0;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    min-width: 240px;
+    font-size: 0.85rem;
+}
+
+.keyboard-hints-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+}
+
+.keyboard-hint {
+    padding: 0.2rem 0;
+    color: var(--text-color);
+}
+
+/* ============================================================================
    Dark Mode Overrides
    ============================================================================ */
 [data-theme="dark"] {
@@ -1120,4 +1266,16 @@ body {
 
 [data-theme="dark"] .sr-delete-btn:hover {
     background: #e53935;
+}
+
+[data-theme="dark"] .btn:focus-visible {
+    box-shadow: 0 0 0 4px rgba(107, 159, 212, 0.3);
+}
+
+[data-theme="dark"] .btn-success:focus-visible {
+    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.3);
+}
+
+[data-theme="dark"] .btn-danger:focus-visible {
+    box-shadow: 0 0 0 4px rgba(239, 83, 80, 0.3);
 }
