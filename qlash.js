@@ -23,7 +23,25 @@ let supabaseClient;
  */
 function showMessage(message, type = 'info') {
     console.log(`Message (${type}): ${message}`);
-    alert(message);
+
+    // Remove existing toast if present
+    const existing = document.getElementById('toast-notification');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = `toast-notification toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Trigger show animation
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 300);
+    }, 4000);
 }
 
 /**
@@ -304,7 +322,7 @@ function isHostPlayer(playerId) {
                     const newIndex = optionGroups.length + 1;
                     const optionGroup = document.createElement('div');
                     optionGroup.className = 'option-group';
-                    optionGroup.innerHTML = `<input type="text" class="option-input" placeholder="Option ${newIndex}"><input type="checkbox" class="correct-checkbox"><label>Richtig</label></div>`;
+                    optionGroup.innerHTML = `<input type="text" class="option-input" placeholder="Option ${newIndex}"><input type="checkbox" class="correct-checkbox"><label>Richtig</label>`;
                     questionForm.insertBefore(optionGroup, addOptionBtn);
                 });
 
@@ -1748,8 +1766,9 @@ function initializePlayerFeatures() {
                         console.log("Player timer up.");
                          // Automatically send an empty answer if time runs out and no answer was selected
                          if (selectedAnswers.length === 0) { // No need to check hostConnection, just update own DB entry
-                             supabaseClient.from('players').update({ last_answer_data: [], last_answer_time: new Date().toISOString() }).eq('id', playerCurrentId);
-                             console.log("Player sent empty answer due to timeout.");
+                             supabaseClient.from('players').update({ last_answer_data: [], last_answer_time: new Date().toISOString() }).eq('id', playerCurrentId)
+                                 .then(() => console.log("Player sent empty answer due to timeout."))
+                                 .catch(e => console.error("Error sending empty answer:", e));
                          }
                     }
                 }, 100); // Update every 100ms

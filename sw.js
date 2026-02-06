@@ -4,7 +4,7 @@
  * Strategy: Stale-While-Revalidate for app shell, Cache First for data
  */
 
-const CACHE_NAME = 'taskcards-v2';
+const CACHE_NAME = 'taskcards-v3';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -90,11 +90,11 @@ self.addEventListener('fetch', (event) => {
                         
                         // Check if content has changed
                         if (cachedResponse) {
-                            // Compare ETags or content to detect changes
-                            const cachedEtag = cachedResponse.headers.get('etag');
-                            const networkEtag = networkResponse.headers.get('etag');
-                            
-                            if (cachedEtag !== networkEtag) {
+                            // Compare Last-Modified timestamps to detect changes
+                            const cachedLastModified = cachedResponse.headers.get('last-modified');
+                            const networkLastModified = networkResponse.headers.get('last-modified');
+
+                            if (cachedLastModified !== networkLastModified) {
                                 // Content changed - update cache and notify
                                 cache.put(event.request, responseToCache);
                                 notifyClientsOfUpdate();

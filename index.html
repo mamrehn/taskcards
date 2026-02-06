@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; base-uri 'self'; form-action 'self';">
     <meta name="referrer" content="no-referrer">
+    <link rel="manifest" href="manifest.json">
     <title>Wählen Sie Ihren Modus</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
         /* General body and font size for better readability and mobile friendliness */
         body {
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 18px;
             margin: 0;
             padding: 0;
@@ -216,11 +217,11 @@
         </header>
 
         <div class="button-container">
-            <a href="#" onclick="triggerConfettiTo('cards.html')" class="choice-button study-button">
+            <a href="cards.html" id="study-btn" class="choice-button study-button">
                 <i class="fas fa-book-open"></i>
                 <span>Alleine lernen (Aufgabenkarten)</span>
             </a>
-            <a href="#" onclick="triggerConfettiTo('qlash.html')" class="choice-button quiz-button">
+            <a href="qlash.html" id="quiz-btn" class="choice-button quiz-button">
                 <i class="fas fa-gamepad"></i>
                 <span>Wissen testen (Multiplayer Quiz)</span>
             </a>

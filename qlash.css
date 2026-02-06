@@ -13,7 +13,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Montserrat', Arial, sans-serif; /* Preferred font from second file */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* General body and font size for better readability and mobile friendliness */
@@ -328,7 +328,6 @@ input, select {
 
 #large-qrcode img {
     width: 300px; /* Significantly increased size from first file */
-    height: 300px;
     max-width: 100%; /* Ensure it's responsive */
     height: auto;
 }
@@ -555,4 +554,35 @@ input, select {
 .player-item.disconnected {
     opacity: 0.5;
     font-style: italic;
+}
+
+/* Toast Notification Styles */
+.toast-notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 12px 24px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    z-index: 10001;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    max-width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.toast-notification.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast-info {
+    background-color: var(--secondary-color);
+}
+
+.toast-error {
+    background-color: var(--wrong-color);
 }

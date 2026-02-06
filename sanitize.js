@@ -59,16 +59,14 @@ function sanitizePlayerName(name) {
     if (typeof name !== 'string') {
         return '';
     }
-    
-    // Remove any HTML
-    let sanitized = sanitizeHTML(name);
-    
-    // Trim and limit length
-    sanitized = sanitizeInput(sanitized, 50);
-    
+
+    // Trim and limit length first
+    let sanitized = sanitizeInput(name, 50);
+
     // Only allow letters, numbers, spaces, and basic punctuation
+    // This inherently strips any HTML tags or dangerous characters
     sanitized = sanitized.replace(/[^a-zA-Z0-9äöüÄÖÜß\s\-_\.]/g, '');
-    
+
     return sanitized;
 }
 

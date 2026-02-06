@@ -226,6 +226,14 @@ function initializeApp() {
     // Add event listener for text explanation toggle
     textExplanationContainer.addEventListener('click', toggleTextExplanation);
 
+    // Add Enter key support for answer submission
+    userAnswerInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            showAnswer();
+        }
+    });
+
     // Hide the next button initially
     nextCardBtn.style.display = 'none';
 
@@ -906,8 +914,9 @@ function updateCardContent(card) {
 
             // Add click handler to toggle selection
             optionItem.addEventListener('click', (e) => {
-                checkbox.checked = !checkbox.checked;
-
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                }
                 optionItem.classList.toggle('selected', checkbox.checked);
 
                 // Update selectedOptionIndices
@@ -1168,7 +1177,7 @@ function showAnswer() {
         let isCorrect;
         if (selectedOptionIndices.length > 0) {
             // Check if the answer is correct
-            isCorrect = arraysEqual(selectedOptionIndices.sort(), card.correct.sort());
+            isCorrect = arraysEqual([...selectedOptionIndices].sort((a, b) => a - b), [...card.correct].sort((a, b) => a - b));
         } else {
             // No selection was made - treat as incorrect (unless there are no correct answers)
             isCorrect = card.correct.length === 0;
@@ -1390,9 +1399,9 @@ function showFeedback() {
             const deckStatItem = document.createElement('div');
             deckStatItem.className = 'deck-stat-item';
             deckStatItem.innerHTML = `
-                <strong>${deckName}:</strong> 
-                ${stats.correct} richtig, 
-                ${stats.incorrect} falsch, 
+                <strong>${sanitizeHTML(deckName)}:</strong>
+                ${stats.correct} richtig,
+                ${stats.incorrect} falsch,
                 ${deckAccuracy}% Genauigkeit
             `;
             
@@ -1557,23 +1566,20 @@ function handleStudyModeChange(event) {
  * Reorganize cards based on selected study mode
  */
 function reorganizeCardsByStudyMode() {
-    // First, randomize the card order
+    // Build card-to-answer map BEFORE shuffling to preserve answer associations
+    const cardAnswerMap = new Map();
+    cards.forEach((card, index) => cardAnswerMap.set(card, answeredCards[index]));
+
+    // Randomize the card order
     shuffleArray(cards);
-    
+
     switch (studyMode) {
         case 'incorrect-first':
             // Show incorrect cards first (current session + previous sessions), then correct/unanswered
-            // Build index map before sorting to avoid unreliable indexOf during sort
-            const cardIndexMap = new Map();
-            cards.forEach((card, index) => cardIndexMap.set(card, index));
-
             cards.sort((a, b) => {
-                const aIndex = cardIndexMap.get(a);
-                const bIndex = cardIndexMap.get(b);
-
                 // Check if answered incorrectly in current session
-                const aIncorrectNow = answeredCards[aIndex] === false;
-                const bIncorrectNow = answeredCards[bIndex] === false;
+                const aIncorrectNow = cardAnswerMap.get(a) === false;
+                const bIncorrectNow = cardAnswerMap.get(b) === false;
 
                 // Check if was incorrect in previous session
                 const aIncorrectBefore = isCardIncorrectFromPreviousSession(a);
@@ -1591,19 +1597,16 @@ function reorganizeCardsByStudyMode() {
         case 'incorrect-only':
             // Filter to show only incorrect cards (current session + previous sessions)
             const incorrectCards = [];
-            const incorrectAnswers = [];
-            cards.forEach((card, index) => {
-                const incorrectNow = answeredCards[index] === false;
+            cards.forEach((card) => {
+                const incorrectNow = cardAnswerMap.get(card) === false;
                 const incorrectBefore = isCardIncorrectFromPreviousSession(card);
-                
+
                 if (incorrectNow || incorrectBefore) {
                     incorrectCards.push(card);
-                    incorrectAnswers.push(answeredCards[index]);
                 }
             });
             if (incorrectCards.length > 0) {
                 cards = incorrectCards;
-                answeredCards = incorrectAnswers;
             } else {
                 showError('Keine falsch beantworteten Karten gefunden.');
             }
@@ -1620,6 +1623,9 @@ function reorganizeCardsByStudyMode() {
             });
             break;
     }
+
+    // Rebuild answeredCards to match the new card order
+    answeredCards = cards.map(card => cardAnswerMap.get(card) ?? null);
 }
 
 /**
