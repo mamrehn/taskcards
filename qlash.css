@@ -159,6 +159,7 @@ input, select {
     border: 1px solid var(--input-border);
     border-radius: 8px; /* More rounded corners from first file */
     background-color: var(--qlash-surface-alt);
+    color: var(--text-color);
     text-align: left;
     cursor: pointer;
     transition: background-color 0.2s ease; /* Transition from first file */
@@ -234,22 +235,22 @@ input, select {
     color: var(--wrong-color);
 }
 
-.result-display .correct { /* Specific correct text within result display */
+#result-display .correct { /* Specific correct text within result display */
     color: var(--correct-color);
     font-weight: bold;
 }
 
-.result-display .incorrect { /* Specific incorrect text within result display */
+#result-display .incorrect { /* Specific incorrect text within result display */
     color: var(--wrong-color);
     font-weight: bold;
 }
 
-.result-display .player-selected {
+#result-display .player-selected {
     text-decoration: underline;
     font-weight: bold;
 }
 
-.result-display .correct-not-selected {
+#result-display .correct-not-selected {
     font-weight: bold;
     font-style: italic;
     color: var(--correct-color);

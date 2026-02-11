@@ -1167,16 +1167,17 @@ function isHostPlayer(playerId) {
                     if (p.currentAnswer && p.currentAnswer.length > 0) {
                         const playerAnsSet = new Set(p.currentAnswer);
 
-                        let isCompletelyCorrect = correctSet.size === playerAnsSet.size &&
-                                        [...playerAnsSet].every(item => correctSet.has(item));
+                        // Count how many correct answers the player selected
+                        const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
 
-                        if (isCompletelyCorrect) {
-                            // Score = Base Points + (Time Remaining / Total Time) * Bonus Points
-                            const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime; // Use max time if no answer time recorded
+                        if (correctHits > 0) {
+                            const correctRatio = correctHits / correctSet.size;
+                            // Score = ratio * (Base Points + Time Bonus)
+                            const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
                             const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
-                            const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5); // Bonus proportional to question value
+                            const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5);
 
-                            p.score += currentQuestionBasePoints + timeBonus;
+                            p.score += correctRatio * (currentQuestionBasePoints + timeBonus);
                         }
                     }
                 });
@@ -1838,14 +1839,17 @@ function initializePlayerFeatures() {
                 const correctSet = new Set(rData.correct);
                 const options = rData.options; // These are the shuffled options from the host
 
-                let isCompletelyCorrect = correctSet.size === playerAnsSet.size &&
-                                           [...playerAnsSet].every(item => correctSet.has(item));
+                const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
+                const isCompletelyCorrect = correctHits === correctSet.size &&
+                                           playerAnsSet.size === correctSet.size;
 
-                if (!playerAnswer || playerAnswer.length === 0) { // Check playerAnswer directly
+                if (!playerAnswer || playerAnswer.length === 0) {
                     resultHtml = "Du hast nicht geantwortet. ";
                 } else if (isCompletelyCorrect) {
                     resultHtml += '<strong class="correct">RICHTIG!</strong> ';
-                    triggerConfetti(); // Trigger confetti for correct answers
+                    triggerConfetti();
+                } else if (correctHits > 0) {
+                    resultHtml += `<strong class="correct">TEILWEISE RICHTIG (${correctHits}/${correctSet.size})</strong> `;
                 } else {
                     resultHtml += '<strong class="incorrect">FALSCH.</strong> ';
                 }
