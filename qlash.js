@@ -1765,11 +1765,12 @@ function initializePlayerFeatures() {
                         submitAnswerBtn.classList.add('hidden');
                         optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
                         console.log("Player timer up.");
-                         // Automatically send an empty answer if time runs out and no answer was selected
-                         if (selectedAnswers.length === 0) { // No need to check hostConnection, just update own DB entry
-                             supabaseClient.from('players').update({ last_answer_data: [], last_answer_time: new Date().toISOString() }).eq('id', playerCurrentId)
-                                 .then(() => console.log("Player sent empty answer due to timeout."))
-                                 .catch(e => console.error("Error sending empty answer:", e));
+                         // Auto-submit current selections if player hasn't already submitted
+                         if (!submitAnswerBtn.disabled) {
+                             submitAnswerBtn.disabled = true;
+                             supabaseClient.from('players').update({ last_answer_data: selectedAnswers, last_answer_time: new Date().toISOString() }).eq('id', playerCurrentId)
+                                 .then(() => console.log("Auto-submitted player answer on timeout:", selectedAnswers))
+                                 .catch(e => console.error("Error auto-submitting answer:", e));
                          }
                     }
                 }, 100); // Update every 100ms
