@@ -654,7 +654,7 @@ function isHostPlayer(playerId) {
                             }, payload => {
                                 if (payload.eventType === 'INSERT') {
                                     if (payload.new.id !== hostPlayerId) { // Ignore host's own insert
-                                        console.log('New player joined:', payload.new);
+                                        console.log('New player joined:', payload.new.name);
                                         quizState.players[payload.new.id] = {
                                             id: payload.new.id,
                                             name: payload.new.name,
@@ -788,7 +788,7 @@ function isHostPlayer(playerId) {
              */
             function handlePlayerData(playerData) {
                 const playerId = playerData.id;
-                console.log('Host received player data update from', playerId, playerData);
+                console.log('Host received update from player:', playerId);
 
                 // Ensure the player exists in our local state and the quiz is active
                 if (!quizState.players[playerId] || !quizState.isQuestionActive) {
@@ -1067,7 +1067,7 @@ function isHostPlayer(playerId) {
                         event: 'quiz_event',
                         payload: qData
                     });
-                    console.log('Question broadcasted:', qData);
+                    console.log('Question broadcasted');
                 } catch (error) {
                     console.error('Error sending question via Supabase:', error);
                     showMessage('Fehler beim Senden der Frage. Bitte überprüfe deine Supabase-Verbindung.', 'error');
@@ -1212,7 +1212,7 @@ function isHostPlayer(playerId) {
                     type: 'result',
                     correct: currentQ.shuffledCorrect, // Send shuffled correct indices
                     isFinal: isFinalQ,
-                    options: currentQ.shuffledOptions, // Send shuffled options to player for result display
+                    // Options removed - players already have them from the question
                     leaderboard: leaderboardData // Include leaderboard for final results
                 };
 
@@ -1696,7 +1696,7 @@ function initializePlayerFeatures() {
              * @param {Object} data - The data received from the host.
              */
             async function handleHostData(data) { // Made async to allow await for DB fetch
-                console.log('Player received data from host:', data);
+                console.log('Player received event:', data.type);
 
                 switch (data.type) {
                     case 'question':
@@ -1841,7 +1841,7 @@ function initializePlayerFeatures() {
                 // Use the actual playerAnswer passed to the function
                 const playerAnsSet = new Set(playerAnswer || []); 
                 const correctSet = new Set(rData.correct);
-                const options = rData.options; // These are the shuffled options from the host
+                const options = playerCurrentQuestionOptions; // Use locally stored options instead of network payload
 
                 const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
                 const isCompletelyCorrect = correctHits === correctSet.size &&
@@ -1900,7 +1900,7 @@ function initializePlayerFeatures() {
              * @param {Object} frData - The final results data received from the host.
              */
             function displayFinalResult(frData) {
-                console.log("Displaying final results for player:", frData); // Debug log
+                console.log("Displaying final results"); // Debug log
                 playerQuestionView.classList.add('hidden');
                 playerResultView.classList.add('hidden');
                 waitingRoom.classList.add('hidden');
