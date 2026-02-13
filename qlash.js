@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Supabase Configuration
  * 
  * SECURITY NOTE: 
@@ -1046,7 +1046,6 @@ function isHostPlayer(playerId) {
                     type: 'question',
                     question: question.question,
                     options: question.shuffledOptions, // Send shuffled options
-                    correct: question.shuffledCorrect, // Send re-mapped correct indices
                     index: quizState.currentQuestionIndex,
                     total: quizState.shuffledQuestions.length,
                     startTime: hostQuestionStartTime, // Send start time for player timer/scoring
@@ -1173,7 +1172,11 @@ function isHostPlayer(playerId) {
                         if (correctHits > 0) {
                             const correctRatio = correctHits / correctSet.size;
                             // Score = ratio * (Base Points + Time Bonus)
-                            const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
+                            let timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
+                            
+                            // Time taken cannot be negative or greater than total time
+                            timeTaken = Math.max(0, Math.min(timeTaken, totalQuestionTime));
+                            
                             const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
                             const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5);
 
