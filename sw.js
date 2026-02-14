@@ -4,7 +4,7 @@
  * Strategy: Stale-While-Revalidate for app shell, Cache First for data
  */
 
-const CACHE_NAME = 'taskcards-v4';
+const CACHE_NAME = 'taskcards-v5';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
