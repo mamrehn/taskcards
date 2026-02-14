@@ -4,7 +4,7 @@
  * Strategy: Stale-While-Revalidate for app shell, Cache First for data
  */
 
-const CACHE_NAME = 'taskcards-v5';
+const CACHE_NAME = 'taskcards-v6';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -89,7 +89,7 @@ self.addEventListener('fetch', (event) => {
                     if (networkResponse.ok) {
                         // Clone before caching
                         const responseToCache = networkResponse.clone();
-                        
+
                         // Check if content has changed
                         if (cachedResponse) {
                             // Compare Last-Modified timestamps to detect changes
