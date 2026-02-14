@@ -3,7 +3,11 @@
  *
  * This placeholder is replaced during build/deployment with the actual server URL.
  */
-const WS_URL = 'wss://qlash-server.fly.dev';
+// During build, '__WS_URL__' is replaced. In dev, it remains.
+const RAW_URL = '__WS_URL__';
+const WS_URL = (typeof window !== 'undefined' && window.WS_URL && window.WS_URL !== '__WS_URL__')
+    ? window.WS_URL
+    : (RAW_URL !== '__WS_URL__' ? RAW_URL : 'wss://qlash-server.fly.dev');
 
 // --- Utility functions ---
 /**
