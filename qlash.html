@@ -1,9 +1,11 @@
 ﻿<!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://qlash-server.fly.dev; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://qlash-server.fly.dev; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self';">
     <meta name="referrer" content="no-referrer">
     <title>Multiplayer Quiz</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -12,6 +14,7 @@
     <script src="sanitize.js"></script>
     <link rel="stylesheet" href="qlash.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -34,11 +37,13 @@
                     <div class="duration-range-row">
                         <div class="duration-input-group">
                             <label for="question-duration-min">Min:</label>
-                            <input type="number" id="question-duration-min" value="10" min="5" max="60" class="duration-input">
+                            <input type="number" id="question-duration-min" value="10" min="5" max="60"
+                                class="duration-input">
                         </div>
                         <div class="duration-input-group">
                             <label for="question-duration-max">Max:</label>
-                            <input type="number" id="question-duration-max" value="30" min="5" max="60" class="duration-input">
+                            <input type="number" id="question-duration-max" value="30" min="5" max="60"
+                                class="duration-input">
                         </div>
                     </div>
                 </div>
@@ -82,7 +87,8 @@
                 <h3>QR-Code scannen oder URL eingeben, um beizutreten:</h3>
                 <div id="qrcode" style="cursor: pointer;"></div>
                 <p>URL eingeben: <a id="join-link" href="#" target="_blank"></a></p>
-                <p>Dann Code eingeben: <span id="room-id" style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.1em;"></span></p>
+                <p>Dann Code eingeben: <span id="room-id"
+                        style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.1em;"></span></p>
                 <p>Verbundene Spieler: <span id="player-count">0</span></p>
                 <div class="players-list" id="players-list"></div>
                 <button id="start-questions-btn" class="btn btn-accent hidden">Fragen starten</button>
@@ -90,13 +96,13 @@
 
             <div id="host-question-display" class="hidden">
                 <h3 id="current-question-text"></h3>
-                 <ul id="host-current-options" class="host-options-list"></ul>
+                <ul id="host-current-options" class="host-options-list"></ul>
                 <div class="question-counter" id="question-counter"></div>
                 <div class="timer-bar-container">
                     <div class="timer-bar" id="timer-bar"></div>
                 </div>
                 <p>Spieler haben geantwortet: <span id="answers-count">0</span>/<span id="total-players">0</span></p>
-                 <div id="host-scoreboard" class="scoreboard hidden">
+                <div id="host-scoreboard" class="scoreboard hidden">
                     <h4>Aktuelle Rangliste (Top 10)</h4>
                     <ol id="scoreboard-list"></ol>
                 </div>
@@ -114,7 +120,7 @@
         <div id="player-view" class="view card">
             <div id="join-form">
                 <h2>Einem Quiz beitreten</h2>
-                 <input type="text" id="room-code-input" placeholder="Host-ID eingeben oder QR scannen">
+                <input type="text" id="room-code-input" placeholder="Host-ID eingeben oder QR scannen">
                 <input type="text" id="player-name-input" placeholder="Dein Name">
                 <button id="join-btn" class="btn">Quiz beitreten</button>
                 <p>Oder scanne den vom Host bereitgestellten QR-Code</p>
@@ -159,7 +165,8 @@
             <h3>Zum Beitreten scannen oder URL eingeben</h3>
             <div id="large-qrcode"></div>
             <p>URL eingeben: <a id="join-link-modal" href="#" target="_blank"></a></p>
-            <p>Dann Code eingeben: <span id="modal-room-id" style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.1em;"></span></p>
+            <p>Dann Code eingeben: <span id="modal-room-id"
+                    style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.1em;"></span></p>
         </div>
     </div>
 
@@ -170,6 +177,8 @@
     </footer>
 
     <!-- Main Application Script -->
+    <script src="qlash-config.js"></script>
     <script src="qlash.js"></script>
 </body>
+
 </html>

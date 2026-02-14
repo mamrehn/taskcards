@@ -10,4 +10,4 @@
  * The placeholder is replaced during CI/CD build via the WS_URL secret.
  */
 
-const WS_URL = '__WS_URL__';
+window.WS_URL = '__WS_URL__';

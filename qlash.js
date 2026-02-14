@@ -3,7 +3,7 @@
  *
  * This placeholder is replaced during build/deployment with the actual server URL.
  */
-const WS_URL = '__WS_URL__';
+const WS_URL = (typeof window !== 'undefined' && window.WS_URL) ? window.WS_URL : 'wss://qlash-server.fly.dev';
 
 // --- Utility functions ---
 /**
@@ -83,77 +83,77 @@ let largeQrcodeContainer = null;
 let modalRoomIdSpan = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-            // Verify WebSocket URL is configured
-            if (!WS_URL || WS_URL === '__WS_URL__') {
-                console.error('WebSocket server URL not configured.');
-                showMessage('Server-URL nicht konfiguriert. Bitte überprüfe die Konfiguration.', 'error');
-                return;
-            }
+    // Verify WebSocket URL is configured
+    if (!WS_URL || WS_URL === '__WS_URL__') {
+        console.error('WebSocket server URL not configured.');
+        showMessage('Server-URL nicht konfiguriert. Bitte überprüfe die Konfiguration.', 'error');
+        return;
+    }
 
-            // Initialize QR modal elements as soon as DOM is ready
-            qrModalOverlay = document.getElementById('qr-modal-overlay');
-            qrModalCloseBtn = document.getElementById('qr-modal-close');
-            largeQrcodeContainer = document.getElementById('large-qrcode');
-            modalRoomIdSpan = document.getElementById('modal-room-id');
+    // Initialize QR modal elements as soon as DOM is ready
+    qrModalOverlay = document.getElementById('qr-modal-overlay');
+    qrModalCloseBtn = document.getElementById('qr-modal-close');
+    largeQrcodeContainer = document.getElementById('large-qrcode');
+    modalRoomIdSpan = document.getElementById('modal-room-id');
 
-            // Event listener for closing the QR code modal when clicking the close button
-            if (qrModalCloseBtn) {
-                qrModalCloseBtn.addEventListener('click', () => {
-                    if (qrModalOverlay) {
-                        qrModalOverlay.classList.add('hidden');
-                    }
-                });
-            }
-
-            // Event listener for closing the QR code modal when clicking the overlay itself
+    // Event listener for closing the QR code modal when clicking the close button
+    if (qrModalCloseBtn) {
+        qrModalCloseBtn.addEventListener('click', () => {
             if (qrModalOverlay) {
-                qrModalOverlay.addEventListener('click', (event) => {
-                    // Only close if the click target is the overlay itself, not its children
-                    if (event.target === qrModalOverlay) {
-                        qrModalOverlay.classList.add('hidden');
-                    }
-                });
+                qrModalOverlay.classList.add('hidden');
             }
-
-
-            // Event listener for "Host a Quiz" button
-            document.getElementById('host-btn').addEventListener('click', () => {
-                showView('host-view');
-                initializeHostFeatures();
-            });
-            // Event listener for "Join a Quiz" button
-            document.getElementById('player-btn').addEventListener('click', () => {
-                showView('player-view');
-                initializePlayerFeatures();
-            });
-
-            // Check URL parameters for a host ID to auto-join on page load
-            const urlParams = new URLSearchParams(window.location.search);
-            const hostIdFromUrl = urlParams.get('host');
-
-            if (hostIdFromUrl) {
-                 // If host ID is in URL, navigate directly to player view and pre-fill
-                 showView('player-view');
-                 initializePlayerFeatures(); // Initialize player features first
-                 document.getElementById('room-code-input').value = hostIdFromUrl;
-            } else {
-                 // Otherwise, show the role selection view
-                 showView('role-selection');
-            }
-
-            // Reconnect WebSocket when tab becomes visible again
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState !== 'visible') return;
-                console.log('Tab became visible, checking connections...');
-
-                if (hostWs && hostWs.readyState !== WebSocket.OPEN && hostRoomId) {
-                    reconnectHostWs();
-                }
-                if (playerWs && playerWs.readyState !== WebSocket.OPEN && playerRoomId) {
-                    reconnectPlayerWs();
-                }
-            });
         });
+    }
+
+    // Event listener for closing the QR code modal when clicking the overlay itself
+    if (qrModalOverlay) {
+        qrModalOverlay.addEventListener('click', (event) => {
+            // Only close if the click target is the overlay itself, not its children
+            if (event.target === qrModalOverlay) {
+                qrModalOverlay.classList.add('hidden');
+            }
+        });
+    }
+
+
+    // Event listener for "Host a Quiz" button
+    document.getElementById('host-btn').addEventListener('click', () => {
+        showView('host-view');
+        initializeHostFeatures();
+    });
+    // Event listener for "Join a Quiz" button
+    document.getElementById('player-btn').addEventListener('click', () => {
+        showView('player-view');
+        initializePlayerFeatures();
+    });
+
+    // Check URL parameters for a host ID to auto-join on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostIdFromUrl = urlParams.get('host');
+
+    if (hostIdFromUrl) {
+        // If host ID is in URL, navigate directly to player view and pre-fill
+        showView('player-view');
+        initializePlayerFeatures(); // Initialize player features first
+        document.getElementById('room-code-input').value = hostIdFromUrl;
+    } else {
+        // Otherwise, show the role selection view
+        showView('role-selection');
+    }
+
+    // Reconnect WebSocket when tab becomes visible again
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        console.log('Tab became visible, checking connections...');
+
+        if (hostWs && hostWs.readyState !== WebSocket.OPEN && hostRoomId) {
+            reconnectHostWs();
+        }
+        if (playerWs && playerWs.readyState !== WebSocket.OPEN && playerRoomId) {
+            reconnectPlayerWs();
+        }
+    });
+});
 
 // --- Host State & Initialization Flag ---
 let hostGlobalQuizState = null;
@@ -197,912 +197,944 @@ function getNonHostPlayerCount() {
 /**
  * Initializes all features and event listeners for the host role.
  */
-        async function initializeHostFeatures() {
-            console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
-            // Initialize quiz state if not already set
-            if (!hostGlobalQuizState) {
-                hostGlobalQuizState = {
-                    currentQuestionIndex: 0,
-                    questions: [], // Stores original questions
-                    shuffledQuestions: [], // Stores shuffled questions for the current quiz session
-                    players: {}, // Player structure includes score and answer time
-                    answersReceived: 0,
-                    isQuestionActive: false,
-                    roomId: null, // This will be the 4-digit alphanumeric code
-                    durationMin: 10, // Minimum question duration in seconds
-                    durationMax: 30, // Maximum question duration in seconds
-                    questionDurations: [] // Per-question durations (computed at quiz start)
-                };
-            }
+async function initializeHostFeatures() {
+    console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
+    // Initialize quiz state if not already set
+    if (!hostGlobalQuizState) {
+        hostGlobalQuizState = {
+            currentQuestionIndex: 0,
+            questions: [], // Stores original questions
+            shuffledQuestions: [], // Stores shuffled questions for the current quiz session
+            players: {}, // Player structure includes score and answer time
+            answersReceived: 0,
+            isQuestionActive: false,
+            roomId: null, // This will be the 4-digit alphanumeric code
+            durationMin: 10, // Minimum question duration in seconds
+            durationMax: 30, // Maximum question duration in seconds
+            questionDurations: [] // Per-question durations (computed at quiz start)
+        };
+    }
 
-            const quizState = hostGlobalQuizState;
-            // Cache DOM elements for performance
-            const jsonFileInput = document.getElementById('json-file');
-            const fileStatus = document.getElementById('file-status');
-            const questionForm = document.getElementById('question-form');
-            const questionText = document.getElementById('question-text');
-            const addOptionBtn = document.getElementById('add-option-btn');
-            const questionsContainer = document.getElementById('questions-container');
-            const durationMinInput = document.getElementById('question-duration-min');
-            const durationMaxInput = document.getElementById('question-duration-max');
-            const startQuizBtn = document.getElementById('start-quiz-btn');
-            const qrContainer = document.getElementById('qr-container');
-            const hostSetup = document.getElementById('host-setup');
-            const qrcodeElement = document.getElementById('qrcode');
-            const roomIdElement = document.getElementById('room-id');
-            const joinLinkElement = document.getElementById('join-link');
-            const joinLinkModalElement = document.getElementById('join-link-modal');
-            const playerCountElement = document.getElementById('player-count');
-            const playersList = document.getElementById('players-list');
-            const startQuestionsBtn = document.getElementById('start-questions-btn');
-            const hostQuestionDisplay = document.getElementById('host-question-display');
-            const currentQuestionTextEl = document.getElementById('current-question-text');
-            const hostCurrentOptionsEl = document.getElementById('host-current-options');
-            const questionCounterEl = document.getElementById('question-counter');
-            const timerBar = document.getElementById('timer-bar');
-            const answersCount = document.getElementById('answers-count');
-            const totalPlayers = document.getElementById('total-players');
-            const hostScoreboardEl = document.getElementById('host-scoreboard');
-            const scoreboardListEl = document.getElementById('scoreboard-list');
-            const showNextBtn = document.getElementById('show-next-btn');
-            const showResultsBtn = document.getElementById('show-results-btn');
-            const hostResults = document.getElementById('host-results');
-            const leaderboard = document.getElementById('leaderboard');
-            const newQuizBtn = document.getElementById('new-quiz-btn');
-            hostViewHeading = document.getElementById('host-view-heading'); // Cache the heading
+    const quizState = hostGlobalQuizState;
+    // Cache DOM elements for performance
+    const jsonFileInput = document.getElementById('json-file');
+    const fileStatus = document.getElementById('file-status');
+    const questionForm = document.getElementById('question-form');
+    const questionText = document.getElementById('question-text');
+    const addOptionBtn = document.getElementById('add-option-btn');
+    const questionsContainer = document.getElementById('questions-container');
+    const durationMinInput = document.getElementById('question-duration-min');
+    const durationMaxInput = document.getElementById('question-duration-max');
+    const startQuizBtn = document.getElementById('start-quiz-btn');
+    const qrContainer = document.getElementById('qr-container');
+    const hostSetup = document.getElementById('host-setup');
+    const qrcodeElement = document.getElementById('qrcode');
+    const roomIdElement = document.getElementById('room-id');
+    const joinLinkElement = document.getElementById('join-link');
+    const joinLinkModalElement = document.getElementById('join-link-modal');
+    const playerCountElement = document.getElementById('player-count');
+    const playersList = document.getElementById('players-list');
+    const startQuestionsBtn = document.getElementById('start-questions-btn');
+    const hostQuestionDisplay = document.getElementById('host-question-display');
+    const currentQuestionTextEl = document.getElementById('current-question-text');
+    const hostCurrentOptionsEl = document.getElementById('host-current-options');
+    const questionCounterEl = document.getElementById('question-counter');
+    const timerBar = document.getElementById('timer-bar');
+    const answersCount = document.getElementById('answers-count');
+    const totalPlayers = document.getElementById('total-players');
+    const hostScoreboardEl = document.getElementById('host-scoreboard');
+    const scoreboardListEl = document.getElementById('scoreboard-list');
+    const showNextBtn = document.getElementById('show-next-btn');
+    const showResultsBtn = document.getElementById('show-results-btn');
+    const hostResults = document.getElementById('host-results');
+    const leaderboard = document.getElementById('leaderboard');
+    const newQuizBtn = document.getElementById('new-quiz-btn');
+    hostViewHeading = document.getElementById('host-view-heading'); // Cache the heading
 
-            // Set default duration input values
-            durationMinInput.value = quizState.durationMin;
-            durationMaxInput.value = quizState.durationMax;
+    // Set default duration input values
+    durationMinInput.value = quizState.durationMin;
+    durationMaxInput.value = quizState.durationMax;
 
-            // Only set up event listeners once
-            if (!isHostInitialized) {
-                console.log("Setting up host event listeners for the first time.");
+    // Only set up event listeners once
+    if (!isHostInitialized) {
+        console.log("Setting up host event listeners for the first time.");
 
-                // Event listener for JSON file import
-                jsonFileInput.addEventListener('change', (event) => {
-                    const file = event.target.files[0];
-                    if (!file) return;
+        // Event listener for JSON file import
+        jsonFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
 
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const data = JSON.parse(e.target.result);
-                            if (data && Array.isArray(data) && data.every(q => q.question && q.options && q.correct)) {
-                                quizState.questions = data;
-                            } else if (data && data.cards && Array.isArray(data.cards)) {
-                                quizState.questions = data.cards;
-                            } else {
-                                fileStatus.textContent = 'Ungültiges JSON. Erwartet wird ein Array von Fragen oder eine "Karten"-Struktur.';
-                                quizState.questions = [];
-                            }
-                            fileStatus.textContent = quizState.questions.length > 0 ? `Importiert ${quizState.questions.length} Fragen.` : (fileStatus.textContent || 'Keine Fragen im JSON gefunden.');
-                            renderQuestionsList();
-                        } catch (error) {
-                            console.error('Error parsing JSON:', error);
-                            fileStatus.textContent = 'Fehler beim Parsen des JSON. Format überprüfen.';
-                            quizState.questions = [];
-                            renderQuestionsList();
-                        }
-                    };
-                    reader.readAsText(file);
-                });
-
-                // Event listener for adding new option input fields
-                addOptionBtn.addEventListener('click', () => {
-                    const optionGroups = questionForm.querySelectorAll('.option-group');
-                    const newIndex = optionGroups.length + 1;
-                    const optionGroup = document.createElement('div');
-                    optionGroup.className = 'option-group';
-                    optionGroup.innerHTML = `<input type="text" class="option-input" placeholder="Option ${newIndex}"><input type="checkbox" class="correct-checkbox"><label>Richtig</label>`;
-                    questionForm.insertBefore(optionGroup, addOptionBtn);
-                });
-
-                // Event listener for submitting a new question
-                questionForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const question = questionText.value.trim();
-                    if (!question) {
-                        showMessage('Bitte gebe eine Frage ein', 'error');
-                        return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data && Array.isArray(data) && data.every(q => q.question && q.options && q.correct)) {
+                        quizState.questions = data;
+                    } else if (data && data.cards && Array.isArray(data.cards)) {
+                        quizState.questions = data.cards;
+                    } else {
+                        fileStatus.textContent = 'Ungültiges JSON. Erwartet wird ein Array von Fragen oder eine "Karten"-Struktur.';
+                        quizState.questions = [];
                     }
-
-                    const optionInputs = questionForm.querySelectorAll('.option-input');
-                    const options = [];
-                    const correct = [];
-
-                    optionInputs.forEach((inputEl) => {
-                        const optionText = inputEl.value.trim();
-                        if (optionText) {
-                            const currentIndex = options.length;
-                            options.push(optionText);
-                            const checkbox = inputEl.parentElement.querySelector('.correct-checkbox');
-                            if (checkbox && checkbox.checked) {
-                                correct.push(currentIndex);
-                            }
-                        }
-                    });
-
-                    if (options.length < 2) {
-                        showMessage('Bitte füge mindestens zwei gültige Optionen hinzu', 'error');
-                        return;
-                    }
-                    if (correct.length === 0) {
-                        showMessage('Bitte wähle mindestens eine richtige Antwort aus', 'error');
-                        return;
-                    }
-
-                    quizState.questions.push({ question, options, correct });
-                    questionText.value = '';
-                    questionForm.querySelectorAll('.option-group').forEach((group, index) => {
-                        const input = group.querySelector('.option-input');
-                        const checkbox = group.querySelector('.correct-checkbox');
-                        if (index < 2) {
-                            if(input) input.value = '';
-                            if(checkbox) checkbox.checked = false;
-                        } else {
-                            group.remove();
-                        }
-                    });
+                    fileStatus.textContent = quizState.questions.length > 0 ? `Importiert ${quizState.questions.length} Fragen.` : (fileStatus.textContent || 'Keine Fragen im JSON gefunden.');
                     renderQuestionsList();
-                });
-
-                // Event listener for starting the quiz
-                startQuizBtn.addEventListener('click', async () => {
-                    if (quizState.questions.length === 0) {
-                        showMessage('Bitte füge mindestens eine Frage hinzu.', 'error');
-                        return;
-                    }
-                    const dMin = parseInt(durationMinInput.value, 10);
-                    const dMax = parseInt(durationMaxInput.value, 10);
-                    if (isNaN(dMin) || isNaN(dMax) || dMin < 5 || dMax > 60 || dMin > dMax) {
-                        showMessage('Bitte gültige Fragedauer eingeben: Min 5-60, Max >= Min.', 'error');
-                        return;
-                    }
-                    quizState.durationMin = dMin;
-                    quizState.durationMax = dMax;
-
-                    // Shuffle questions once when quiz starts
-                    quizState.shuffledQuestions = [...quizState.questions]; // Create a copy
-                    shuffleArray(quizState.shuffledQuestions);
-
-                    // Pre-compute per-question durations based on character count
-                    const charCounts = quizState.shuffledQuestions.map(q =>
-                        q.question.length + q.options.reduce((sum, o) => sum + o.length, 0)
-                    );
-                    const minChars = Math.min(...charCounts);
-                    const maxChars = Math.max(...charCounts);
-                    const charRange = maxChars - minChars;
-                    quizState.questionDurations = charCounts.map(count => {
-                        if (charRange === 0) return Math.round((dMin + dMax) / 2);
-                        const t = (count - minChars) / charRange;
-                        return Math.round(dMin + t * (dMax - dMin));
-                    });
-
-                    await initHostConnection();
-                });
-
-                // Event listener for starting questions (after players join)
-                startQuestionsBtn.addEventListener('click', async () => {
-                    if (getNonHostPlayerCount() === 0) {
-                        showMessage("Es sind noch keine Spieler beigetreten!", 'info');
-                        return;
-                    }
-                    qrContainer.classList.add('hidden');
-                    hostQuestionDisplay.classList.remove('hidden');
-                    if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
-                    quizState.currentQuestionIndex = 0;
-                    await startQuestion();
-                });
-
-                // Event listener for moving to the next question
-                showNextBtn.addEventListener('click', async () => {
-                    quizState.currentQuestionIndex++;
-                    await startQuestion();
-                });
-
-                // Event listener for showing final results
-                showResultsBtn.addEventListener('click', showFinalResults);
-
-                // Event listener for starting a new quiz
-                newQuizBtn.addEventListener('click', async () => {
-                    // Terminate room on server and close WebSocket
-                    if (hostWs && hostWs.readyState === WebSocket.OPEN) {
-                        hostWs.send(JSON.stringify({ type: 'terminate' }));
-                    }
-                    if (hostWs) {
-                        hostWs.onclose = null; // Prevent reconnect on intentional close
-                        hostWs.close();
-                        hostWs = null;
-                    }
-
-                    hostRoomId = null;
-                    hostSessionId = null;
-                    hostGlobalQuizState = null;
-                    isHostInitialized = false;
-                    fileStatus.textContent = '';
-                    if(jsonFileInput) jsonFileInput.value = '';
-                    hostResults.classList.add('hidden');
-                    hostQuestionDisplay.classList.add('hidden');
-                    qrContainer.classList.add('hidden');
-                    hostSetup.classList.remove('hidden');
-                    document.getElementById('role-selection').classList.remove('hidden');
-                    if (hostViewHeading) hostViewHeading.classList.remove('hidden');
-                    initializeHostFeatures();
-                });
-
-                // Clean up on window unload
-                if (hostBeforeUnloadHandler) {
-                    window.removeEventListener('beforeunload', hostBeforeUnloadHandler);
+                } catch (error) {
+                    console.error('Error parsing JSON:', error);
+                    fileStatus.textContent = 'Fehler beim Parsen des JSON. Format überprüfen.';
+                    quizState.questions = [];
+                    renderQuestionsList();
                 }
-                hostBeforeUnloadHandler = () => {
-                    if (hostWs) hostWs.close();
-                };
-                window.addEventListener('beforeunload', hostBeforeUnloadHandler);
+            };
+            reader.readAsText(file);
+        });
 
-                // Event listener for opening the QR code modal
-                qrcodeElement.addEventListener('click', () => {
-                    if (qrModalOverlay && largeQrcodeContainer && hostRoomId) {
-                        qrModalOverlay.classList.remove('hidden');
-                        largeQrcodeContainer.innerHTML = ''; // Clear previous QR
-                        new QRCode(largeQrcodeContainer, {
-                            text: joinLinkElement.href, // Use the full join link
-                            width: 300, // Larger size for modal
-                            height: 300,
-                            colorDark : "#000000",
-                            colorLight : "#ffffff",
-                            correctLevel : QRCode.CorrectLevel.H
-                        });
-                        modalRoomIdSpan.textContent = quizState.roomId; // Display the 4-digit room code in modal
-                    }
-                });
+        // Event listener for adding new option input fields
+        addOptionBtn.addEventListener('click', () => {
+            const optionGroups = questionForm.querySelectorAll('.option-group');
+            const newIndex = optionGroups.length + 1;
+            const optionGroup = document.createElement('div');
+            optionGroup.className = 'option-group';
+            optionGroup.innerHTML = `<input type="text" class="option-input" placeholder="Option ${newIndex}"><input type="checkbox" class="correct-checkbox"><label>Richtig</label>`;
+            questionForm.insertBefore(optionGroup, addOptionBtn);
+        });
 
-                isHostInitialized = true;
+        // Event listener for submitting a new question
+        questionForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const question = questionText.value.trim();
+            if (!question) {
+                showMessage('Bitte gebe eine Frage ein', 'error');
+                return;
             }
 
+            const optionInputs = questionForm.querySelectorAll('.option-input');
+            const options = [];
+            const correct = [];
+
+            optionInputs.forEach((inputEl) => {
+                const optionText = inputEl.value.trim();
+                if (optionText) {
+                    const currentIndex = options.length;
+                    options.push(optionText);
+                    const checkbox = inputEl.parentElement.querySelector('.correct-checkbox');
+                    if (checkbox && checkbox.checked) {
+                        correct.push(currentIndex);
+                    }
+                }
+            });
+
+            if (options.length < 2) {
+                showMessage('Bitte füge mindestens zwei gültige Optionen hinzu', 'error');
+                return;
+            }
+            if (correct.length === 0) {
+                showMessage('Bitte wähle mindestens eine richtige Antwort aus', 'error');
+                return;
+            }
+
+            quizState.questions.push({ question, options, correct });
+            questionText.value = '';
+            questionForm.querySelectorAll('.option-group').forEach((group, index) => {
+                const input = group.querySelector('.option-input');
+                const checkbox = group.querySelector('.correct-checkbox');
+                if (index < 2) {
+                    if (input) input.value = '';
+                    if (checkbox) checkbox.checked = false;
+                } else {
+                    group.remove();
+                }
+            });
             renderQuestionsList();
-            refreshPlayerDisplay();
+        });
 
-            // Logic to determine which host section to display on initialization/re-entry
-            if(hostRoomId) { // Check if a room is already established
-                if (quizState.isQuestionActive || quizState.currentQuestionIndex < quizState.shuffledQuestions.length) {
-                    hostSetup.classList.add('hidden');
-                    qrContainer.classList.add('hidden');
-                    hostResults.classList.add('hidden');
-                    hostQuestionDisplay.classList.remove('hidden');
-                    if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
-                    // Re-render current question details if returning to view
-                    const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
-                    currentQuestionTextEl.textContent = currentQuestion.question;
-                    // Options are displayed without correct indicators while question is active
-                    displayHostOptions(currentQuestion.shuffledOptions || currentQuestion.options, []); // Use shuffled if available
-                    questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
-                    answersCount.textContent = quizState.answersReceived.toString();
-                    totalPlayers.textContent = getNonHostPlayerCount().toString();
-                    if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) showNextBtn.classList.remove('hidden');
-                    else showResultsBtn.classList.remove('hidden');
-                } else if (hostResults.classList.contains('active')) {
-                    hostSetup.classList.add('hidden');
-                    qrContainer.classList.add('hidden');
-                    hostQuestionDisplay.classList.add('hidden');
-                    hostResults.classList.remove('hidden');
-                    if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
-                    displayLeaderboard();
-                } else { // Room is open, but quiz not active, show QR container
-                    hostSetup.classList.add('hidden');
-                    qrContainer.classList.remove('hidden');
-                    if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
-                    const currentJoinUrl = updateJoinLink(hostRoomId); // Get the current join URL
-                    generateQRCode(currentJoinUrl); // Generate QR with the full URL
-                    roomIdElement.textContent = quizState.roomId || 'N/A';
-                }
-            } else { // Default: show setup if no room instance
-                hostSetup.classList.remove('hidden');
-                qrContainer.classList.add('hidden');
-                hostQuestionDisplay.classList.add('hidden');
-                hostResults.classList.add('hidden');
-                if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
+        // Event listener for starting the quiz
+        startQuizBtn.addEventListener('click', async () => {
+            if (quizState.questions.length === 0) {
+                showMessage('Bitte füge mindestens eine Frage hinzu.', 'error');
+                return;
+            }
+            const dMin = parseInt(durationMinInput.value, 10);
+            const dMax = parseInt(durationMaxInput.value, 10);
+            if (isNaN(dMin) || isNaN(dMax) || dMin < 5 || dMax > 60 || dMin > dMax) {
+                showMessage('Bitte gültige Fragedauer eingeben: Min 5-60, Max >= Min.', 'error');
+                return;
+            }
+            quizState.durationMin = dMin;
+            quizState.durationMax = dMax;
+
+            // Shuffle questions once when quiz starts
+            quizState.shuffledQuestions = [...quizState.questions]; // Create a copy
+            shuffleArray(quizState.shuffledQuestions);
+
+            // Pre-compute per-question durations based on character count
+            const charCounts = quizState.shuffledQuestions.map(q =>
+                q.question.length + q.options.reduce((sum, o) => sum + o.length, 0)
+            );
+            const minChars = Math.min(...charCounts);
+            const maxChars = Math.max(...charCounts);
+            const charRange = maxChars - minChars;
+            quizState.questionDurations = charCounts.map(count => {
+                if (charRange === 0) return Math.round((dMin + dMax) / 2);
+                const t = (count - minChars) / charRange;
+                return Math.round(dMin + t * (dMax - dMin));
+            });
+
+            await initHostConnection();
+        });
+
+        // Event listener for starting questions (after players join)
+        startQuestionsBtn.addEventListener('click', async () => {
+            if (getNonHostPlayerCount() === 0) {
+                showMessage("Es sind noch keine Spieler beigetreten!", 'info');
+                return;
+            }
+            qrContainer.classList.add('hidden');
+            hostQuestionDisplay.classList.remove('hidden');
+            if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
+            quizState.currentQuestionIndex = 0;
+            await startQuestion();
+        });
+
+        // Event listener for moving to the next question
+        showNextBtn.addEventListener('click', async () => {
+            quizState.currentQuestionIndex++;
+            await startQuestion();
+        });
+
+        // Event listener for showing final results
+        showResultsBtn.addEventListener('click', showFinalResults);
+
+        // Event listener for starting a new quiz
+        newQuizBtn.addEventListener('click', async () => {
+            // Terminate room on server and close WebSocket
+            if (hostWs && hostWs.readyState === WebSocket.OPEN) {
+                hostWs.send(JSON.stringify({ type: 'terminate' }));
+            }
+            if (hostWs) {
+                hostWs.onclose = null; // Prevent reconnect on intentional close
+                hostWs.close();
+                hostWs = null;
             }
 
+            hostRoomId = null;
+            hostSessionId = null;
+            hostGlobalQuizState = null;
+            isHostInitialized = false;
+            fileStatus.textContent = '';
+            if (jsonFileInput) jsonFileInput.value = '';
+            hostResults.classList.add('hidden');
+            hostQuestionDisplay.classList.add('hidden');
+            qrContainer.classList.add('hidden');
+            hostSetup.classList.remove('hidden');
+            document.getElementById('role-selection').classList.remove('hidden');
+            if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+            initializeHostFeatures();
+        });
 
-            /**
-             * Renders the list of added questions in the host setup view.
-             */
-            function renderQuestionsList() {
-                questionsContainer.innerHTML = '';
-                if (quizState.questions.length === 0) {
-                    questionsContainer.innerHTML = '<p>Noch keine Fragen hinzugefügt</p>';
-                    startQuizBtn.classList.add('hidden');
-                    return;
-                }
+        // Clean up on window unload
+        if (hostBeforeUnloadHandler) {
+            window.removeEventListener('beforeunload', hostBeforeUnloadHandler);
+        }
+        hostBeforeUnloadHandler = () => {
+            if (hostWs) hostWs.close();
+        };
+        window.addEventListener('beforeunload', hostBeforeUnloadHandler);
 
-                quizState.questions.forEach((q, index) => {
-                    const item = document.createElement('div');
-                    item.className = 'question-item';
-                    const correctIndices = q.correct.map(i => i + 1).join(', ');
-                    item.innerHTML = `
+        // Event listener for opening the QR code modal
+        qrcodeElement.addEventListener('click', () => {
+            if (qrModalOverlay && largeQrcodeContainer && hostRoomId) {
+                qrModalOverlay.classList.remove('hidden');
+                largeQrcodeContainer.innerHTML = ''; // Clear previous QR
+                new QRCode(largeQrcodeContainer, {
+                    text: joinLinkElement.href, // Use the full join link
+                    width: 300, // Larger size for modal
+                    height: 300,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                modalRoomIdSpan.textContent = quizState.roomId; // Display the 4-digit room code in modal
+            }
+        });
+
+        isHostInitialized = true;
+    }
+
+    renderQuestionsList();
+    refreshPlayerDisplay();
+
+    // Logic to determine which host section to display on initialization/re-entry
+    if (hostRoomId) { // Check if a room is already established
+        if (quizState.isQuestionActive || quizState.currentQuestionIndex < quizState.shuffledQuestions.length) {
+            hostSetup.classList.add('hidden');
+            qrContainer.classList.add('hidden');
+            hostResults.classList.add('hidden');
+            hostQuestionDisplay.classList.remove('hidden');
+            if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
+            // Re-render current question details if returning to view
+            const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+            currentQuestionTextEl.textContent = currentQuestion.question;
+            // Options are displayed without correct indicators while question is active
+            displayHostOptions(currentQuestion.shuffledOptions || currentQuestion.options, []); // Use shuffled if available
+            questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
+            answersCount.textContent = quizState.answersReceived.toString();
+            totalPlayers.textContent = getNonHostPlayerCount().toString();
+            if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) showNextBtn.classList.remove('hidden');
+            else showResultsBtn.classList.remove('hidden');
+        } else if (hostResults.classList.contains('active')) {
+            hostSetup.classList.add('hidden');
+            qrContainer.classList.add('hidden');
+            hostQuestionDisplay.classList.add('hidden');
+            hostResults.classList.remove('hidden');
+            if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
+            displayLeaderboard();
+        } else { // Room is open, but quiz not active, show QR container
+            hostSetup.classList.add('hidden');
+            qrContainer.classList.remove('hidden');
+            if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
+            const currentJoinUrl = updateJoinLink(hostRoomId); // Get the current join URL
+            generateQRCode(currentJoinUrl); // Generate QR with the full URL
+            roomIdElement.textContent = quizState.roomId || 'N/A';
+        }
+    } else { // Default: show setup if no room instance
+        hostSetup.classList.remove('hidden');
+        qrContainer.classList.add('hidden');
+        hostQuestionDisplay.classList.add('hidden');
+        hostResults.classList.add('hidden');
+        if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
+    }
+
+
+    /**
+     * Renders the list of added questions in the host setup view.
+     */
+    function renderQuestionsList() {
+        questionsContainer.innerHTML = '';
+        if (quizState.questions.length === 0) {
+            questionsContainer.innerHTML = '<p>Noch keine Fragen hinzugefügt</p>';
+            startQuizBtn.classList.add('hidden');
+            return;
+        }
+
+        quizState.questions.forEach((q, index) => {
+            const item = document.createElement('div');
+            item.className = 'question-item';
+            const correctIndices = q.correct.map(i => i + 1).join(', ');
+            item.innerHTML = `
                         <p><strong>F${index + 1}:</strong> ${sanitizeHTML(q.question)}</p>
                         <p><strong>Optionen:</strong> ${q.options.map(o => sanitizeHTML(o)).join('; ')}</p>
                         <p><strong>Richtige Option(en):</strong> ${correctIndices}</p>
                         <button class="btn remove-question" data-index="${index}">Entfernen</button>
                     `;
-                    questionsContainer.appendChild(item);
-                });
+            questionsContainer.appendChild(item);
+        });
 
-                document.querySelectorAll('.remove-question').forEach(button => {
-                    button.onclick = (e) => {
-                        const index = parseInt(e.target.getAttribute('data-index'));
-                        quizState.questions.splice(index, 1);
-                        renderQuestionsList();
-                    };
-                });
+        document.querySelectorAll('.remove-question').forEach(button => {
+            button.onclick = (e) => {
+                const index = parseInt(e.target.getAttribute('data-index'));
+                quizState.questions.splice(index, 1);
+                renderQuestionsList();
+            };
+        });
 
-                startQuizBtn.classList.remove('hidden');
-            }
+        startQuizBtn.classList.remove('hidden');
+    }
 
-            /**
-             * Initializes WebSocket connection for the host, creates a room, and sets up message handlers.
-             */
-            async function initHostConnection() {
-                hostWsReconnectAttempts = 0;
+    /**
+     * Initializes WebSocket connection for the host, creates a room, and sets up message handlers.
+     */
+    async function initHostConnection() {
+        hostWsReconnectAttempts = 0;
 
-                hostWs = new WebSocket(WS_URL);
+        hostWs = new WebSocket(WS_URL);
 
-                hostWs.onopen = () => {
-                    console.log('Host WebSocket connected');
-                    hostWsReconnectAttempts = 0;
-                    hostWs.send(JSON.stringify({ type: 'create_room' }));
-                };
+        hostWs.onopen = () => {
+            console.log('Host WebSocket connected');
+            hostWsReconnectAttempts = 0;
+            hostWs.send(JSON.stringify({ type: 'create_room' }));
+        };
 
-                hostWs.onmessage = (event) => {
-                    let msg;
-                    try { msg = JSON.parse(event.data); } catch { return; }
+        hostWs.onmessage = (event) => {
+            let msg;
+            try { msg = JSON.parse(event.data); } catch { return; }
 
-                    switch (msg.type) {
-                        case 'room_created':
-                            hostRoomId = msg.roomId;
-                            hostSessionId = msg.sessionId;
-                            quizState.roomId = msg.roomId.substring(0, 2) + ' ' + msg.roomId.substring(2, 4);
-                            hostSetup.classList.add('hidden');
-                            qrContainer.classList.remove('hidden');
-                            roomIdElement.textContent = quizState.roomId;
-                            const currentJoinUrl = updateJoinLink(hostRoomId);
-                            generateQRCode(currentJoinUrl);
-                            if (hostViewHeading) hostViewHeading.classList.remove('hidden');
-                            break;
+            switch (msg.type) {
+                case 'room_created':
+                    hostRoomId = msg.roomId;
+                    hostSessionId = msg.sessionId;
+                    quizState.roomId = msg.roomId.substring(0, 2) + ' ' + msg.roomId.substring(2, 4);
+                    hostSetup.classList.add('hidden');
+                    qrContainer.classList.remove('hidden');
+                    roomIdElement.textContent = quizState.roomId;
+                    const currentJoinUrl = updateJoinLink(hostRoomId);
+                    generateQRCode(currentJoinUrl);
+                    if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+                    break;
 
-                        case 'host_reconnected':
-                            console.log('Host reconnected, restoring player state');
-                            if (msg.players) {
-                                msg.players.forEach(p => {
-                                    if (quizState.players[p.sessionId]) {
-                                        quizState.players[p.sessionId].isConnected = p.isConnected;
-                                        quizState.players[p.sessionId].score = p.score;
-                                    } else {
-                                        quizState.players[p.sessionId] = {
-                                            id: p.sessionId,
-                                            name: p.name,
-                                            score: p.score,
-                                            currentAnswer: [],
-                                            answerTime: null,
-                                            isConnected: p.isConnected
-                                        };
-                                    }
-                                });
-                            }
-                            refreshPlayerDisplay();
-                            break;
-
-                        case 'player_joined':
-                            console.log('New player joined:', msg.name);
-                            quizState.players[msg.sessionId] = {
-                                id: msg.sessionId,
-                                name: msg.name,
-                                score: 0,
-                                currentAnswer: [],
-                                answerTime: null,
-                                isConnected: true
-                            };
-                            refreshPlayerDisplay();
-                            break;
-
-                        case 'player_left':
-                            if (quizState.players[msg.sessionId]) {
-                                quizState.players[msg.sessionId].isConnected = false;
-                                refreshPlayerDisplay();
-                                if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
-                                    endQuestion();
-                                }
-                            }
-                            break;
-
-                        case 'player_reconnected':
-                            if (quizState.players[msg.sessionId]) {
-                                quizState.players[msg.sessionId].isConnected = true;
-                                quizState.players[msg.sessionId].score = msg.score;
+                case 'host_reconnected':
+                    console.log('Host reconnected, restoring player state');
+                    if (msg.players) {
+                        msg.players.forEach(p => {
+                            if (quizState.players[p.sessionId]) {
+                                quizState.players[p.sessionId].isConnected = p.isConnected;
+                                quizState.players[p.sessionId].score = p.score;
                             } else {
-                                quizState.players[msg.sessionId] = {
-                                    id: msg.sessionId,
-                                    name: msg.name,
-                                    score: msg.score,
+                                quizState.players[p.sessionId] = {
+                                    id: p.sessionId,
+                                    name: p.name,
+                                    score: p.score,
                                     currentAnswer: [],
                                     answerTime: null,
-                                    isConnected: true
+                                    isConnected: p.isConnected
                                 };
-                            }
-                            refreshPlayerDisplay();
-                            break;
-
-                        case 'player_answered':
-                            handlePlayerAnswer(msg);
-                            break;
-
-                        case 'error':
-                            showMessage(msg.message, 'error');
-                            break;
-                    }
-                };
-
-                hostWs.onclose = () => {
-                    console.log('Host WebSocket closed');
-                    if (hostRoomId && hostWsReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
-                        hostWsReconnectAttempts++;
-                        console.log(`Host reconnecting (${hostWsReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
-                        setTimeout(reconnectHostWs, RECONNECT_DELAY_MS);
-                    } else if (hostWsReconnectAttempts >= HOST_MAX_RECONNECT_ATTEMPTS) {
-                        showMessage('Verbindung zum Server verloren. Bitte lade die Seite neu.', 'error');
-                    }
-                };
-
-                hostWs.onerror = (err) => {
-                    console.error('Host WebSocket error:', err);
-                };
-            }
-
-            /**
-             * Reconnects the host WebSocket after a disconnect.
-             */
-            function reconnectHostWs() {
-                const ws = new WebSocket(WS_URL);
-
-                ws.onopen = () => {
-                    console.log('Host WebSocket reconnected');
-                    hostWsReconnectAttempts = 0;
-                    ws.send(JSON.stringify({ type: 'reconnect_host', roomId: hostRoomId, sessionId: hostSessionId }));
-                };
-
-                // Copy the same handlers from the main hostWs
-                ws.onmessage = hostWs ? hostWs.onmessage : null;
-                ws.onclose = hostWs ? hostWs.onclose : null;
-                ws.onerror = hostWs ? hostWs.onerror : null;
-
-                hostWs = ws;
-            }
-
-            /**
-             * Handles a player answer received via WebSocket.
-             * @param {Object} msg - The answer message from the server.
-             */
-            function handlePlayerAnswer(msg) {
-                const playerId = msg.sessionId;
-                if (!quizState.players[playerId] || !quizState.isQuestionActive) return;
-
-                const p = quizState.players[playerId];
-                // Only count if player hasn't answered this question yet
-                if (p.currentAnswer && p.currentAnswer.length > 0) return;
-
-                quizState.answersReceived++;
-                const answerReceiveTime = msg.answerTime ? new Date(msg.answerTime).getTime() : Date.now();
-                const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000;
-                p.answerTime = timeTaken;
-                p.currentAnswer = msg.answerData;
-                answersCount.textContent = quizState.answersReceived.toString();
-
-                if (quizState.answersReceived >= getNonHostPlayerCount()) {
-                    endQuestion();
-                }
-            }
-
-            /**
-             * Refreshes the displayed list of players from local state (no DB query needed).
-             */
-            function refreshPlayerDisplay() {
-                const allPlayers = getNonHostPlayers();
-                const connectedCount = getConnectedNonHostPlayers().length;
-
-                playerCountElement.textContent = connectedCount.toString();
-                totalPlayers.textContent = connectedCount.toString();
-
-                playersList.innerHTML = '';
-                allPlayers.forEach(p => {
-                    const i = document.createElement('div');
-                    i.className = 'player-item';
-                    if (p.isConnected === false) i.classList.add('disconnected');
-                    i.textContent = p.name + (p.isConnected === false ? ' (getrennt)' : '');
-                    playersList.appendChild(i);
-                });
-
-                startQuestionsBtn.classList.toggle('hidden', connectedCount === 0);
-            }
-
-            /**
-             * Generates and displays a QR code for the given URL.
-             * @param {string} url - The URL to encode in the QR code.
-             */
-            function generateQRCode(url) {
-                qrcodeElement.innerHTML = ''; // Clear previous QR code
-                if (typeof QRCode === 'undefined') {
-                    console.error("QR-Code-Bibliothek nicht geladen.");
-                    qrcodeElement.innerHTML = `<p class="qr-error">QR-Code-Bibliothek nicht geladen. URL: ${sanitizeHTML(url)}</p>`;
-                    return;
-                }
-                try {
-                    new QRCode(qrcodeElement, {
-                        text: url, // Encode the full URL
-                        width: 240, // Increased size for initial display
-                        height: 240,
-                        colorDark : "#000000",
-                        colorLight : "#ffffff",
-                        correctLevel : QRCode.CorrectLevel.H // High error correction for complex URLs
-                    });
-                } catch (e) {
-                    console.error("QR Code generation error:", e);
-                    qrcodeElement.innerHTML = `<p class="qr-error">Fehler beim Generieren des QR-Codes. URL: ${sanitizeHTML(url)}</p>`;
-                }
-            }
-
-             /**
-              * Updates the join link to include the host's Peer ID.
-              * @param {string} roomId - The room ID (4-digit alphanumeric code).
-              * @returns {string} The full join URL.
-              */
-            function updateJoinLink(roomId) {
-                // Correctly construct the URL by taking the base path and appending the query parameter
-                const baseUrl = window.location.origin + window.location.pathname.split('?')[0];
-                const joinUrl = `${baseUrl}?host=${roomId}`;
-                joinLinkElement.href = joinUrl;
-                // Display the short URL for easy typing
-                const shortUrl = 'bycs.link/karten';
-                joinLinkElement.textContent = shortUrl;
-
-                joinLinkModalElement.href = joinUrl;
-                joinLinkModalElement.textContent = shortUrl;
-
-                return joinUrl; // Return the URL for QR code generation
-            }
-
-
-            /**
-             * Starts a new question round on the host side.
-             */
-            async function startQuestion() {
-                if (quizState.currentQuestionIndex >= quizState.shuffledQuestions.length) {
-                    showFinalResults();
-                    return;
-                }
-
-                const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
-                quizState.answersReceived = 0;
-                quizState.isQuestionActive = true;
-                hostQuestionStartTime = Date.now();
-
-                // Prepare shuffled options and correct indices for this question
-                const optionObjects = currentQuestion.options.map((text, index) => ({ text, originalIndex: index }));
-                shuffleArray(optionObjects); // Shuffle the options
-                const shuffledOptions = optionObjects.map(obj => obj.text);
-                const shuffledCorrectIndices = currentQuestion.correct.map(originalIdx =>
-                    optionObjects.findIndex(obj => obj.originalIndex === originalIdx)
-                );
-
-                // Store shuffled options and correct indices in the current question object
-                currentQuestion.shuffledOptions = shuffledOptions;
-                currentQuestion.shuffledCorrect = shuffledCorrectIndices;
-
-                // Reset player answers for the new question in local state
-                for (const p of Object.values(quizState.players)) {
-                    p.currentAnswer = [];
-                    p.answerTime = null;
-                }
-
-
-                currentQuestionTextEl.textContent = currentQuestion.question;
-                // Display options on host side WITHOUT correct indicators initially
-                displayHostOptions(shuffledOptions, []); // Use shuffled options for display
-                questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
-                answersCount.textContent = '0';
-                totalPlayers.textContent = getNonHostPlayerCount().toString();
-
-                showNextBtn.classList.add('hidden');
-                showResultsBtn.classList.add('hidden');
-                hostScoreboardEl.classList.add('hidden'); // Hide scoreboard while question is active
-                if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
-
-                const currentDuration = quizState.questionDurations[quizState.currentQuestionIndex];
-                startTimer(currentDuration);
-                await sendQuestionToPlayers(currentQuestion); // Pass the question object which now contains shuffled data
-            }
-
-            /**
-             * Displays the question options on the host side.
-             * @param {string[]} options - An array of option strings (already shuffled if applicable).
-             * @param {number[]} [correctIndices=[]] - An optional array of indices for correct answers (already re-mapped if applicable).
-             * @param {number[]} [optionCounts=[]] - An optional array of counts for each option selected by players.
-             */
-            function displayHostOptions(options, correctIndices = [], optionCounts = []) {
-                 hostCurrentOptionsEl.innerHTML = '';
-                 const correctSet = new Set(correctIndices);
-                 options.forEach((option, index) => {
-                     const li = document.createElement('li');
-                     let optionText = option;
-                     if (optionCounts && optionCounts[index] !== undefined) {
-                         optionText += ` (${optionCounts[index]}x gewählt)`;
-                     }
-                     li.textContent = optionText;
-                     if (correctSet.has(index)) {
-                         li.classList.add('correct');
-                     }
-                     hostCurrentOptionsEl.appendChild(li);
-                 });
-            }
-
-
-            /**
-             * Sends question data to all connected players via WebSocket server.
-             * @param {Object} question - The question object to send (contains shuffled options and correct indices).
-             */
-            async function sendQuestionToPlayers(question) {
-                if (!hostWs || hostWs.readyState !== WebSocket.OPEN) {
-                    showMessage('Keine Verbindung zum Server. Bitte überprüfe deine Verbindung.', 'error');
-                    return;
-                }
-                hostWs.send(JSON.stringify({
-                    type: 'start_question',
-                    question: question.question,
-                    options: question.shuffledOptions,
-                    index: quizState.currentQuestionIndex,
-                    total: quizState.shuffledQuestions.length,
-                    startTime: hostQuestionStartTime,
-                    duration: quizState.questionDurations[quizState.currentQuestionIndex]
-                }));
-                console.log('Question sent via WebSocket');
-            }
-
-            /**
-             * Starts the timer for the current question.
-             * @param {number} durationSeconds - The total duration of the timer in seconds.
-             */
-            function startTimer(durationSeconds) {
-                timerBar.style.width = '100%';
-                if (hostTimerInterval) clearInterval(hostTimerInterval);
-
-                const totalDurationMs = durationSeconds * 1000;
-                const timerStartTime = Date.now();
-
-                hostTimerInterval = setInterval(() => {
-                     const elapsed = Date.now() - timerStartTime;
-                     const remaining = Math.max(0, totalDurationMs - elapsed);
-                     timerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
-
-                    if (remaining <= 0) {
-                        endQuestion();
-                    }
-                }, 100); // Update every 100ms
-            }
-
-            /**
-             * Ends the current question round, calculates scores, and displays results.
-             */
-            async function endQuestion() {
-                if (!quizState.isQuestionActive) return;
-
-                if (hostTimerInterval) {
-                    clearInterval(hostTimerInterval);
-                    hostTimerInterval = null;
-                }
-
-                quizState.isQuestionActive = false;
-
-                // Calculate option counts for display on host side
-                const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
-                const optionCounts = Array(currentQuestion.shuffledOptions.length).fill(0);
-                getNonHostPlayers().forEach(p => {
-                    if (p.currentAnswer && Array.isArray(p.currentAnswer)) {
-                        p.currentAnswer.forEach(ansIndex => {
-                            if (optionCounts[ansIndex] !== undefined) {
-                                optionCounts[ansIndex]++;
                             }
                         });
                     }
-                });
+                    refreshPlayerDisplay();
+                    break;
 
-                // Display correct answers and counts on the host side
-                displayHostOptions(currentQuestion.shuffledOptions, currentQuestion.shuffledCorrect, optionCounts);
+                case 'player_joined':
+                    console.log('New player joined:', msg.name);
+                    quizState.players[msg.sessionId] = {
+                        id: msg.sessionId,
+                        name: msg.name,
+                        score: 0,
+                        currentAnswer: [],
+                        answerTime: null,
+                        isConnected: true
+                    };
+                    refreshPlayerDisplay();
+                    break;
 
+                case 'player_left':
+                    if (quizState.players[msg.sessionId]) {
+                        quizState.players[msg.sessionId].isConnected = false;
+                        refreshPlayerDisplay();
+                        if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
+                            endQuestion();
+                        }
+                    }
+                    break;
 
-                calculateScores();
-                await sendResultsToPlayers();
+                case 'player_reconnected':
+                    if (quizState.players[msg.sessionId]) {
+                        quizState.players[msg.sessionId].isConnected = true;
+                        quizState.players[msg.sessionId].score = msg.score;
+                    } else {
+                        quizState.players[msg.sessionId] = {
+                            id: msg.sessionId,
+                            name: msg.name,
+                            score: msg.score,
+                            currentAnswer: [],
+                            answerTime: null,
+                            isConnected: true
+                        };
+                    }
+                    refreshPlayerDisplay();
+                    break;
 
-                displayCurrentScoreboard(); // Display the scoreboard
+                case 'player_answered':
+                    handlePlayerAnswer(msg);
+                    break;
 
-                if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) {
-                    showNextBtn.classList.remove('hidden');
-                    showResultsBtn.classList.add('hidden');
-                } else {
-                    showNextBtn.classList.add('hidden');
-                    showResultsBtn.classList.remove('hidden');
+                case 'error':
+                    showMessage(msg.message, 'error');
+                    break;
+            }
+        };
+
+        hostWs.onclose = () => {
+            console.log('Host WebSocket closed');
+            if (hostRoomId && hostWsReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
+                hostWsReconnectAttempts++;
+                console.log(`Host reconnecting (${hostWsReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
+                setTimeout(reconnectHostWs, RECONNECT_DELAY_MS);
+            } else if (hostWsReconnectAttempts >= HOST_MAX_RECONNECT_ATTEMPTS) {
+                showMessage('Verbindung zum Server verloren. Bitte lade die Seite neu.', 'error');
+            }
+        };
+
+        hostWs.onerror = (err) => {
+            console.error('Host WebSocket error:', err);
+        };
+    }
+
+    /**
+     * Reconnects the host WebSocket after a disconnect.
+     */
+    function reconnectHostWs() {
+        const ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+            console.log('Host WebSocket reconnected');
+            hostWsReconnectAttempts = 0;
+            ws.send(JSON.stringify({ type: 'reconnect_host', roomId: hostRoomId, sessionId: hostSessionId }));
+        };
+
+        ws.onmessage = (event) => {
+            let msg;
+            try { msg = JSON.parse(event.data); } catch { return; }
+
+            if (msg.type === 'room_not_found_try_restore') {
+                console.log("Room needs restoration. Sending state...");
+                // Server lost the room (e.g., restart), but we have the valid session.
+                // Attempt to restore the room with current players.
+                const playersToRestore = [];
+                if (hostGlobalQuizState && hostGlobalQuizState.players) {
+                    for (const p of Object.values(hostGlobalQuizState.players)) {
+                        playersToRestore.push({
+                            id: p.id,
+                            name: p.name,
+                            score: p.score
+                        });
+                    }
                 }
+
+                ws.send(JSON.stringify({
+                    type: 'restore_room',
+                    roomId: hostRoomId,
+                    sessionId: hostSessionId,
+                    players: playersToRestore
+                }));
+                return; // Wait for host_reconnected
             }
 
-            /**
-             * Calculates scores for the current question based on correctness and time taken.
-             */
-            function calculateScores() {
-                const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
-                const correctSet = new Set(currentQ.shuffledCorrect); // Use shuffled correct indices
-                const totalQuestionTime = quizState.questionDurations[quizState.currentQuestionIndex];
-                const numQuestions = quizState.shuffledQuestions.length;
-                const totalOptions = currentQ.shuffledOptions.length;
-                const totalWrong = totalOptions - correctSet.size;
+            // Delegate to original handler for other messages
+            if (hostWs && hostWs.onmessage) {
+                hostWs.onmessage(event);
+            }
+        };
 
-                const basePointsFirst = 100;
-                const basePointsLast = 300;
-                let currentQuestionBasePoints = basePointsFirst;
+        ws.onclose = hostWs ? hostWs.onclose : null;
+        ws.onerror = hostWs ? hostWs.onerror : null;
 
-                if (numQuestions > 1) {
-                    const pointsIncreasePerQuestion = (basePointsLast - basePointsFirst) / (numQuestions - 1);
-                    currentQuestionBasePoints = basePointsFirst + (quizState.currentQuestionIndex * pointsIncreasePerQuestion);
-                }
+        hostWs = ws;
+    }
 
-                getNonHostPlayers().forEach(p => {
-                    if (p.currentAnswer && p.currentAnswer.length > 0) {
-                        const playerAnsSet = new Set(p.currentAnswer);
+    /**
+     * Handles a player answer received via WebSocket.
+     * @param {Object} msg - The answer message from the server.
+     */
+    function handlePlayerAnswer(msg) {
+        const playerId = msg.sessionId;
+        if (!quizState.players[playerId] || !quizState.isQuestionActive) return;
 
-                        const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
-                        const wrongHits = [...playerAnsSet].filter(item => !correctSet.has(item)).length;
+        const p = quizState.players[playerId];
+        // Only count if player hasn't answered this question yet
+        if (p.currentAnswer && p.currentAnswer.length > 0) return;
 
-                        // Proportional penalty: subtract wrong ratio from correct ratio
-                        const correctRatio = correctHits / correctSet.size;
-                        const wrongPenalty = totalWrong > 0 ? (wrongHits / totalWrong) : 0;
-                        const adjustedRatio = Math.max(0, correctRatio - wrongPenalty);
+        quizState.answersReceived++;
+        const answerReceiveTime = msg.answerTime ? new Date(msg.answerTime).getTime() : Date.now();
+        const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000;
+        p.answerTime = timeTaken;
+        p.currentAnswer = msg.answerData;
+        answersCount.textContent = quizState.answersReceived.toString();
 
-                        if (adjustedRatio > 0) {
-                            const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
-                            const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
-                            const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5);
+        if (quizState.answersReceived >= getNonHostPlayerCount()) {
+            endQuestion();
+        }
+    }
 
-                            p.score += adjustedRatio * (currentQuestionBasePoints + timeBonus);
-                        }
+    /**
+     * Refreshes the displayed list of players from local state (no DB query needed).
+     */
+    function refreshPlayerDisplay() {
+        const allPlayers = getNonHostPlayers();
+        const connectedCount = getConnectedNonHostPlayers().length;
+
+        playerCountElement.textContent = connectedCount.toString();
+        totalPlayers.textContent = connectedCount.toString();
+
+        playersList.innerHTML = '';
+        allPlayers.forEach(p => {
+            const i = document.createElement('div');
+            i.className = 'player-item';
+            if (p.isConnected === false) i.classList.add('disconnected');
+            i.textContent = p.name + (p.isConnected === false ? ' (getrennt)' : '');
+            playersList.appendChild(i);
+        });
+
+        startQuestionsBtn.classList.toggle('hidden', connectedCount === 0);
+    }
+
+    /**
+     * Generates and displays a QR code for the given URL.
+     * @param {string} url - The URL to encode in the QR code.
+     */
+    function generateQRCode(url) {
+        qrcodeElement.innerHTML = ''; // Clear previous QR code
+        if (typeof QRCode === 'undefined') {
+            console.error("QR-Code-Bibliothek nicht geladen.");
+            qrcodeElement.innerHTML = `<p class="qr-error">QR-Code-Bibliothek nicht geladen. URL: ${sanitizeHTML(url)}</p>`;
+            return;
+        }
+        try {
+            new QRCode(qrcodeElement, {
+                text: url, // Encode the full URL
+                width: 240, // Increased size for initial display
+                height: 240,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H // High error correction for complex URLs
+            });
+        } catch (e) {
+            console.error("QR Code generation error:", e);
+            qrcodeElement.innerHTML = `<p class="qr-error">Fehler beim Generieren des QR-Codes. URL: ${sanitizeHTML(url)}</p>`;
+        }
+    }
+
+    /**
+     * Updates the join link to include the host's Peer ID.
+     * @param {string} roomId - The room ID (4-digit alphanumeric code).
+     * @returns {string} The full join URL.
+     */
+    function updateJoinLink(roomId) {
+        // Correctly construct the URL by taking the base path and appending the query parameter
+        const baseUrl = window.location.origin + window.location.pathname.split('?')[0];
+        const joinUrl = `${baseUrl}?host=${roomId}`;
+        joinLinkElement.href = joinUrl;
+        // Display the short URL for easy typing
+        const shortUrl = 'bycs.link/karten';
+        joinLinkElement.textContent = shortUrl;
+
+        joinLinkModalElement.href = joinUrl;
+        joinLinkModalElement.textContent = shortUrl;
+
+        return joinUrl; // Return the URL for QR code generation
+    }
+
+
+    /**
+     * Starts a new question round on the host side.
+     */
+    async function startQuestion() {
+        if (quizState.currentQuestionIndex >= quizState.shuffledQuestions.length) {
+            showFinalResults();
+            return;
+        }
+
+        const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+        quizState.answersReceived = 0;
+        quizState.isQuestionActive = true;
+        hostQuestionStartTime = Date.now();
+
+        // Prepare shuffled options and correct indices for this question
+        const optionObjects = currentQuestion.options.map((text, index) => ({ text, originalIndex: index }));
+        shuffleArray(optionObjects); // Shuffle the options
+        const shuffledOptions = optionObjects.map(obj => obj.text);
+        const shuffledCorrectIndices = currentQuestion.correct.map(originalIdx =>
+            optionObjects.findIndex(obj => obj.originalIndex === originalIdx)
+        );
+
+        // Store shuffled options and correct indices in the current question object
+        currentQuestion.shuffledOptions = shuffledOptions;
+        currentQuestion.shuffledCorrect = shuffledCorrectIndices;
+
+        // Reset player answers for the new question in local state
+        for (const p of Object.values(quizState.players)) {
+            p.currentAnswer = [];
+            p.answerTime = null;
+        }
+
+
+        currentQuestionTextEl.textContent = currentQuestion.question;
+        // Display options on host side WITHOUT correct indicators initially
+        displayHostOptions(shuffledOptions, []); // Use shuffled options for display
+        questionCounterEl.textContent = `Frage ${quizState.currentQuestionIndex + 1} von ${quizState.shuffledQuestions.length}`;
+        answersCount.textContent = '0';
+        totalPlayers.textContent = getNonHostPlayerCount().toString();
+
+        showNextBtn.classList.add('hidden');
+        showResultsBtn.classList.add('hidden');
+        hostScoreboardEl.classList.add('hidden'); // Hide scoreboard while question is active
+        if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
+
+        const currentDuration = quizState.questionDurations[quizState.currentQuestionIndex];
+        startTimer(currentDuration);
+        await sendQuestionToPlayers(currentQuestion); // Pass the question object which now contains shuffled data
+    }
+
+    /**
+     * Displays the question options on the host side.
+     * @param {string[]} options - An array of option strings (already shuffled if applicable).
+     * @param {number[]} [correctIndices=[]] - An optional array of indices for correct answers (already re-mapped if applicable).
+     * @param {number[]} [optionCounts=[]] - An optional array of counts for each option selected by players.
+     */
+    function displayHostOptions(options, correctIndices = [], optionCounts = []) {
+        hostCurrentOptionsEl.innerHTML = '';
+        const correctSet = new Set(correctIndices);
+        options.forEach((option, index) => {
+            const li = document.createElement('li');
+            let optionText = option;
+            if (optionCounts && optionCounts[index] !== undefined) {
+                optionText += ` (${optionCounts[index]}x gewählt)`;
+            }
+            li.textContent = optionText;
+            if (correctSet.has(index)) {
+                li.classList.add('correct');
+            }
+            hostCurrentOptionsEl.appendChild(li);
+        });
+    }
+
+
+    /**
+     * Sends question data to all connected players via WebSocket server.
+     * @param {Object} question - The question object to send (contains shuffled options and correct indices).
+     */
+    async function sendQuestionToPlayers(question) {
+        if (!hostWs || hostWs.readyState !== WebSocket.OPEN) {
+            showMessage('Keine Verbindung zum Server. Bitte überprüfe deine Verbindung.', 'error');
+            return;
+        }
+        hostWs.send(JSON.stringify({
+            type: 'start_question',
+            question: question.question,
+            options: question.shuffledOptions,
+            index: quizState.currentQuestionIndex,
+            total: quizState.shuffledQuestions.length,
+            startTime: hostQuestionStartTime,
+            duration: quizState.questionDurations[quizState.currentQuestionIndex]
+        }));
+        console.log('Question sent via WebSocket');
+    }
+
+    /**
+     * Starts the timer for the current question.
+     * @param {number} durationSeconds - The total duration of the timer in seconds.
+     */
+    function startTimer(durationSeconds) {
+        timerBar.style.width = '100%';
+        if (hostTimerInterval) clearInterval(hostTimerInterval);
+
+        const totalDurationMs = durationSeconds * 1000;
+        const timerStartTime = Date.now();
+
+        hostTimerInterval = setInterval(() => {
+            const elapsed = Date.now() - timerStartTime;
+            const remaining = Math.max(0, totalDurationMs - elapsed);
+            timerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
+
+            if (remaining <= 0) {
+                endQuestion();
+            }
+        }, 100); // Update every 100ms
+    }
+
+    /**
+     * Ends the current question round, calculates scores, and displays results.
+     */
+    async function endQuestion() {
+        if (!quizState.isQuestionActive) return;
+
+        if (hostTimerInterval) {
+            clearInterval(hostTimerInterval);
+            hostTimerInterval = null;
+        }
+
+        quizState.isQuestionActive = false;
+
+        // Calculate option counts for display on host side
+        const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+        const optionCounts = Array(currentQuestion.shuffledOptions.length).fill(0);
+        getNonHostPlayers().forEach(p => {
+            if (p.currentAnswer && Array.isArray(p.currentAnswer)) {
+                p.currentAnswer.forEach(ansIndex => {
+                    if (optionCounts[ansIndex] !== undefined) {
+                        optionCounts[ansIndex]++;
                     }
                 });
             }
+        });
 
-            /**
-             * Sends results of the current question to all players via WebSocket server.
-             */
-            async function sendResultsToPlayers() {
-                if (!hostWs || hostWs.readyState !== WebSocket.OPEN) return;
-
-                const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex];
-                const isFinalQ = quizState.currentQuestionIndex === quizState.shuffledQuestions.length - 1;
-                const leaderboardData = getLeaderboardData();
-
-                // Build playerScores map so server can store scores for reconnection
-                const playerScores = {};
-                getNonHostPlayers().forEach(p => { playerScores[p.id] = p.score; });
-
-                hostWs.send(JSON.stringify({
-                    type: 'send_results',
-                    correct: currentQ.shuffledCorrect,
-                    isFinal: isFinalQ,
-                    options: currentQ.shuffledOptions,
-                    leaderboard: leaderboardData,
-                    playerScores: playerScores
-                }));
-                console.log('Results sent via WebSocket');
-            }
-
-             /**
-              * Displays the current scoreboard (top 10) on the host side.
-              */
-            function displayCurrentScoreboard() {
-                const sortedPlayers = getLeaderboardData(); // This function already filters out the host
-                scoreboardListEl.innerHTML = '';
-                hostScoreboardEl.classList.remove('hidden');
-
-                const topPlayers = sortedPlayers.slice(0, 10);
-
-                if (topPlayers.length === 0) {
-                    scoreboardListEl.innerHTML = '<li>Noch keine Spieler.</li>';
-                    return;
-                }
-
-                topPlayers.forEach((p, idx) => {
-                    const li = document.createElement('li');
-                    li.className = 'scoreboard-item';
-                    if (idx === 0) li.classList.add('rank-1');
-                    else if (idx === 1) li.classList.add('rank-2');
-                    else if (idx === 2) li.classList.add('rank-3');
-                    li.innerHTML = `<span>${idx + 1}. ${sanitizeHTML(p.name)}</span><span>${Math.round(p.score)} Punkte</span>`;
-                    scoreboardListEl.appendChild(li);
-                });
-            }
+        // Display correct answers and counts on the host side
+        displayHostOptions(currentQuestion.shuffledOptions, currentQuestion.shuffledCorrect, optionCounts);
 
 
-            /**
-             * Shows the final results leaderboard on the host side.
-             */
-            function showFinalResults() {
-                hostQuestionDisplay.classList.add('hidden');
-                hostResults.classList.remove('hidden'); // Ensure host results view is shown
-                if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
+        calculateScores();
+        await sendResultsToPlayers();
 
-                displayLeaderboard();
+        displayCurrentScoreboard(); // Display the scoreboard
 
-                // No need to send 'final' broadcast here, it's already sent with the last 'result'
-                // This function just handles the host UI transition
-            }
-
-            /**
-             * Retrieves and sorts player data for the leaderboard.
-             * @returns {Array<Object>} Sorted array of player objects with name and score.
-             */
-            function getLeaderboardData() {
-                return getNonHostPlayers()
-                    .map(p => ({ name: p.name, score: p.score }))
-                    .sort((a, b) => b.score - a.score);
-            }
-
-            /**
-             * Displays the final leaderboard on the host side.
-             */
-            function displayLeaderboard() {
-                const sortedPlayers = getLeaderboardData(); // This function already filters out the host
-                leaderboard.innerHTML = '';
-
-                if (sortedPlayers.length === 0) {
-                    leaderboard.innerHTML = '<p>Noch keine Spieler in der Rangliste.</p>';
-                    return;
-                }
-
-                sortedPlayers.forEach((p, idx) => {
-                    const i = document.createElement('div');
-                    i.className = 'leaderboard-item';
-                    if (idx === 0) i.classList.add('rank-1');
-                    else if (idx === 1) i.classList.add('rank-2');
-                    else if (idx === 2) i.classList.add('rank-3');
-                    i.innerHTML = `<span>${idx + 1}. ${sanitizeHTML(p.name)}</span><span>${Math.round(p.score)} Punkte</span>`;
-                    leaderboard.appendChild(i);
-                });
-            }
-
-            /**
-             * Resets the host's state and UI to the initial setup form.
-             */
-            async function resetHostStateAndUI() {
-                // Close WebSocket connection
-                if (hostWs) {
-                    hostWs.onclose = null; // Prevent reconnect
-                    hostWs.close();
-                    hostWs = null;
-                }
-
-                hostWsReconnectAttempts = 0;
-                hostGlobalQuizState = null;
-                isHostInitialized = false;
-                hostRoomId = null;
-                hostSessionId = null;
-
-                fileStatus.textContent = '';
-                if(jsonFileInput) jsonFileInput.value = '';
-                hostResults.classList.add('hidden');
-                hostQuestionDisplay.classList.add('hidden');
-                qrContainer.classList.add('hidden');
-                hostSetup.classList.remove('hidden');
-                document.getElementById('role-selection').classList.remove('hidden');
-                if (hostViewHeading) hostViewHeading.classList.remove('hidden');
-                initializeHostFeatures();
-            }
+        if (quizState.currentQuestionIndex < quizState.shuffledQuestions.length - 1) {
+            showNextBtn.classList.remove('hidden');
+            showResultsBtn.classList.add('hidden');
+        } else {
+            showNextBtn.classList.add('hidden');
+            showResultsBtn.classList.remove('hidden');
         }
+    }
+
+    /**
+     * Calculates scores for the current question based on correctness and time taken.
+     */
+    function calculateScores() {
+        const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
+        const correctSet = new Set(currentQ.shuffledCorrect); // Use shuffled correct indices
+        const totalQuestionTime = quizState.questionDurations[quizState.currentQuestionIndex];
+        const numQuestions = quizState.shuffledQuestions.length;
+        const totalOptions = currentQ.shuffledOptions.length;
+        const totalWrong = totalOptions - correctSet.size;
+
+        const basePointsFirst = 100;
+        const basePointsLast = 300;
+        let currentQuestionBasePoints = basePointsFirst;
+
+        if (numQuestions > 1) {
+            const pointsIncreasePerQuestion = (basePointsLast - basePointsFirst) / (numQuestions - 1);
+            currentQuestionBasePoints = basePointsFirst + (quizState.currentQuestionIndex * pointsIncreasePerQuestion);
+        }
+
+        getNonHostPlayers().forEach(p => {
+            if (p.currentAnswer && p.currentAnswer.length > 0) {
+                const playerAnsSet = new Set(p.currentAnswer);
+
+                const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
+                const wrongHits = [...playerAnsSet].filter(item => !correctSet.has(item)).length;
+
+                // Proportional penalty: subtract wrong ratio from correct ratio
+                const correctRatio = correctHits / correctSet.size;
+                const wrongPenalty = totalWrong > 0 ? (wrongHits / totalWrong) : 0;
+                const adjustedRatio = Math.max(0, correctRatio - wrongPenalty);
+
+                if (adjustedRatio > 0) {
+                    const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
+                    const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
+                    const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5);
+
+                    p.score += adjustedRatio * (currentQuestionBasePoints + timeBonus);
+                }
+            }
+        });
+    }
+
+    /**
+     * Sends results of the current question to all players via WebSocket server.
+     */
+    async function sendResultsToPlayers() {
+        if (!hostWs || hostWs.readyState !== WebSocket.OPEN) return;
+
+        const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex];
+        const isFinalQ = quizState.currentQuestionIndex === quizState.shuffledQuestions.length - 1;
+        const leaderboardData = getLeaderboardData();
+
+        // Build playerScores map so server can store scores for reconnection
+        const playerScores = {};
+        getNonHostPlayers().forEach(p => { playerScores[p.id] = p.score; });
+
+        hostWs.send(JSON.stringify({
+            type: 'send_results',
+            correct: currentQ.shuffledCorrect,
+            isFinal: isFinalQ,
+            options: currentQ.shuffledOptions,
+            leaderboard: leaderboardData,
+            playerScores: playerScores
+        }));
+        console.log('Results sent via WebSocket');
+    }
+
+    /**
+     * Displays the current scoreboard (top 10) on the host side.
+     */
+    function displayCurrentScoreboard() {
+        const sortedPlayers = getLeaderboardData(); // This function already filters out the host
+        scoreboardListEl.innerHTML = '';
+        hostScoreboardEl.classList.remove('hidden');
+
+        const topPlayers = sortedPlayers.slice(0, 10);
+
+        if (topPlayers.length === 0) {
+            scoreboardListEl.innerHTML = '<li>Noch keine Spieler.</li>';
+            return;
+        }
+
+        topPlayers.forEach((p, idx) => {
+            const li = document.createElement('li');
+            li.className = 'scoreboard-item';
+            if (idx === 0) li.classList.add('rank-1');
+            else if (idx === 1) li.classList.add('rank-2');
+            else if (idx === 2) li.classList.add('rank-3');
+            li.innerHTML = `<span>${idx + 1}. ${sanitizeHTML(p.name)}</span><span>${Math.round(p.score)} Punkte</span>`;
+            scoreboardListEl.appendChild(li);
+        });
+    }
+
+
+    /**
+     * Shows the final results leaderboard on the host side.
+     */
+    function showFinalResults() {
+        hostQuestionDisplay.classList.add('hidden');
+        hostResults.classList.remove('hidden'); // Ensure host results view is shown
+        if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
+
+        displayLeaderboard();
+
+        // No need to send 'final' broadcast here, it's already sent with the last 'result'
+        // This function just handles the host UI transition
+    }
+
+    /**
+     * Retrieves and sorts player data for the leaderboard.
+     * @returns {Array<Object>} Sorted array of player objects with name and score.
+     */
+    function getLeaderboardData() {
+        return getNonHostPlayers()
+            .map(p => ({ name: p.name, score: p.score }))
+            .sort((a, b) => b.score - a.score);
+    }
+
+    /**
+     * Displays the final leaderboard on the host side.
+     */
+    function displayLeaderboard() {
+        const sortedPlayers = getLeaderboardData(); // This function already filters out the host
+        leaderboard.innerHTML = '';
+
+        if (sortedPlayers.length === 0) {
+            leaderboard.innerHTML = '<p>Noch keine Spieler in der Rangliste.</p>';
+            return;
+        }
+
+        sortedPlayers.forEach((p, idx) => {
+            const i = document.createElement('div');
+            i.className = 'leaderboard-item';
+            if (idx === 0) i.classList.add('rank-1');
+            else if (idx === 1) i.classList.add('rank-2');
+            else if (idx === 2) i.classList.add('rank-3');
+            i.innerHTML = `<span>${idx + 1}. ${sanitizeHTML(p.name)}</span><span>${Math.round(p.score)} Punkte</span>`;
+            leaderboard.appendChild(i);
+        });
+    }
+
+    /**
+     * Resets the host's state and UI to the initial setup form.
+     */
+    async function resetHostStateAndUI() {
+        // Close WebSocket connection
+        if (hostWs) {
+            hostWs.onclose = null; // Prevent reconnect
+            hostWs.close();
+            hostWs = null;
+        }
+
+        hostWsReconnectAttempts = 0;
+        hostGlobalQuizState = null;
+        isHostInitialized = false;
+        hostRoomId = null;
+        hostSessionId = null;
+
+        fileStatus.textContent = '';
+        if (jsonFileInput) jsonFileInput.value = '';
+        hostResults.classList.add('hidden');
+        hostQuestionDisplay.classList.add('hidden');
+        qrContainer.classList.add('hidden');
+        hostSetup.classList.remove('hidden');
+        document.getElementById('role-selection').classList.remove('hidden');
+        if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+        initializeHostFeatures();
+    }
+}
 
 // --- Player State & Initialization Flag ---
 let playerWs = null;
@@ -1238,417 +1270,417 @@ function triggerConfetti() {
  * Initializes all features and event listeners for the player role.
  */
 function initializePlayerFeatures() {
-            console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
+    console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
 
-            // Cache DOM elements for performance
-            const roomCodeInput = document.getElementById('room-code-input');
-            const playerNameInput = document.getElementById('player-name-input');
-            const joinBtn = document.getElementById('join-btn');
-            const joinForm = document.getElementById('join-form');
-            const waitingRoom = document.getElementById('waiting-room');
-            const waitingMessage = document.getElementById('waiting-message');
-            const playerQuestionView = document.getElementById('player-question');
-            const playerQuestionTextEl = document.getElementById('player-question-text');
-            const playerQuestionCounterEl = document.getElementById('player-question-counter');
-            const playerTimerBar = document.getElementById('player-timer-bar');
-            const optionsContainer = document.getElementById('options-container');
-            const submitAnswerBtn = document.getElementById('submit-answer-btn');
-            const playerResultView = document.getElementById('player-result');
-            const resultDisplay = document.getElementById('result-display');
-            const playerScoreEl = document.getElementById('player-score');
-            const waitingForNext = document.getElementById('waiting-for-next');
-            const playerFinalResultView = document.getElementById('player-final-result');
-            const finalScoreEl = document.getElementById('final-score');
-            const playAgainBtn = document.getElementById('play-again-btn');
-            const playerLeaderboardContainer = document.getElementById('player-leaderboard-container');
+    // Cache DOM elements for performance
+    const roomCodeInput = document.getElementById('room-code-input');
+    const playerNameInput = document.getElementById('player-name-input');
+    const joinBtn = document.getElementById('join-btn');
+    const joinForm = document.getElementById('join-form');
+    const waitingRoom = document.getElementById('waiting-room');
+    const waitingMessage = document.getElementById('waiting-message');
+    const playerQuestionView = document.getElementById('player-question');
+    const playerQuestionTextEl = document.getElementById('player-question-text');
+    const playerQuestionCounterEl = document.getElementById('player-question-counter');
+    const playerTimerBar = document.getElementById('player-timer-bar');
+    const optionsContainer = document.getElementById('options-container');
+    const submitAnswerBtn = document.getElementById('submit-answer-btn');
+    const playerResultView = document.getElementById('player-result');
+    const resultDisplay = document.getElementById('result-display');
+    const playerScoreEl = document.getElementById('player-score');
+    const waitingForNext = document.getElementById('waiting-for-next');
+    const playerFinalResultView = document.getElementById('player-final-result');
+    const finalScoreEl = document.getElementById('final-score');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    const playerLeaderboardContainer = document.getElementById('player-leaderboard-container');
 
-            if (!isPlayerInitialized) {
-                console.log("Setting up player event listeners for the first time.");
+    if (!isPlayerInitialized) {
+        console.log("Setting up player event listeners for the first time.");
 
-                joinBtn.addEventListener('click', async () => {
-                    const roomCode = roomCodeInput.value.trim().replace(/\s/g, ''); // Remove spaces
-                    const playerName = playerNameInput.value.trim();
-                    // Use a default name if player doesn't provide one
-                    const finalPlayerName = playerName || 'Spieler ' + generateAlphanumericId(4);
+        joinBtn.addEventListener('click', async () => {
+            const roomCode = roomCodeInput.value.trim().replace(/\s/g, ''); // Remove spaces
+            const playerName = playerNameInput.value.trim();
+            // Use a default name if player doesn't provide one
+            const finalPlayerName = playerName || 'Spieler ' + generateAlphanumericId(4);
 
-                    if (!roomCode) {
-                        showMessage('Bitte gib einen Raum-Code ein.', 'error');
-                        return;
-                    }
-                    initPlayerConnection(roomCode, finalPlayerName);
-                });
+            if (!roomCode) {
+                showMessage('Bitte gib einen Raum-Code ein.', 'error');
+                return;
+            }
+            initPlayerConnection(roomCode, finalPlayerName);
+        });
 
-                submitAnswerBtn.addEventListener('click', async () => {
-                    if (selectedAnswers.length === 0) {
-                        showMessage('Bitte wähle mindestens eine Antwort aus.', 'info');
-                        return;
-                    }
+        submitAnswerBtn.addEventListener('click', async () => {
+            if (selectedAnswers.length === 0) {
+                showMessage('Bitte wähle mindestens eine Antwort aus.', 'info');
+                return;
+            }
 
+            submitAnswerBtn.disabled = true;
+            optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
+            console.log("Player submitted answer:", selectedAnswers);
+
+            if (playerTimerInterval) {
+                clearInterval(playerTimerInterval);
+                playerTimerInterval = null;
+            }
+
+            // Send answer via WebSocket
+            if (playerWs && playerWs.readyState === WebSocket.OPEN) {
+                playerWs.send(JSON.stringify({
+                    type: 'submit_answer',
+                    answerData: selectedAnswers,
+                    answerTime: new Date().toISOString()
+                }));
+                console.log('Player answer sent via WebSocket.');
+            }
+        });
+
+        playAgainBtn.addEventListener('click', () => {
+            resetPlayerStateAndUI();
+            isPlayerInitialized = false;
+            showView('role-selection');
+        });
+
+        // Clean up on window unload using fetch+keepalive for reliable delivery
+        if (playerBeforeUnloadHandler) {
+            window.removeEventListener('beforeunload', playerBeforeUnloadHandler);
+        }
+        playerBeforeUnloadHandler = () => {
+            if (playerWs) playerWs.close();
+        };
+        window.addEventListener('beforeunload', playerBeforeUnloadHandler);
+
+        isPlayerInitialized = true;
+    }
+
+    roomCodeInput.value = '';
+    playerNameInput.value = '';
+    joinForm.classList.remove('hidden');
+    waitingRoom.classList.add('hidden');
+    playerQuestionView.classList.add('hidden');
+    playerResultView.classList.add('hidden');
+    playerFinalResultView.classList.add('hidden');
+
+
+    /**
+     * Initializes WebSocket connection for the player and joins a room.
+     * @param {string} roomCode - The room code to join.
+     * @param {string} pName - The player's name.
+     */
+    function initPlayerConnection(roomCode, pName) {
+        playerRoomId = roomCode;
+        let playerWsReconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 30;
+
+        joinForm.classList.add('hidden');
+        waitingRoom.classList.remove('hidden');
+        waitingMessage.textContent = `Verbinde mit Raum ${playerRoomId}...`;
+
+        // Check for existing session (reconnection)
+        const existingSession = getPlayerSession(playerRoomId);
+        const existingSessionId = existingSession ? existingSession.playerId : null;
+
+        function connectPlayerWs() {
+            playerWs = new WebSocket(WS_URL);
+
+            playerWs.onopen = () => {
+                console.log('Player WebSocket connected');
+                playerWsReconnectAttempts = 0;
+                playerWs.send(JSON.stringify({
+                    type: 'join',
+                    roomCode: roomCode,
+                    playerName: pName,
+                    sessionId: existingSessionId || playerCurrentId
+                }));
+            };
+
+            playerWs.onmessage = (event) => {
+                let msg;
+                try { msg = JSON.parse(event.data); } catch { return; }
+
+                switch (msg.type) {
+                    case 'joined':
+                        playerCurrentId = msg.sessionId;
+                        playerScore = msg.score || 0;
+                        savePlayerSession(roomCode, msg.sessionId, msg.playerName || pName);
+                        waitingMessage.textContent = msg.isReconnect
+                            ? 'Wieder verbunden! Warte auf Host...'
+                            : 'Verbunden! Warte auf Host...';
+                        break;
+
+                    case 'question':
+                        playerCurrentQuestionOptions = msg.options;
+                        selectedAnswers = [];
+                        playerQuestionStartTime = msg.startTime || Date.now();
+                        displayQuestion(msg);
+                        const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
+                        const remainingDuration = Math.max(1, msg.duration - elapsedSinceStart);
+                        startPlayerTimer(remainingDuration);
+                        break;
+
+                    case 'result':
+                        playerScore = msg.playerScore || playerScore;
+                        displayResult(msg, selectedAnswers, playerScore);
+                        waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
+                        if (msg.isFinal) displayFinalResult(msg);
+                        break;
+
+                    case 'quiz_terminated':
+                        showMessage("Der Host hat das Quiz beendet.", 'info');
+                        resetPlayerStateAndUI();
+                        showView('role-selection');
+                        break;
+
+                    case 'error':
+                        showMessage(msg.message, 'error');
+                        resetPlayerStateAndUI();
+                        break;
+                }
+            };
+
+            playerWs.onclose = () => {
+                console.log('Player WebSocket closed');
+                if (playerRoomId && playerCurrentId && playerWsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    playerWsReconnectAttempts++;
+                    waitingMessage.textContent = `Verbindung unterbrochen. Reconnect ${playerWsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`;
+                    setTimeout(connectPlayerWs, RECONNECT_DELAY_MS);
+                } else if (playerWsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                    showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
+                    resetPlayerStateAndUI();
+                }
+            };
+
+            playerWs.onerror = (err) => {
+                console.error('Player WebSocket error:', err);
+            };
+        }
+
+        connectPlayerWs();
+    }
+
+    // handleHostData removed — all message handling is now in playerWs.onmessage
+
+    /**
+     * Starts the player's timer for the current question.
+     * @param {number} durationSeconds - The total duration of the timer in seconds.
+     */
+    function startPlayerTimer(durationSeconds) {
+        playerTimerBar.style.width = '100%';
+        if (playerTimerInterval) clearInterval(playerTimerInterval);
+
+        const totalDurationMs = durationSeconds * 1000;
+        const timerStartTime = Date.now();
+
+        playerTimerInterval = setInterval(() => {
+            const elapsed = Date.now() - timerStartTime;
+            const remaining = Math.max(0, totalDurationMs - elapsed);
+            playerTimerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
+
+            if (remaining <= 0) {
+                clearInterval(playerTimerInterval);
+                playerTimerInterval = null;
+                submitAnswerBtn.classList.add('hidden');
+                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
+                console.log("Player timer up.");
+                // Auto-submit current selections if player hasn't already submitted
+                if (!submitAnswerBtn.disabled) {
                     submitAnswerBtn.disabled = true;
-                    optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
-                    console.log("Player submitted answer:", selectedAnswers);
-
-                    if (playerTimerInterval) {
-                        clearInterval(playerTimerInterval);
-                        playerTimerInterval = null;
-                    }
-
-                    // Send answer via WebSocket
                     if (playerWs && playerWs.readyState === WebSocket.OPEN) {
                         playerWs.send(JSON.stringify({
                             type: 'submit_answer',
                             answerData: selectedAnswers,
                             answerTime: new Date().toISOString()
                         }));
-                        console.log('Player answer sent via WebSocket.');
+                        console.log("Auto-submitted player answer on timeout:", selectedAnswers);
                     }
-                });
-
-                playAgainBtn.addEventListener('click', () => {
-                    resetPlayerStateAndUI();
-                    isPlayerInitialized = false;
-                    showView('role-selection');
-                });
-
-                // Clean up on window unload using fetch+keepalive for reliable delivery
-                if (playerBeforeUnloadHandler) {
-                    window.removeEventListener('beforeunload', playerBeforeUnloadHandler);
                 }
-                playerBeforeUnloadHandler = () => {
-                    if (playerWs) playerWs.close();
-                };
-                window.addEventListener('beforeunload', playerBeforeUnloadHandler);
-
-                isPlayerInitialized = true;
             }
+        }, 100); // Update every 100ms
+    }
 
-            roomCodeInput.value = '';
-            playerNameInput.value = '';
-            joinForm.classList.remove('hidden');
-            waitingRoom.classList.add('hidden');
-            playerQuestionView.classList.add('hidden');
-            playerResultView.classList.add('hidden');
-            playerFinalResultView.classList.add('hidden');
+    /**
+     * Displays the question and options for the player.
+     * @param {Object} qData - The question data received from the host.
+     */
+    function displayQuestion(qData) {
+        waitingRoom.classList.add('hidden');
+        playerResultView.classList.add('hidden');
+        playerQuestionView.classList.remove('hidden');
 
+        playerQuestionTextEl.textContent = qData.question;
+        playerQuestionCounterEl.textContent = `Frage ${qData.index + 1} von ${qData.total}`;
 
-            /**
-             * Initializes WebSocket connection for the player and joins a room.
-             * @param {string} roomCode - The room code to join.
-             * @param {string} pName - The player's name.
-             */
-            function initPlayerConnection(roomCode, pName) {
-                playerRoomId = roomCode;
-                let playerWsReconnectAttempts = 0;
-                const MAX_RECONNECT_ATTEMPTS = 30;
+        optionsContainer.innerHTML = '';
+        selectedAnswers = []; // Ensure selectedAnswers is reset for a new question
 
-                joinForm.classList.add('hidden');
-                waitingRoom.classList.remove('hidden');
-                waitingMessage.textContent = `Verbinde mit Raum ${playerRoomId}...`;
+        // qData.options are already shuffled from the host
+        qData.options.forEach((option, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.textContent = option;
+            btn.dataset.index = index;
 
-                // Check for existing session (reconnection)
-                const existingSession = getPlayerSession(playerRoomId);
-                const existingSessionId = existingSession ? existingSession.playerId : null;
+            btn.addEventListener('click', () => {
+                const optIdx = parseInt(btn.dataset.index);
+                const pos = selectedAnswers.indexOf(optIdx);
 
-                function connectPlayerWs() {
-                    playerWs = new WebSocket(WS_URL);
-
-                    playerWs.onopen = () => {
-                        console.log('Player WebSocket connected');
-                        playerWsReconnectAttempts = 0;
-                        playerWs.send(JSON.stringify({
-                            type: 'join',
-                            roomCode: roomCode,
-                            playerName: pName,
-                            sessionId: existingSessionId || playerCurrentId
-                        }));
-                    };
-
-                    playerWs.onmessage = (event) => {
-                        let msg;
-                        try { msg = JSON.parse(event.data); } catch { return; }
-
-                        switch (msg.type) {
-                            case 'joined':
-                                playerCurrentId = msg.sessionId;
-                                playerScore = msg.score || 0;
-                                savePlayerSession(roomCode, msg.sessionId, msg.playerName || pName);
-                                waitingMessage.textContent = msg.isReconnect
-                                    ? 'Wieder verbunden! Warte auf Host...'
-                                    : 'Verbunden! Warte auf Host...';
-                                break;
-
-                            case 'question':
-                                playerCurrentQuestionOptions = msg.options;
-                                selectedAnswers = [];
-                                playerQuestionStartTime = msg.startTime || Date.now();
-                                displayQuestion(msg);
-                                const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
-                                const remainingDuration = Math.max(1, msg.duration - elapsedSinceStart);
-                                startPlayerTimer(remainingDuration);
-                                break;
-
-                            case 'result':
-                                playerScore = msg.playerScore || playerScore;
-                                displayResult(msg, selectedAnswers, playerScore);
-                                waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
-                                if (msg.isFinal) displayFinalResult(msg);
-                                break;
-
-                            case 'quiz_terminated':
-                                showMessage("Der Host hat das Quiz beendet.", 'info');
-                                resetPlayerStateAndUI();
-                                showView('role-selection');
-                                break;
-
-                            case 'error':
-                                showMessage(msg.message, 'error');
-                                resetPlayerStateAndUI();
-                                break;
-                        }
-                    };
-
-                    playerWs.onclose = () => {
-                        console.log('Player WebSocket closed');
-                        if (playerRoomId && playerCurrentId && playerWsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                            playerWsReconnectAttempts++;
-                            waitingMessage.textContent = `Verbindung unterbrochen. Reconnect ${playerWsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`;
-                            setTimeout(connectPlayerWs, RECONNECT_DELAY_MS);
-                        } else if (playerWsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                            showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
-                            resetPlayerStateAndUI();
-                        }
-                    };
-
-                    playerWs.onerror = (err) => {
-                        console.error('Player WebSocket error:', err);
-                    };
-                }
-
-                connectPlayerWs();
-            }
-
-            // handleHostData removed — all message handling is now in playerWs.onmessage
-
-            /**
-             * Starts the player's timer for the current question.
-             * @param {number} durationSeconds - The total duration of the timer in seconds.
-             */
-            function startPlayerTimer(durationSeconds) {
-                playerTimerBar.style.width = '100%';
-                if (playerTimerInterval) clearInterval(playerTimerInterval);
-
-                const totalDurationMs = durationSeconds * 1000;
-                const timerStartTime = Date.now();
-
-                playerTimerInterval = setInterval(() => {
-                    const elapsed = Date.now() - timerStartTime;
-                    const remaining = Math.max(0, totalDurationMs - elapsed);
-                    playerTimerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
-
-                    if (remaining <= 0) {
-                        clearInterval(playerTimerInterval);
-                        playerTimerInterval = null;
-                        submitAnswerBtn.classList.add('hidden');
-                        optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
-                        console.log("Player timer up.");
-                         // Auto-submit current selections if player hasn't already submitted
-                         if (!submitAnswerBtn.disabled) {
-                             submitAnswerBtn.disabled = true;
-                             if (playerWs && playerWs.readyState === WebSocket.OPEN) {
-                                 playerWs.send(JSON.stringify({
-                                     type: 'submit_answer',
-                                     answerData: selectedAnswers,
-                                     answerTime: new Date().toISOString()
-                                 }));
-                                 console.log("Auto-submitted player answer on timeout:", selectedAnswers);
-                             }
-                         }
-                    }
-                }, 100); // Update every 100ms
-            }
-
-            /**
-             * Displays the question and options for the player.
-             * @param {Object} qData - The question data received from the host.
-             */
-            function displayQuestion(qData) {
-                waitingRoom.classList.add('hidden');
-                playerResultView.classList.add('hidden');
-                playerQuestionView.classList.remove('hidden');
-
-                playerQuestionTextEl.textContent = qData.question;
-                playerQuestionCounterEl.textContent = `Frage ${qData.index + 1} von ${qData.total}`;
-
-                optionsContainer.innerHTML = '';
-                selectedAnswers = []; // Ensure selectedAnswers is reset for a new question
-
-                // qData.options are already shuffled from the host
-                qData.options.forEach((option, index) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'option-btn';
-                    btn.textContent = option;
-                    btn.dataset.index = index;
-
-                    btn.addEventListener('click', () => {
-                        const optIdx = parseInt(btn.dataset.index);
-                        const pos = selectedAnswers.indexOf(optIdx);
-
-                        if (pos > -1) {
-                            selectedAnswers.splice(pos, 1);
-                            btn.classList.remove('selected');
-                        } else {
-                            selectedAnswers.push(optIdx);
-                            btn.classList.add('selected');
-                        }
-
-                        submitAnswerBtn.classList.toggle('hidden', selectedAnswers.length === 0);
-                    });
-
-                    optionsContainer.appendChild(btn);
-                });
-
-                submitAnswerBtn.classList.add('hidden');
-                submitAnswerBtn.disabled = false;
-                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
-                    btn.disabled = false;
-                    btn.classList.remove('correct-answer', 'incorrect-answer', 'selected'); // Clean up previous result styles
-                });
-            }
-
-            /**
-             * Displays the result of the just-answered question for the player.
-             * @param {Object} rData - The result data received from the host.
-             * @param {Array<number>} playerAnswer - The player's actual answer for this question (fetched from DB or local).
-             * @param {number} currentScore - The player's current score (fetched from DB).
-             */
-            function displayResult(rData, playerAnswer, currentScore) {
-                playerQuestionView.classList.add('hidden');
-                playerResultView.classList.remove('hidden');
-
-                let resultHtml = 'Deine Antwort war ';
-                // Use the actual playerAnswer passed to the function
-                const playerAnsSet = new Set(playerAnswer || []); 
-                const correctSet = new Set(rData.correct);
-                const options = rData.options; // These are the shuffled options from the host
-
-                const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
-                const isCompletelyCorrect = correctHits === correctSet.size &&
-                                           playerAnsSet.size === correctSet.size;
-
-                if (!playerAnswer || playerAnswer.length === 0) {
-                    resultHtml = "Du hast nicht geantwortet. ";
-                } else if (isCompletelyCorrect) {
-                    resultHtml += '<strong class="correct">RICHTIG!</strong> ';
-                    triggerConfetti();
-                } else if (correctHits > 0) {
-                    resultHtml += `<strong class="correct">TEILWEISE RICHTIG (${correctHits}/${correctSet.size})</strong> `;
+                if (pos > -1) {
+                    selectedAnswers.splice(pos, 1);
+                    btn.classList.remove('selected');
                 } else {
-                    resultHtml += '<strong class="incorrect">FALSCH.</strong> ';
+                    selectedAnswers.push(optIdx);
+                    btn.classList.add('selected');
                 }
 
-                resultHtml += '<br>Richtige Antwort(en): ';
+                submitAnswerBtn.classList.toggle('hidden', selectedAnswers.length === 0);
+            });
 
-                options.forEach((option, index) => {
-                    // Always show correct answers
-                    if (correctSet.has(index)) {
-                         if (playerAnsSet.has(index)) {
-                             resultHtml += `<span class="correct player-selected">"${sanitizeHTML(option)}"</span> `; // Correct and selected by player
-                         } else {
-                             resultHtml += `<span class="correct-not-selected">"${sanitizeHTML(option)}"</span> `; // Correct but not selected by player
-                         }
-                    } else if (playerAnsSet.has(index)) {
-                         // Per instruction: "Do not show the falsely selected answers of the player anymore."
-                         // This means we don't add special classes or text for them.
-                         // The original text for the option will still be there, but no specific highlight.
-                    }
-                });
+            optionsContainer.appendChild(btn);
+        });
 
+        submitAnswerBtn.classList.add('hidden');
+        submitAnswerBtn.disabled = false;
+        optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('correct-answer', 'incorrect-answer', 'selected'); // Clean up previous result styles
+        });
+    }
 
-                resultDisplay.innerHTML = resultHtml;
-                playerScoreEl.textContent = Math.round(currentScore); // Use currentScore passed to the function
+    /**
+     * Displays the result of the just-answered question for the player.
+     * @param {Object} rData - The result data received from the host.
+     * @param {Array<number>} playerAnswer - The player's actual answer for this question (fetched from DB or local).
+     * @param {number} currentScore - The player's current score (fetched from DB).
+     */
+    function displayResult(rData, playerAnswer, currentScore) {
+        playerQuestionView.classList.add('hidden');
+        playerResultView.classList.remove('hidden');
 
-                // Update player option buttons to show correct/incorrect after result
-                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
-                    const index = parseInt(btn.dataset.index);
-                    btn.disabled = true; // Ensure buttons are disabled
-                    btn.classList.remove('selected'); // Remove selected class from active state
+        let resultHtml = 'Deine Antwort war ';
+        // Use the actual playerAnswer passed to the function
+        const playerAnsSet = new Set(playerAnswer || []);
+        const correctSet = new Set(rData.correct);
+        const options = rData.options; // These are the shuffled options from the host
 
-                    if (correctSet.has(index)) {
-                        btn.classList.add('correct-answer'); // Highlight correct answer
-                    }
-                    // If the player selected a correct answer, re-apply 'selected' to show they chose it.
-                    if (playerAnsSet.has(index) && correctSet.has(index)) {
-                         btn.classList.add('selected'); // Re-apply selected style if it was correct and selected
-                    }
-                });
-            }
+        const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
+        const isCompletelyCorrect = correctHits === correctSet.size &&
+            playerAnsSet.size === correctSet.size;
 
-            /**
-             * Displays the final results and leaderboard for the player.
-             * @param {Object} frData - The final results data received from the host.
-             */
-            function displayFinalResult(frData) {
-                console.log("Displaying final results for player:", frData); // Debug log
-                playerQuestionView.classList.add('hidden');
-                playerResultView.classList.add('hidden');
-                waitingRoom.classList.add('hidden');
-                playerFinalResultView.classList.remove('hidden'); // Ensure this view is shown
-
-                finalScoreEl.textContent = Math.round(playerScore); // Use the global playerScore for final display
-
-                playerLeaderboardContainer.innerHTML = '';
-
-                if (frData.leaderboard) {
-                    const lbDiv = document.createElement('div');
-                    lbDiv.innerHTML = '<h4>Endgültige Rangliste:</h4>';
-                    const ol = document.createElement('ol');
-                    if (frData.leaderboard.length === 0) {
-                        ol.innerHTML = '<li>Keine Spieler in der Rangliste.</li>';
-                    } else {
-                        frData.leaderboard.forEach((p, idx) => { // Added idx for rank highlighting
-                            const li = document.createElement('li');
-                            if (idx === 0) li.classList.add('rank-1');
-                            else if (idx === 1) li.classList.add('rank-2');
-                            else if (idx === 2) li.classList.add('rank-3');
-                            li.textContent = `${idx + 1}. ${p.name}: ${Math.round(p.score)} Punkte`;
-                            ol.appendChild(li);
-                        });
-                    }
-                    lbDiv.appendChild(ol);
-                    playerLeaderboardContainer.appendChild(lbDiv);
-                } else {
-                    playerLeaderboardContainer.innerHTML = '<p>Keine Ranglistendaten verfügbar.</p>'; // Fallback
-                }
-            }
-
-            /**
-             * Resets the player's state and UI to the initial join form.
-             */
-            function resetPlayerStateAndUI() {
-                if (playerWs) {
-                    playerWs.onclose = null; // Prevent reconnect
-                    playerWs.close();
-                    playerWs = null;
-                }
-
-                playerScore = 0;
-                selectedAnswers = [];
-                playerCurrentQuestionOptions = [];
-                playerQuestionStartTime = null;
-                playerRoomId = null;
-                playerCurrentId = null;
-
-                roomCodeInput.value = '';
-                playerNameInput.value = '';
-                joinForm.classList.remove('hidden');
-                waitingRoom.classList.add('hidden');
-                playerQuestionView.classList.add('hidden');
-                playerResultView.classList.add('hidden');
-                playerFinalResultView.classList.add('hidden');
-                optionsContainer.innerHTML = '';
-                resultDisplay.innerHTML = '';
-                playerLeaderboardContainer.innerHTML = '';
-                playerScoreEl.textContent = '0';
-                finalScoreEl.textContent = '0';
-            }
+        if (!playerAnswer || playerAnswer.length === 0) {
+            resultHtml = "Du hast nicht geantwortet. ";
+        } else if (isCompletelyCorrect) {
+            resultHtml += '<strong class="correct">RICHTIG!</strong> ';
+            triggerConfetti();
+        } else if (correctHits > 0) {
+            resultHtml += `<strong class="correct">TEILWEISE RICHTIG (${correctHits}/${correctSet.size})</strong> `;
+        } else {
+            resultHtml += '<strong class="incorrect">FALSCH.</strong> ';
         }
+
+        resultHtml += '<br>Richtige Antwort(en): ';
+
+        options.forEach((option, index) => {
+            // Always show correct answers
+            if (correctSet.has(index)) {
+                if (playerAnsSet.has(index)) {
+                    resultHtml += `<span class="correct player-selected">"${sanitizeHTML(option)}"</span> `; // Correct and selected by player
+                } else {
+                    resultHtml += `<span class="correct-not-selected">"${sanitizeHTML(option)}"</span> `; // Correct but not selected by player
+                }
+            } else if (playerAnsSet.has(index)) {
+                // Per instruction: "Do not show the falsely selected answers of the player anymore."
+                // This means we don't add special classes or text for them.
+                // The original text for the option will still be there, but no specific highlight.
+            }
+        });
+
+
+        resultDisplay.innerHTML = resultHtml;
+        playerScoreEl.textContent = Math.round(currentScore); // Use currentScore passed to the function
+
+        // Update player option buttons to show correct/incorrect after result
+        optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
+            const index = parseInt(btn.dataset.index);
+            btn.disabled = true; // Ensure buttons are disabled
+            btn.classList.remove('selected'); // Remove selected class from active state
+
+            if (correctSet.has(index)) {
+                btn.classList.add('correct-answer'); // Highlight correct answer
+            }
+            // If the player selected a correct answer, re-apply 'selected' to show they chose it.
+            if (playerAnsSet.has(index) && correctSet.has(index)) {
+                btn.classList.add('selected'); // Re-apply selected style if it was correct and selected
+            }
+        });
+    }
+
+    /**
+     * Displays the final results and leaderboard for the player.
+     * @param {Object} frData - The final results data received from the host.
+     */
+    function displayFinalResult(frData) {
+        console.log("Displaying final results for player:", frData); // Debug log
+        playerQuestionView.classList.add('hidden');
+        playerResultView.classList.add('hidden');
+        waitingRoom.classList.add('hidden');
+        playerFinalResultView.classList.remove('hidden'); // Ensure this view is shown
+
+        finalScoreEl.textContent = Math.round(playerScore); // Use the global playerScore for final display
+
+        playerLeaderboardContainer.innerHTML = '';
+
+        if (frData.leaderboard) {
+            const lbDiv = document.createElement('div');
+            lbDiv.innerHTML = '<h4>Endgültige Rangliste:</h4>';
+            const ol = document.createElement('ol');
+            if (frData.leaderboard.length === 0) {
+                ol.innerHTML = '<li>Keine Spieler in der Rangliste.</li>';
+            } else {
+                frData.leaderboard.forEach((p, idx) => { // Added idx for rank highlighting
+                    const li = document.createElement('li');
+                    if (idx === 0) li.classList.add('rank-1');
+                    else if (idx === 1) li.classList.add('rank-2');
+                    else if (idx === 2) li.classList.add('rank-3');
+                    li.textContent = `${idx + 1}. ${p.name}: ${Math.round(p.score)} Punkte`;
+                    ol.appendChild(li);
+                });
+            }
+            lbDiv.appendChild(ol);
+            playerLeaderboardContainer.appendChild(lbDiv);
+        } else {
+            playerLeaderboardContainer.innerHTML = '<p>Keine Ranglistendaten verfügbar.</p>'; // Fallback
+        }
+    }
+
+    /**
+     * Resets the player's state and UI to the initial join form.
+     */
+    function resetPlayerStateAndUI() {
+        if (playerWs) {
+            playerWs.onclose = null; // Prevent reconnect
+            playerWs.close();
+            playerWs = null;
+        }
+
+        playerScore = 0;
+        selectedAnswers = [];
+        playerCurrentQuestionOptions = [];
+        playerQuestionStartTime = null;
+        playerRoomId = null;
+        playerCurrentId = null;
+
+        roomCodeInput.value = '';
+        playerNameInput.value = '';
+        joinForm.classList.remove('hidden');
+        waitingRoom.classList.add('hidden');
+        playerQuestionView.classList.add('hidden');
+        playerResultView.classList.add('hidden');
+        playerFinalResultView.classList.add('hidden');
+        optionsContainer.innerHTML = '';
+        resultDisplay.innerHTML = '';
+        playerLeaderboardContainer.innerHTML = '';
+        playerScoreEl.textContent = '0';
+        finalScoreEl.textContent = '0';
+    }
+}

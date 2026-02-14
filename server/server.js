@@ -72,6 +72,7 @@ wss.on('connection', (ws) => {
         switch (msg.type) {
             case 'create_room': handleCreateRoom(ws, msg); break;
             case 'reconnect_host': handleReconnectHost(ws, msg); break;
+            case 'restore_room': handleRestoreRoom(ws, msg); break;
             case 'join': handleJoin(ws, msg); break;
             case 'submit_answer': handleSubmitAnswer(ws, msg); break;
             case 'start_question': handleStartQuestion(ws, msg); break;
@@ -110,8 +111,19 @@ function handleReconnectHost(ws, msg) {
     const roomId = (msg.roomId || '').toUpperCase();
     const room = rooms.get(roomId);
 
-    if (!room || room.hostSessionId !== msg.sessionId) {
-        send(ws, { type: 'error', message: 'Raum nicht gefunden oder Session ungültig.' });
+    // If room not found but host sends a session ID, they might be able to restore it
+    if (!room) {
+        if (msg.sessionId) {
+            send(ws, { type: 'room_not_found_try_restore', roomId, sessionId: msg.sessionId });
+            console.log(`Host tried to reconnect to missing room ${roomId}, suggesting restoration`);
+        } else {
+            send(ws, { type: 'error', message: 'Raum nicht gefunden.' });
+        }
+        return;
+    }
+
+    if (room.hostSessionId !== msg.sessionId) {
+        send(ws, { type: 'error', message: 'Ungültige Session-ID für diesen Raum.' });
         return;
     }
 
@@ -129,11 +141,76 @@ function handleReconnectHost(ws, msg) {
     // Send current room state back to host
     const playerList = [];
     for (const [sid, p] of room.players) {
-        playerList.push({ sessionId: sid, name: p.name, score: p.score, isConnected: p.isConnected });
+        // Only send what's necessary
+        playerList.push({
+            sessionId: sid,
+            name: p.name,
+            score: p.score,
+            isConnected: p.isConnected
+        });
     }
 
     send(ws, { type: 'host_reconnected', roomId, players: playerList });
     console.log(`Host reconnected to room ${roomId}`);
+}
+
+function handleRestoreRoom(ws, msg) {
+    // msg should contain: roomId, sessionId, gameState (optional players list etc.)
+    const roomId = (msg.roomId || '').toUpperCase();
+    const hostSessionId = msg.sessionId;
+
+    if (!roomId || !hostSessionId) {
+        send(ws, { type: 'error', message: 'Wiederherstellung fehlgeschlagen: Fehlende Daten.' });
+        return;
+    }
+
+    if (rooms.has(roomId)) {
+        // Room actually exists, maybe created by someone else or race condition?
+        // Check if it matches this host
+        const existingRoom = rooms.get(roomId);
+        if (existingRoom.hostSessionId === hostSessionId) {
+            // It's this host's room, just reconnect normally
+            handleReconnectHost(ws, msg);
+            return;
+        } else {
+            // Room ID taken by someone else (unlikely with random IDs but possible)
+            send(ws, { type: 'error', message: 'Raum-ID bereits vergeben. Bitte neues Quiz starten.' });
+            return;
+        }
+    }
+
+    // Re-create the room
+    const room = {
+        hostWs: ws,
+        hostSessionId: hostSessionId,
+        players: new Map(),
+        createdAt: Date.now(),
+        hostDisconnectTimer: null
+    };
+
+    // Restore players if provided
+    if (msg.players && Array.isArray(msg.players)) {
+        for (const p of msg.players) {
+            // p: { id, name, score, ... }
+            if (p.id && p.name) {
+                room.players.set(p.id, {
+                    name: p.name,
+                    score: p.score || 0,
+                    ws: null,       // WebSocket connection is lost, they must reconnect
+                    isConnected: false
+                });
+            }
+        }
+    }
+
+    rooms.set(roomId, room);
+
+    ws.roomId = roomId;
+    ws.sessionId = hostSessionId;
+    ws.role = 'host';
+
+    send(ws, { type: 'host_reconnected', roomId, players: msg.players || [], isRestored: true });
+    console.log(`Room ${roomId} RESTORED by host ${hostSessionId}`);
 }
 
 function handleJoin(ws, msg) {
