@@ -1,19 +1,9 @@
 ﻿/**
- * Supabase Configuration
- * 
- * SECURITY NOTE: 
- * - These values are replaced by environment variables during deployment
- * - The anon key is designed for public use but should be protected with RLS policies
- * - Enable Row-Level Security (RLS) on all Supabase tables
- * - Configure rate limiting in Supabase project settings
+ * WebSocket Server Configuration
+ *
+ * This placeholder is replaced during build/deployment with the actual server URL.
  */
-
-// These placeholders are replaced during build/deployment
-const SUPABASE_URL = '__SUPABASE_URL__';
-const SUPABASE_ANON_KEY = '__SUPABASE_ANON_KEY__';
-
-// Declare supabaseClient globally
-let supabaseClient; 
+const WS_URL = '__WS_URL__';
 
 // --- Utility functions ---
 /**
@@ -93,15 +83,11 @@ let largeQrcodeContainer = null;
 let modalRoomIdSpan = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-            // Initialize Supabase client here, after the DOM is loaded
-            // This ensures the Supabase global object is available
-            if (typeof supabase !== 'undefined' && supabase.createClient) { 
-                const { createClient } = supabase;
-                supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            } else {
-                console.error("Supabase library not loaded or 'supabase.createClient' is undefined. Please check network and script loading.");
-                showMessage("Fehler: Die Supabase-Bibliothek konnte nicht geladen werden. Bitte überprüfe deine Internetverbindung oder versuche es später erneut.", 'error');
-                return; // Prevent further execution if Supabase is not available
+            // Verify WebSocket URL is configured
+            if (!WS_URL || WS_URL === '__WS_URL__') {
+                console.error('WebSocket server URL not configured.');
+                showMessage('Server-URL nicht konfiguriert. Bitte überprüfe die Konfiguration.', 'error');
+                return;
             }
 
             // Initialize QR modal elements as soon as DOM is ready
@@ -155,50 +141,33 @@ document.addEventListener('DOMContentLoaded', () => {
                  showView('role-selection');
             }
 
-            // Reconnect Supabase channels when tab becomes visible again (e.g., after sleep/tab switch)
-            document.addEventListener('visibilitychange', async () => {
+            // Reconnect WebSocket when tab becomes visible again
+            document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState !== 'visible') return;
-
                 console.log('Tab became visible, checking connections...');
 
-                // Host reconnection
-                if (hostRoomId && hostPlayerId) {
-                    // Re-mark host as connected
-                    try {
-                        await supabaseClient.from('players').update({ is_connected: true }).eq('id', hostPlayerId);
-                    } catch (e) {
-                        console.error('Error re-marking host as connected:', e);
-                    }
+                if (hostWs && hostWs.readyState !== WebSocket.OPEN && hostRoomId) {
+                    reconnectHostWs();
                 }
-
-                // Player reconnection
-                if (playerRoomId && playerCurrentId) {
-                    // Re-mark player as connected
-                    try {
-                        await supabaseClient.from('players').update({ is_connected: true }).eq('id', playerCurrentId);
-                    } catch (e) {
-                        console.error('Error re-marking player as connected:', e);
-                    }
+                if (playerWs && playerWs.readyState !== WebSocket.OPEN && playerRoomId) {
+                    reconnectPlayerWs();
                 }
             });
         });
 
 // --- Host State & Initialization Flag ---
 let hostGlobalQuizState = null;
-let hostSupabaseChannel = null;
-let hostPlayersSubscription = null;
+let hostWs = null;
+let hostSessionId = null;
 let isHostInitialized = false;
 let hostTimerInterval = null;
 let hostQuestionStartTime = null;
 let hostRoomId = null;
-let hostPlayerId = null;
 let hostViewHeading = null;
 let hostBeforeUnloadHandler = null;
-let hostBroadcastReconnectAttempts = 0;
-let hostPlayersReconnectAttempts = 0;
-let hostHeartbeatInterval = null;
-const HOST_MAX_RECONNECT_ATTEMPTS = 10;
-const RECONNECT_DELAY_MS = 2000;
+let hostWsReconnectAttempts = 0;
+const HOST_MAX_RECONNECT_ATTEMPTS = 30;
+const RECONNECT_DELAY_MS = 10000;
 
 /**
  * Returns an array of non-host players from quizState.
@@ -206,24 +175,23 @@ const RECONNECT_DELAY_MS = 2000;
  */
 function getNonHostPlayers() {
     if (!hostGlobalQuizState) return [];
-    return Object.values(hostGlobalQuizState.players).filter(p => p.id !== hostPlayerId);
+    return Object.values(hostGlobalQuizState.players);
 }
 
 /**
- * Returns the count of non-host players.
- * @returns {number} Number of non-host players.
+ * Returns only connected players (for answer counting).
+ * @returns {Array<Object>} Array of connected player objects.
+ */
+function getConnectedNonHostPlayers() {
+    return getNonHostPlayers().filter(p => p.isConnected !== false);
+}
+
+/**
+ * Returns the count of connected players.
+ * @returns {number} Number of connected players.
  */
 function getNonHostPlayerCount() {
-    return getNonHostPlayers().length;
-}
-
-/**
- * Checks if a player ID belongs to the host.
- * @param {string} playerId - The player ID to check.
- * @returns {boolean} True if the player is the host.
- */
-function isHostPlayer(playerId) {
-    return playerId === hostPlayerId;
+    return getConnectedNonHostPlayers().length;
 }
 
 /**
@@ -241,7 +209,9 @@ function isHostPlayer(playerId) {
                     answersReceived: 0,
                     isQuestionActive: false,
                     roomId: null, // This will be the 4-digit alphanumeric code
-                    questionDuration: 20 // Default question duration in seconds
+                    durationMin: 10, // Minimum question duration in seconds
+                    durationMax: 30, // Maximum question duration in seconds
+                    questionDurations: [] // Per-question durations (computed at quiz start)
                 };
             }
 
@@ -253,7 +223,8 @@ function isHostPlayer(playerId) {
             const questionText = document.getElementById('question-text');
             const addOptionBtn = document.getElementById('add-option-btn');
             const questionsContainer = document.getElementById('questions-container');
-            const questionDurationInput = document.getElementById('question-duration-input');
+            const durationMinInput = document.getElementById('question-duration-min');
+            const durationMaxInput = document.getElementById('question-duration-max');
             const startQuizBtn = document.getElementById('start-quiz-btn');
             const qrContainer = document.getElementById('qr-container');
             const hostSetup = document.getElementById('host-setup');
@@ -280,8 +251,9 @@ function isHostPlayer(playerId) {
             const newQuizBtn = document.getElementById('new-quiz-btn');
             hostViewHeading = document.getElementById('host-view-heading'); // Cache the heading
 
-            // Set default duration input value
-            questionDurationInput.value = quizState.questionDuration;
+            // Set default duration input values
+            durationMinInput.value = quizState.durationMin;
+            durationMaxInput.value = quizState.durationMax;
 
             // Only set up event listeners once
             if (!isHostInitialized) {
@@ -381,18 +353,33 @@ function isHostPlayer(playerId) {
                         showMessage('Bitte füge mindestens eine Frage hinzu.', 'error');
                         return;
                     }
-                    const duration = parseInt(questionDurationInput.value, 10);
-                    if (isNaN(duration) || duration < 5 || duration > 60) {
-                        showMessage('Bitte gebe eine gültige Fragedauer zwischen 5 und 60 Sekunden ein.', 'error');
+                    const dMin = parseInt(durationMinInput.value, 10);
+                    const dMax = parseInt(durationMaxInput.value, 10);
+                    if (isNaN(dMin) || isNaN(dMax) || dMin < 5 || dMax > 60 || dMin > dMax) {
+                        showMessage('Bitte gültige Fragedauer eingeben: Min 5-60, Max >= Min.', 'error');
                         return;
                     }
-                    quizState.questionDuration = duration;
+                    quizState.durationMin = dMin;
+                    quizState.durationMax = dMax;
 
                     // Shuffle questions once when quiz starts
                     quizState.shuffledQuestions = [...quizState.questions]; // Create a copy
                     shuffleArray(quizState.shuffledQuestions);
 
-                    await initHostSupabase();
+                    // Pre-compute per-question durations based on character count
+                    const charCounts = quizState.shuffledQuestions.map(q =>
+                        q.question.length + q.options.reduce((sum, o) => sum + o.length, 0)
+                    );
+                    const minChars = Math.min(...charCounts);
+                    const maxChars = Math.max(...charCounts);
+                    const charRange = maxChars - minChars;
+                    quizState.questionDurations = charCounts.map(count => {
+                        if (charRange === 0) return Math.round((dMin + dMax) / 2);
+                        const t = (count - minChars) / charRange;
+                        return Math.round(dMin + t * (dMax - dMin));
+                    });
+
+                    await initHostConnection();
                 });
 
                 // Event listener for starting questions (after players join)
@@ -419,28 +406,18 @@ function isHostPlayer(playerId) {
 
                 // Event listener for starting a new quiz
                 newQuizBtn.addEventListener('click', async () => {
-                    // Stop heartbeat
-                    if (hostHeartbeatInterval) {
-                        clearInterval(hostHeartbeatInterval);
-                        hostHeartbeatInterval = null;
+                    // Terminate room on server and close WebSocket
+                    if (hostWs && hostWs.readyState === WebSocket.OPEN) {
+                        hostWs.send(JSON.stringify({ type: 'terminate' }));
+                    }
+                    if (hostWs) {
+                        hostWs.onclose = null; // Prevent reconnect on intentional close
+                        hostWs.close();
+                        hostWs = null;
                     }
 
-                    // Clean up Supabase subscriptions
-                    if (hostSupabaseChannel) {
-                        await supabaseClient.removeChannel(hostSupabaseChannel);
-                        hostSupabaseChannel = null;
-                    }
-                    if (hostPlayersSubscription) {
-                        await supabaseClient.removeChannel(hostPlayersSubscription);
-                        hostPlayersSubscription = null;
-                    }
-
-                    // Remove room and players from DB
-                    if (hostRoomId) {
-                        await supabaseClient.from('players').delete().eq('room_id', hostRoomId); // Delete players first due to foreign key
-                        await supabaseClient.from('rooms').delete().eq('id', hostRoomId);
-                    }
-
+                    hostRoomId = null;
+                    hostSessionId = null;
                     hostGlobalQuizState = null;
                     isHostInitialized = false;
                     fileStatus.textContent = '';
@@ -449,41 +426,17 @@ function isHostPlayer(playerId) {
                     hostQuestionDisplay.classList.add('hidden');
                     qrContainer.classList.add('hidden');
                     hostSetup.classList.remove('hidden');
-                    document.getElementById('role-selection').classList.remove('hidden'); // Show role selection again
-                    if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
-                    initializeHostFeatures(); // Re-initialize to reset UI fully
+                    document.getElementById('role-selection').classList.remove('hidden');
+                    if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+                    initializeHostFeatures();
                 });
 
-                // Clean up on window unload using sendBeacon for reliable delivery
-                // Remove any existing handler to prevent duplicates
+                // Clean up on window unload
                 if (hostBeforeUnloadHandler) {
                     window.removeEventListener('beforeunload', hostBeforeUnloadHandler);
                 }
                 hostBeforeUnloadHandler = () => {
-                    // Use sendBeacon for reliable delivery during page unload
-                    if (hostPlayerId && SUPABASE_URL && SUPABASE_ANON_KEY) {
-                        const url = `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(hostPlayerId)}`;
-                        const headers = {
-                            'Content-Type': 'application/json',
-                            'apikey': SUPABASE_ANON_KEY,
-                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                            'Prefer': 'return=minimal'
-                        };
-                        const body = JSON.stringify({ is_connected: false });
-                        // fetch with keepalive: true is queued by the browser even during unload
-                        try {
-                            fetch(url, { method: 'PATCH', headers, body, keepalive: true });
-                        } catch (e) {
-                            // Best effort - page is unloading
-                        }
-                    }
-                    // Best-effort channel cleanup (synchronous, non-blocking)
-                    if (hostSupabaseChannel) {
-                        supabaseClient.removeChannel(hostSupabaseChannel);
-                    }
-                    if (hostPlayersSubscription) {
-                        supabaseClient.removeChannel(hostPlayersSubscription);
-                    }
+                    if (hostWs) hostWs.close();
                 };
                 window.addEventListener('beforeunload', hostBeforeUnloadHandler);
 
@@ -508,7 +461,7 @@ function isHostPlayer(playerId) {
             }
 
             renderQuestionsList();
-            updatePlayersList();
+            refreshPlayerDisplay();
 
             // Logic to determine which host section to display on initialization/re-entry
             if(hostRoomId) { // Check if a room is already established
@@ -588,326 +541,188 @@ function isHostPlayer(playerId) {
             }
 
             /**
-             * Initializes Supabase for the host, creates a room, and sets up subscriptions.
+             * Initializes WebSocket connection for the host, creates a room, and sets up message handlers.
              */
-            async function initHostSupabase() {
-                // Generate a random 4-character alphanumeric room code
-                const rawGeneratedId = generateAlphanumericId(4);
-                hostRoomId = rawGeneratedId; // Store the raw ID for Supabase
-                quizState.roomId = rawGeneratedId.substring(0, 2) + ' ' + rawGeneratedId.substring(2, 4); // Store formatted for display
+            async function initHostConnection() {
+                hostWsReconnectAttempts = 0;
 
-                hostPlayerId = `host-${generateAlphanumericId(12)}`; // Unique ID for the host player
+                hostWs = new WebSocket(WS_URL);
 
-                try {
-                    // Insert room into Supabase
-                    const { data: roomData, error: roomError } = await supabaseClient
-                        .from('rooms')
-                        .insert([
-                            {
-                                id: hostRoomId,
-                                current_question_index: quizState.currentQuestionIndex,
-                                quiz_state: {
-                                    is_active: false,
-                                    question_duration: quizState.questionDuration
-                                },
-                                host_player_id: hostPlayerId
-                            }
-                        ]);
+                hostWs.onopen = () => {
+                    console.log('Host WebSocket connected');
+                    hostWsReconnectAttempts = 0;
+                    hostWs.send(JSON.stringify({ type: 'create_room' }));
+                };
 
-                    if (roomError) throw roomError;
-                    console.log('Room created in Supabase:', roomData);
+                hostWs.onmessage = (event) => {
+                    let msg;
+                    try { msg = JSON.parse(event.data); } catch { return; }
 
-                    // Insert host as a player (for internal state management, not for display in player list)
-                    const { data: hostPlayerData, error: hostPlayerError } = await supabaseClient
-                        .from('players')
-                        .insert([
-                            {
-                                id: hostPlayerId,
-                                room_id: hostRoomId,
-                                name: 'Host', // Host's name
-                                score: 0,
-                                is_connected: true
-                            }
-                        ]);
+                    switch (msg.type) {
+                        case 'room_created':
+                            hostRoomId = msg.roomId;
+                            hostSessionId = msg.sessionId;
+                            quizState.roomId = msg.roomId.substring(0, 2) + ' ' + msg.roomId.substring(2, 4);
+                            hostSetup.classList.add('hidden');
+                            qrContainer.classList.remove('hidden');
+                            roomIdElement.textContent = quizState.roomId;
+                            const currentJoinUrl = updateJoinLink(hostRoomId);
+                            generateQRCode(currentJoinUrl);
+                            if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+                            break;
 
-                    if (hostPlayerError) throw hostPlayerError;
-                    console.log('Host player created:', hostPlayerData);
-                    quizState.players[hostPlayerId] = {
-                        id: hostPlayerId,
-                        name: 'Host',
-                        score: 0,
-                        currentAnswer: [],
-                        answerTime: null
-                    };
-                    updatePlayersList();
-
-
-                    // Subscribe to player changes in this room with reconnection logic
-                    function subscribeToPlayerChanges() {
-                        hostPlayersSubscription = supabaseClient
-                            .channel(`players_in_room_${hostRoomId}_${Date.now()}`) // Unique channel name for reconnection
-                            .on('postgres_changes', {
-                                event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
-                                schema: 'public',
-                                table: 'players',
-                                filter: `room_id=eq.${hostRoomId}`
-                            }, payload => {
-                                if (payload.eventType === 'INSERT') {
-                                    if (payload.new.id !== hostPlayerId) { // Ignore host's own insert
-                                        console.log('New player joined:', payload.new);
-                                        quizState.players[payload.new.id] = {
-                                            id: payload.new.id,
-                                            name: payload.new.name,
-                                            score: payload.new.score,
-                                            currentAnswer: [],
-                                            answerTime: null
-                                        };
-                                        updatePlayersList();
-                                    }
-                                } else if (payload.eventType === 'UPDATE') {
-                                    if (payload.new.id !== hostPlayerId) { // Ignore host's own updates
-                                        handlePlayerData(payload.new);
-                                    }
-                                } else if (payload.eventType === 'DELETE') {
-                                    console.log('Player disconnected (deleted):', payload.old.id);
-                                    if (quizState.players[payload.old.id]) {
-                                        delete quizState.players[payload.old.id];
-                                        updatePlayersList();
-                                        if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
-                                            endQuestion();
-                                        }
-                                    }
-                                }
-                            })
-                            .subscribe((status) => {
-                                if (status === 'SUBSCRIBED') {
-                                    console.log('Host subscribed to player changes channel');
-                                    hostPlayersReconnectAttempts = 0;
-                                    // Sync players from DB to catch anything missed during reconnection
-                                    updatePlayersList();
-                                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                                    console.error('Host player changes channel status:', status);
-                                    if (hostPlayersReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
-                                        hostPlayersReconnectAttempts++;
-                                        console.log(`Reconnecting player changes (${hostPlayersReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
-                                        if (hostPlayersSubscription) {
-                                            supabaseClient.removeChannel(hostPlayersSubscription);
-                                        }
-                                        setTimeout(subscribeToPlayerChanges, RECONNECT_DELAY_MS);
+                        case 'host_reconnected':
+                            console.log('Host reconnected, restoring player state');
+                            if (msg.players) {
+                                msg.players.forEach(p => {
+                                    if (quizState.players[p.sessionId]) {
+                                        quizState.players[p.sessionId].isConnected = p.isConnected;
+                                        quizState.players[p.sessionId].score = p.score;
                                     } else {
-                                        console.error('Host player changes: max reconnect attempts reached.');
+                                        quizState.players[p.sessionId] = {
+                                            id: p.sessionId,
+                                            name: p.name,
+                                            score: p.score,
+                                            currentAnswer: [],
+                                            answerTime: null,
+                                            isConnected: p.isConnected
+                                        };
                                     }
-                                }
-                            });
-                    }
-                    subscribeToPlayerChanges();
+                                });
+                            }
+                            refreshPlayerDisplay();
+                            break;
 
-
-                    // Get initial players list
-                    const { data: initialPlayers, error: initialPlayersError } = await supabaseClient
-                        .from('players')
-                        .select('*')
-                        .eq('room_id', hostRoomId)
-                        .eq('is_connected', true); // Only fetch currently connected players
-
-                    if (initialPlayersError) throw initialPlayersError;
-                    initialPlayers.forEach(p => {
-                        if (p.id !== hostPlayerId) { // Ensure host is not added to quizState.players from initial fetch
-                            quizState.players[p.id] = {
-                                id: p.id,
-                                name: p.name,
-                                score: p.score || 0,
-                                currentAnswer: p.last_answer_data || [],
-                                answerTime: p.last_answer_time ? (new Date(p.last_answer_time).getTime() - hostQuestionStartTime) / 1000 : null
+                        case 'player_joined':
+                            console.log('New player joined:', msg.name);
+                            quizState.players[msg.sessionId] = {
+                                id: msg.sessionId,
+                                name: msg.name,
+                                score: 0,
+                                currentAnswer: [],
+                                answerTime: null,
+                                isConnected: true
                             };
-                        }
-                    });
-                    updatePlayersList();
+                            refreshPlayerDisplay();
+                            break;
 
-
-                    // Initialize broadcast channel for this room with reconnection logic
-                    let hostBroadcastInitialConnect = true;
-                    function subscribeToHostBroadcast() {
-                        hostSupabaseChannel = supabaseClient.channel(`quiz_room_${hostRoomId}`);
-                        hostSupabaseChannel.subscribe((status) => {
-                            if (status === 'SUBSCRIBED') {
-                                console.log('Host subscribed to broadcast channel:', `quiz_room_${hostRoomId}`);
-                                hostBroadcastReconnectAttempts = 0;
-                                if (hostBroadcastInitialConnect) {
-                                    hostBroadcastInitialConnect = false;
-                                    hostSetup.classList.add('hidden');
-                                    qrContainer.classList.remove('hidden');
-                                    roomIdElement.textContent = quizState.roomId;
-                                    const currentJoinUrl = updateJoinLink(hostRoomId);
-                                    generateQRCode(currentJoinUrl);
-                                    if (hostViewHeading) hostViewHeading.classList.remove('hidden');
-                                }
-                            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                                console.error('Host broadcast channel status:', status);
-                                if (hostBroadcastReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
-                                    hostBroadcastReconnectAttempts++;
-                                    console.log(`Reconnecting host broadcast (${hostBroadcastReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
-                                    if (hostSupabaseChannel) {
-                                        supabaseClient.removeChannel(hostSupabaseChannel);
-                                    }
-                                    setTimeout(subscribeToHostBroadcast, RECONNECT_DELAY_MS);
-                                } else {
-                                    console.error('Host broadcast: max reconnect attempts reached.');
-                                    showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
-                                    resetHostStateAndUI();
+                        case 'player_left':
+                            if (quizState.players[msg.sessionId]) {
+                                quizState.players[msg.sessionId].isConnected = false;
+                                refreshPlayerDisplay();
+                                if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
+                                    endQuestion();
                                 }
                             }
-                        });
-                    }
-                    subscribeToHostBroadcast();
+                            break;
 
-                    // Start host heartbeat to signal liveness
-                    if (hostHeartbeatInterval) clearInterval(hostHeartbeatInterval);
-                    hostHeartbeatInterval = setInterval(async () => {
-                        if (hostPlayerId) {
-                            try {
-                                await supabaseClient.from('players')
-                                    .update({ is_connected: true })
-                                    .eq('id', hostPlayerId);
-                            } catch (e) {
-                                console.warn('Host heartbeat failed:', e);
-                            }
-                        }
-                    }, 30000); // Every 30 seconds
-
-                } catch (error) {
-                    console.error('Error initializing host Supabase:', error);
-                    showMessage(`Fehler beim Starten des Hosts: ${error.message}. Bitte überprüfe deine Supabase-Konfiguration und versuche es erneut.`, 'error');
-                    resetHostStateAndUI();
-                }
-            }
-
-            /**
-             * Handles data received from connected players (via Supabase database updates).
-             * @param {Object} playerData - The updated player data from Supabase.
-             */
-            function handlePlayerData(playerData) {
-                const playerId = playerData.id;
-                console.log('Host received player data update from', playerId, playerData);
-
-                // Ensure the player exists in our local state and the quiz is active
-                if (!quizState.players[playerId] || !quizState.isQuestionActive) {
-                    // If player is new or reconnected, add them to local state
-                    if (playerId !== hostPlayerId && !quizState.players[playerId]) { // Only add if not host and not already present
-                        quizState.players[playerId] = {
-                            id: playerId,
-                            name: playerData.name,
-                            score: playerData.score || 0,
-                            currentAnswer: playerData.last_answer_data || [],
-                            answerTime: playerData.last_answer_time ? (new Date(playerData.last_answer_time).getTime() - hostQuestionStartTime) / 1000 : null
-                        };
-                        updatePlayersList();
-                    }
-                    // If quiz is not active, just update player's score and connection status
-                    if (playerId !== hostPlayerId) { // Only update non-host players
-                        quizState.players[playerId].score = playerData.score || 0;
-                        quizState.players[playerId].is_connected = playerData.is_connected;
-                        updatePlayersList(); // Update connected players count
-                    }
-                    return;
-                }
-
-                // Only count as a new answer if player hasn't answered this question yet
-                // and the answer data is different from the last recorded one for this question
-                const currentQuestion = quizState.shuffledQuestions[quizState.currentQuestionIndex];
-                const hasAnsweredCurrentQuestion = quizState.players[playerId].currentAnswer &&
-                                                   JSON.stringify(quizState.players[playerId].currentAnswer) === JSON.stringify(playerData.last_answer_data);
-
-                if (playerData.last_answer_data && !hasAnsweredCurrentQuestion) {
-                    quizState.answersReceived++;
-                    const answerReceiveTime = playerData.last_answer_time ? new Date(playerData.last_answer_time).getTime() : Date.now();
-                    const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000; // Time in seconds
-                    quizState.players[playerId].answerTime = timeTaken;
-                    quizState.players[playerId].currentAnswer = playerData.last_answer_data; // Store the new answer
-                    answersCount.textContent = quizState.answersReceived.toString();
-
-                    // Check if all non-host players have answered
-                    if (quizState.answersReceived >= getNonHostPlayerCount()) {
-                        endQuestion();
-                    }
-                }
-            }
-
-            /**
-             * Updates the displayed list of connected players and player count.
-             */
-            async function updatePlayersList() {
-                try {
-                    const { data: players, error } = await supabaseClient
-                        .from('players')
-                        .select('id, name, score') // Fetch score to keep local state updated
-                        .eq('room_id', hostRoomId)
-                        .eq('is_connected', true); // Only show connected players
-
-                    if (error) throw error;
-
-                    // Filter out the host from the list of players for display
-                    const nonHostPlayers = players.filter(p => p.id !== hostPlayerId);
-
-                    // During active questions, only update UI and add new players - don't overwrite existing state
-                    // This prevents race conditions where answer data could be lost
-                    if (quizState.isQuestionActive) {
-                        // Only add new players, don't modify existing ones
-                        nonHostPlayers.forEach(p => {
-                            if (!quizState.players[p.id]) {
-                                quizState.players[p.id] = {
-                                    id: p.id,
-                                    name: p.name,
-                                    score: p.score || 0,
+                        case 'player_reconnected':
+                            if (quizState.players[msg.sessionId]) {
+                                quizState.players[msg.sessionId].isConnected = true;
+                                quizState.players[msg.sessionId].score = msg.score;
+                            } else {
+                                quizState.players[msg.sessionId] = {
+                                    id: msg.sessionId,
+                                    name: msg.name,
+                                    score: msg.score,
                                     currentAnswer: [],
-                                    answerTime: null
+                                    answerTime: null,
+                                    isConnected: true
                                 };
                             }
-                        });
-                        // Remove disconnected players
-                        const connectedIds = new Set(nonHostPlayers.map(p => p.id));
-                        connectedIds.add(hostPlayerId); // Keep host
-                        Object.keys(quizState.players).forEach(id => {
-                            if (!connectedIds.has(id)) {
-                                delete quizState.players[id];
-                            }
-                        });
-                    } else {
-                        // When no question is active, safe to do full sync
-                        const currentConnectedPlayers = {};
-                        nonHostPlayers.forEach(p => {
-                            currentConnectedPlayers[p.id] = {
-                                id: p.id,
-                                name: p.name,
-                                score: p.score || 0,
-                                currentAnswer: quizState.players[p.id]?.currentAnswer || [],
-                                answerTime: quizState.players[p.id]?.answerTime || null
-                            };
-                        });
-                        // Ensure the host's player object is in quizState.players for internal logic
-                        if (quizState.players[hostPlayerId]) {
-                            currentConnectedPlayers[hostPlayerId] = quizState.players[hostPlayerId];
-                        }
-                        quizState.players = currentConnectedPlayers;
+                            refreshPlayerDisplay();
+                            break;
+
+                        case 'player_answered':
+                            handlePlayerAnswer(msg);
+                            break;
+
+                        case 'error':
+                            showMessage(msg.message, 'error');
+                            break;
                     }
+                };
 
-                    const playerCount = nonHostPlayers.length; // Count only non-host players
-                    playerCountElement.textContent = playerCount.toString();
-                    totalPlayers.textContent = playerCount.toString(); // Total players for answers count is also non-host
+                hostWs.onclose = () => {
+                    console.log('Host WebSocket closed');
+                    if (hostRoomId && hostWsReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
+                        hostWsReconnectAttempts++;
+                        console.log(`Host reconnecting (${hostWsReconnectAttempts}/${HOST_MAX_RECONNECT_ATTEMPTS})...`);
+                        setTimeout(reconnectHostWs, RECONNECT_DELAY_MS);
+                    } else if (hostWsReconnectAttempts >= HOST_MAX_RECONNECT_ATTEMPTS) {
+                        showMessage('Verbindung zum Server verloren. Bitte lade die Seite neu.', 'error');
+                    }
+                };
 
-                    playersList.innerHTML = '';
+                hostWs.onerror = (err) => {
+                    console.error('Host WebSocket error:', err);
+                };
+            }
 
-                    nonHostPlayers.forEach(p => { // Iterate only non-host players for display
-                        const i = document.createElement('div');
-                        i.className = 'player-item';
-                        i.textContent = p.name;
-                        playersList.appendChild(i);
-                    });
+            /**
+             * Reconnects the host WebSocket after a disconnect.
+             */
+            function reconnectHostWs() {
+                const ws = new WebSocket(WS_URL);
 
-                    startQuestionsBtn.classList.toggle('hidden', playerCount === 0);
-                } catch (error) {
-                    console.error('Error updating players list from Supabase:', error);
+                ws.onopen = () => {
+                    console.log('Host WebSocket reconnected');
+                    hostWsReconnectAttempts = 0;
+                    ws.send(JSON.stringify({ type: 'reconnect_host', roomId: hostRoomId, sessionId: hostSessionId }));
+                };
+
+                // Copy the same handlers from the main hostWs
+                ws.onmessage = hostWs ? hostWs.onmessage : null;
+                ws.onclose = hostWs ? hostWs.onclose : null;
+                ws.onerror = hostWs ? hostWs.onerror : null;
+
+                hostWs = ws;
+            }
+
+            /**
+             * Handles a player answer received via WebSocket.
+             * @param {Object} msg - The answer message from the server.
+             */
+            function handlePlayerAnswer(msg) {
+                const playerId = msg.sessionId;
+                if (!quizState.players[playerId] || !quizState.isQuestionActive) return;
+
+                const p = quizState.players[playerId];
+                // Only count if player hasn't answered this question yet
+                if (p.currentAnswer && p.currentAnswer.length > 0) return;
+
+                quizState.answersReceived++;
+                const answerReceiveTime = msg.answerTime ? new Date(msg.answerTime).getTime() : Date.now();
+                const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000;
+                p.answerTime = timeTaken;
+                p.currentAnswer = msg.answerData;
+                answersCount.textContent = quizState.answersReceived.toString();
+
+                if (quizState.answersReceived >= getNonHostPlayerCount()) {
+                    endQuestion();
                 }
+            }
+
+            /**
+             * Refreshes the displayed list of players from local state (no DB query needed).
+             */
+            function refreshPlayerDisplay() {
+                const allPlayers = getNonHostPlayers();
+                const connectedCount = getConnectedNonHostPlayers().length;
+
+                playerCountElement.textContent = connectedCount.toString();
+                totalPlayers.textContent = connectedCount.toString();
+
+                playersList.innerHTML = '';
+                allPlayers.forEach(p => {
+                    const i = document.createElement('div');
+                    i.className = 'player-item';
+                    if (p.isConnected === false) i.classList.add('disconnected');
+                    i.textContent = p.name + (p.isConnected === false ? ' (getrennt)' : '');
+                    playersList.appendChild(i);
+                });
+
+                startQuestionsBtn.classList.toggle('hidden', connectedCount === 0);
             }
 
             /**
@@ -938,7 +753,7 @@ function isHostPlayer(playerId) {
 
              /**
               * Updates the join link to include the host's Peer ID.
-              * @param {string} roomId - The Supabase room ID (4-digit alphanumeric code).
+              * @param {string} roomId - The room ID (4-digit alphanumeric code).
               * @returns {string} The full join URL.
               */
             function updateJoinLink(roomId) {
@@ -947,7 +762,7 @@ function isHostPlayer(playerId) {
                 const joinUrl = `${baseUrl}?host=${roomId}`;
                 joinLinkElement.href = joinUrl;
                 // Display the short URL for easy typing
-                const shortUrl = 'https://bycs.link/karten';
+                const shortUrl = 'bycs.link/karten';
                 joinLinkElement.textContent = shortUrl;
 
                 joinLinkModalElement.href = joinUrl;
@@ -983,17 +798,10 @@ function isHostPlayer(playerId) {
                 currentQuestion.shuffledOptions = shuffledOptions;
                 currentQuestion.shuffledCorrect = shuffledCorrectIndices;
 
-                // Reset player answers for the new question in local state and in DB
+                // Reset player answers for the new question in local state
                 for (const p of Object.values(quizState.players)) {
                     p.currentAnswer = [];
                     p.answerTime = null;
-                    if (p.id !== hostPlayerId) { // Don't reset host's own entry
-                        try {
-                            await supabaseClient.from('players').update({ last_answer_data: [], last_answer_time: null }).eq('id', p.id);
-                        } catch (error) {
-                            console.error(`Error resetting player ${p.name}'s answer:`, error);
-                        }
-                    }
                 }
 
 
@@ -1009,7 +817,8 @@ function isHostPlayer(playerId) {
                 hostScoreboardEl.classList.add('hidden'); // Hide scoreboard while question is active
                 if (hostViewHeading) hostViewHeading.classList.add('hidden'); // Hide "Quiz hosten" heading
 
-                startTimer(quizState.questionDuration); // Use host-defined duration
+                const currentDuration = quizState.questionDurations[quizState.currentQuestionIndex];
+                startTimer(currentDuration);
                 await sendQuestionToPlayers(currentQuestion); // Pass the question object which now contains shuffled data
             }
 
@@ -1038,41 +847,24 @@ function isHostPlayer(playerId) {
 
 
             /**
-             * Sends question data to all connected players via Supabase Broadcast.
-             * @param {Object} question - The question object to send (now contains shuffled options and correct indices).
+             * Sends question data to all connected players via WebSocket server.
+             * @param {Object} question - The question object to send (contains shuffled options and correct indices).
              */
             async function sendQuestionToPlayers(question) {
-                const qData = {
-                    type: 'question',
+                if (!hostWs || hostWs.readyState !== WebSocket.OPEN) {
+                    showMessage('Keine Verbindung zum Server. Bitte überprüfe deine Verbindung.', 'error');
+                    return;
+                }
+                hostWs.send(JSON.stringify({
+                    type: 'start_question',
                     question: question.question,
-                    options: question.shuffledOptions, // Send shuffled options
-                    correct: question.shuffledCorrect, // Send re-mapped correct indices
+                    options: question.shuffledOptions,
                     index: quizState.currentQuestionIndex,
                     total: quizState.shuffledQuestions.length,
-                    startTime: hostQuestionStartTime, // Send start time for player timer/scoring
-                    duration: quizState.questionDuration // Send duration to players
-                };
-                try {
-                    // Update room state in DB
-                    await supabaseClient
-                        .from('rooms')
-                        .update({
-                            current_question_index: quizState.currentQuestionIndex,
-                            quiz_state: { is_active: true, question_duration: quizState.questionDuration }
-                        })
-                        .eq('id', hostRoomId);
-
-                    // Broadcast question to players
-                    await hostSupabaseChannel.send({
-                        type: 'broadcast',
-                        event: 'quiz_event',
-                        payload: qData
-                    });
-                    console.log('Question broadcasted:', qData);
-                } catch (error) {
-                    console.error('Error sending question via Supabase:', error);
-                    showMessage('Fehler beim Senden der Frage. Bitte überprüfe deine Supabase-Verbindung.', 'error');
-                }
+                    startTime: hostQuestionStartTime,
+                    duration: quizState.questionDurations[quizState.currentQuestionIndex]
+                }));
+                console.log('Question sent via WebSocket');
             }
 
             /**
@@ -1147,8 +939,10 @@ function isHostPlayer(playerId) {
             function calculateScores() {
                 const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
                 const correctSet = new Set(currentQ.shuffledCorrect); // Use shuffled correct indices
-                const totalQuestionTime = quizState.questionDuration; // Use host-defined duration
+                const totalQuestionTime = quizState.questionDurations[quizState.currentQuestionIndex];
                 const numQuestions = quizState.shuffledQuestions.length;
+                const totalOptions = currentQ.shuffledOptions.length;
+                const totalWrong = totalOptions - correctSet.size;
 
                 const basePointsFirst = 100;
                 const basePointsLast = 300;
@@ -1158,72 +952,53 @@ function isHostPlayer(playerId) {
                     const pointsIncreasePerQuestion = (basePointsLast - basePointsFirst) / (numQuestions - 1);
                     currentQuestionBasePoints = basePointsFirst + (quizState.currentQuestionIndex * pointsIncreasePerQuestion);
                 }
-                // If only one question, it gets basePointsFirst (100)
-                // If 2 questions, 1st gets 100, 2nd gets 300. (200 increase / 1 interval = 200 per question)
-                // If 3 questions, 1st gets 100, 2nd gets 200, 3rd gets 300. (200 increase / 2 intervals = 100 per question)
-
 
                 getNonHostPlayers().forEach(p => {
                     if (p.currentAnswer && p.currentAnswer.length > 0) {
                         const playerAnsSet = new Set(p.currentAnswer);
 
-                        // Count how many correct answers the player selected
                         const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
+                        const wrongHits = [...playerAnsSet].filter(item => !correctSet.has(item)).length;
 
-                        if (correctHits > 0) {
-                            const correctRatio = correctHits / correctSet.size;
-                            // Score = ratio * (Base Points + Time Bonus)
+                        // Proportional penalty: subtract wrong ratio from correct ratio
+                        const correctRatio = correctHits / correctSet.size;
+                        const wrongPenalty = totalWrong > 0 ? (wrongHits / totalWrong) : 0;
+                        const adjustedRatio = Math.max(0, correctRatio - wrongPenalty);
+
+                        if (adjustedRatio > 0) {
                             const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
                             const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
                             const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5);
 
-                            p.score += correctRatio * (currentQuestionBasePoints + timeBonus);
+                            p.score += adjustedRatio * (currentQuestionBasePoints + timeBonus);
                         }
                     }
                 });
             }
 
             /**
-             * Sends results of the current question to all players via Supabase Broadcast.
+             * Sends results of the current question to all players via WebSocket server.
              */
             async function sendResultsToPlayers() {
-                const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex]; // Use shuffled questions
+                if (!hostWs || hostWs.readyState !== WebSocket.OPEN) return;
+
+                const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex];
                 const isFinalQ = quizState.currentQuestionIndex === quizState.shuffledQuestions.length - 1;
+                const leaderboardData = getLeaderboardData();
 
-                const leaderboardData = getLeaderboardData(); // Get latest leaderboard for results
+                // Build playerScores map so server can store scores for reconnection
+                const playerScores = {};
+                getNonHostPlayers().forEach(p => { playerScores[p.id] = p.score; });
 
-                for (const p of getNonHostPlayers()) {
-                    // Update player score in DB
-                    try {
-                        await supabaseClient
-                            .from('players')
-                            .update({ score: p.score })
-                            .eq('id', p.id);
-                    } catch (error) {
-                        console.error(`Error updating player ${p.name}'s score in Supabase:`, error);
-                    }
-                }
-
-                // Broadcast result to all players after all scores are updated in DB
-                const resData = {
-                    type: 'result',
-                    correct: currentQ.shuffledCorrect, // Send shuffled correct indices
+                hostWs.send(JSON.stringify({
+                    type: 'send_results',
+                    correct: currentQ.shuffledCorrect,
                     isFinal: isFinalQ,
-                    options: currentQ.shuffledOptions, // Send shuffled options to player for result display
-                    leaderboard: leaderboardData // Include leaderboard for final results
-                };
-
-                try {
-                    await hostSupabaseChannel.send({
-                        type: 'broadcast',
-                        event: 'quiz_event',
-                        payload: resData
-                    });
-                    console.log('Results broadcasted.');
-                } catch (error) {
-                    console.error('Error broadcasting results via Supabase:', error);
-                    showMessage('Fehler beim Senden der Ergebnisse. Bitte überprüfe deine Supabase-Verbindung.', 'error');
-                }
+                    options: currentQ.shuffledOptions,
+                    leaderboard: leaderboardData,
+                    playerScores: playerScores
+                }));
+                console.log('Results sent via WebSocket');
             }
 
              /**
@@ -1304,30 +1079,18 @@ function isHostPlayer(playerId) {
              * Resets the host's state and UI to the initial setup form.
              */
             async function resetHostStateAndUI() {
-                // Stop heartbeat
-                if (hostHeartbeatInterval) {
-                    clearInterval(hostHeartbeatInterval);
-                    hostHeartbeatInterval = null;
+                // Close WebSocket connection
+                if (hostWs) {
+                    hostWs.onclose = null; // Prevent reconnect
+                    hostWs.close();
+                    hostWs = null;
                 }
 
-                // Reset reconnection counters
-                hostBroadcastReconnectAttempts = 0;
-                hostPlayersReconnectAttempts = 0;
-
-                // Unsubscribe from Supabase channels
-                if (hostSupabaseChannel) {
-                    await supabaseClient.removeChannel(hostSupabaseChannel);
-                    hostSupabaseChannel = null;
-                }
-                if (hostPlayersSubscription) {
-                    await supabaseClient.removeChannel(hostPlayersSubscription);
-                    hostPlayersSubscription = null;
-                }
-
+                hostWsReconnectAttempts = 0;
                 hostGlobalQuizState = null;
                 isHostInitialized = false;
                 hostRoomId = null;
-                hostPlayerId = null;
+                hostSessionId = null;
 
                 fileStatus.textContent = '';
                 if(jsonFileInput) jsonFileInput.value = '';
@@ -1335,14 +1098,14 @@ function isHostPlayer(playerId) {
                 hostQuestionDisplay.classList.add('hidden');
                 qrContainer.classList.add('hidden');
                 hostSetup.classList.remove('hidden');
-                document.getElementById('role-selection').classList.remove('hidden'); // Show role selection again
-                if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
-                initializeHostFeatures(); // Re-initialize to reset UI fully
+                document.getElementById('role-selection').classList.remove('hidden');
+                if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+                initializeHostFeatures();
             }
         }
 
 // --- Player State & Initialization Flag ---
-let playerSupabaseChannel = null;
+let playerWs = null;
 let playerRoomId = null;
 let playerCurrentId = null;
 let isPlayerInitialized = false;
@@ -1352,6 +1115,37 @@ let selectedAnswers = [];
 let playerScore = 0;
 let playerQuestionStartTime = null;
 let playerBeforeUnloadHandler = null;
+
+/**
+ * Reconnects the player WebSocket (called from visibilitychange).
+ */
+function reconnectPlayerWs() {
+    if (playerWs) {
+        playerWs.onclose = null;
+        playerWs.close();
+    }
+    const session = getPlayerSession(playerRoomId);
+    const name = session ? session.playerName : 'Spieler';
+    // initPlayerConnection is defined inside initializePlayerFeatures but the call
+    // goes through the module-scoped playerWs reconnect logic inside connectPlayerWs
+    // We need a different approach: just re-open the WS and send join with sessionId
+    const ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+        ws.send(JSON.stringify({
+            type: 'join',
+            roomCode: playerRoomId,
+            playerName: name,
+            sessionId: playerCurrentId
+        }));
+    };
+    // Copy handlers from existing playerWs if available
+    if (playerWs) {
+        ws.onmessage = playerWs.onmessage;
+        ws.onclose = playerWs.onclose;
+        ws.onerror = playerWs.onerror;
+    }
+    playerWs = ws;
+}
 
 // --- Player Persistence Helpers ---
 /**
@@ -1481,7 +1275,7 @@ function initializePlayerFeatures() {
                         showMessage('Bitte gib einen Raum-Code ein.', 'error');
                         return;
                     }
-                    await initPlayerSupabase(roomCode, finalPlayerName);
+                    initPlayerConnection(roomCode, finalPlayerName);
                 });
 
                 submitAnswerBtn.addEventListener('click', async () => {
@@ -1499,19 +1293,14 @@ function initializePlayerFeatures() {
                         playerTimerInterval = null;
                     }
 
-                    // Update player's answer in Supabase
-                    try {
-                        await supabaseClient
-                            .from('players')
-                            .update({
-                                last_answer_data: selectedAnswers,
-                                last_answer_time: new Date().toISOString()
-                            })
-                            .eq('id', playerCurrentId);
-                        console.log('Player answer updated in Supabase.');
-                    } catch (error) {
-                        console.error('Error updating player answer in Supabase:', error);
-                        showMessage('Fehler beim Absenden der Antwort. Bitte versuche es erneut.', 'error');
+                    // Send answer via WebSocket
+                    if (playerWs && playerWs.readyState === WebSocket.OPEN) {
+                        playerWs.send(JSON.stringify({
+                            type: 'submit_answer',
+                            answerData: selectedAnswers,
+                            answerTime: new Date().toISOString()
+                        }));
+                        console.log('Player answer sent via WebSocket.');
                     }
                 });
 
@@ -1526,26 +1315,7 @@ function initializePlayerFeatures() {
                     window.removeEventListener('beforeunload', playerBeforeUnloadHandler);
                 }
                 playerBeforeUnloadHandler = () => {
-                    // Use fetch with keepalive for reliable delivery during page unload
-                    if (playerCurrentId && SUPABASE_URL && SUPABASE_ANON_KEY) {
-                        const url = `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(playerCurrentId)}`;
-                        const headers = {
-                            'Content-Type': 'application/json',
-                            'apikey': SUPABASE_ANON_KEY,
-                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                            'Prefer': 'return=minimal'
-                        };
-                        const body = JSON.stringify({ is_connected: false });
-                        try {
-                            fetch(url, { method: 'PATCH', headers, body, keepalive: true });
-                        } catch (e) {
-                            // Best effort - page is unloading
-                        }
-                    }
-                    // Best-effort channel cleanup
-                    if (playerSupabaseChannel) {
-                        supabaseClient.removeChannel(playerSupabaseChannel);
-                    }
+                    if (playerWs) playerWs.close();
                 };
                 window.addEventListener('beforeunload', playerBeforeUnloadHandler);
 
@@ -1562,186 +1332,102 @@ function initializePlayerFeatures() {
 
 
             /**
-             * Initializes Supabase for the player and joins a room.
-             * @param {string} hostRoomId - The Supabase room ID.
+             * Initializes WebSocket connection for the player and joins a room.
+             * @param {string} roomCode - The room code to join.
              * @param {string} pName - The player's name.
              */
-            async function initPlayerSupabase(hostRoomId, pName) {
-                playerRoomId = hostRoomId;
+            function initPlayerConnection(roomCode, pName) {
+                playerRoomId = roomCode;
+                let playerWsReconnectAttempts = 0;
+                const MAX_RECONNECT_ATTEMPTS = 30;
 
                 joinForm.classList.add('hidden');
                 waitingRoom.classList.remove('hidden');
                 waitingMessage.textContent = `Verbinde mit Raum ${playerRoomId}...`;
 
-                try {
-                    // Check if room exists
-                    const { data: room, error: roomError } = await supabaseClient
-                        .from('rooms')
-                        .select('id')
-                        .eq('id', playerRoomId)
-                        .single();
+                // Check for existing session (reconnection)
+                const existingSession = getPlayerSession(playerRoomId);
+                const existingSessionId = existingSession ? existingSession.playerId : null;
 
-                    if (roomError || !room) {
-                        showMessage('Raum nicht gefunden oder Fehler beim Abrufen des Raums. Bitte überprüfe den Code.', 'error');
-                        resetPlayerStateAndUI();
-                        return;
-                    }
+                function connectPlayerWs() {
+                    playerWs = new WebSocket(WS_URL);
 
-                    // Check for existing session (reconnection)
-                    const existingSession = getPlayerSession(playerRoomId);
-                    let isReconnecting = false;
+                    playerWs.onopen = () => {
+                        console.log('Player WebSocket connected');
+                        playerWsReconnectAttempts = 0;
+                        playerWs.send(JSON.stringify({
+                            type: 'join',
+                            roomCode: roomCode,
+                            playerName: pName,
+                            sessionId: existingSessionId || playerCurrentId
+                        }));
+                    };
 
-                    if (existingSession) {
-                        // Try to reconnect with existing player ID
-                        const { data: existingPlayer, error: existingPlayerError } = await supabaseClient
-                            .from('players')
-                            .select('id, name, score')
-                            .eq('id', existingSession.playerId)
-                            .eq('room_id', playerRoomId)
-                            .single();
+                    playerWs.onmessage = (event) => {
+                        let msg;
+                        try { msg = JSON.parse(event.data); } catch { return; }
 
-                        if (!existingPlayerError && existingPlayer) {
-                            // Player exists, reconnect
-                            playerCurrentId = existingSession.playerId;
-                            playerScore = existingPlayer.score || 0;
-                            isReconnecting = true;
-                            console.log('Reconnecting player:', playerCurrentId);
-
-                            // Update connection status
-                            await supabaseClient
-                                .from('players')
-                                .update({ is_connected: true })
-                                .eq('id', playerCurrentId);
-
-                            // Update session timestamp
-                            savePlayerSession(playerRoomId, playerCurrentId, existingPlayer.name);
-                        } else {
-                            // Session exists but player not found in DB, clear stale session
-                            clearPlayerSession(playerRoomId);
-                        }
-                    }
-
-                    if (!isReconnecting) {
-                        // New player - generate new ID and insert
-                        playerCurrentId = `player-${generateAlphanumericId(12)}`;
-
-                        const { data: playerData, error: playerInsertError } = await supabaseClient
-                            .from('players')
-                            .insert([
-                                {
-                                    id: playerCurrentId,
-                                    room_id: playerRoomId,
-                                    name: pName,
-                                    score: 0,
-                                    is_connected: true
-                                }
-                            ]);
-
-                        if (playerInsertError) throw playerInsertError;
-                        console.log('Player joined Supabase:', playerData);
-
-                        // Save session for future reconnection
-                        savePlayerSession(playerRoomId, playerCurrentId, pName);
-                    }
-
-                    // Subscribe to broadcast channel for this room with reconnection handling
-                    let reconnectAttempts = 0;
-                    const MAX_RECONNECT_ATTEMPTS = 5;
-                    const RECONNECT_DELAY_MS = 2000;
-
-                    function subscribeToChannel() {
-                        playerSupabaseChannel = supabaseClient.channel(`quiz_room_${playerRoomId}`);
-                        playerSupabaseChannel.on('broadcast', { event: 'quiz_event' }, (payload) => {
-                            handleHostData(payload.payload); // Process messages from host
-                        }).subscribe((status) => {
-                            if (status === 'SUBSCRIBED') {
-                                console.log('Player subscribed to broadcast channel:', `quiz_room_${playerRoomId}`);
-                                reconnectAttempts = 0; // Reset on successful connection
-                                waitingMessage.textContent = isReconnecting
+                        switch (msg.type) {
+                            case 'joined':
+                                playerCurrentId = msg.sessionId;
+                                playerScore = msg.score || 0;
+                                savePlayerSession(roomCode, msg.sessionId, msg.playerName || pName);
+                                waitingMessage.textContent = msg.isReconnect
                                     ? 'Wieder verbunden! Warte auf Host...'
                                     : 'Verbunden! Warte auf Host...';
-                            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                                console.error('Player channel status:', status);
-                                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                                    reconnectAttempts++;
-                                    console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-                                    waitingMessage.textContent = `Verbindung unterbrochen. Reconnect ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`;
-                                    // Clean up old channel before reconnecting
-                                    if (playerSupabaseChannel) {
-                                        supabaseClient.removeChannel(playerSupabaseChannel);
-                                    }
-                                    setTimeout(subscribeToChannel, RECONNECT_DELAY_MS);
-                                } else {
-                                    showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
-                                    resetPlayerStateAndUI();
-                                }
-                            }
-                        });
-                    }
+                                break;
 
-                    subscribeToChannel();
+                            case 'question':
+                                playerCurrentQuestionOptions = msg.options;
+                                selectedAnswers = [];
+                                playerQuestionStartTime = msg.startTime || Date.now();
+                                displayQuestion(msg);
+                                const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
+                                const remainingDuration = Math.max(1, msg.duration - elapsedSinceStart);
+                                startPlayerTimer(remainingDuration);
+                                break;
 
-                } catch (error) {
-                    console.error('Error initializing player Supabase:', error);
-                    showMessage(`Fehler beim Beitreten des Quiz: ${error.message}.`, 'error');
-                    resetPlayerStateAndUI();
+                            case 'result':
+                                playerScore = msg.playerScore || playerScore;
+                                displayResult(msg, selectedAnswers, playerScore);
+                                waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
+                                if (msg.isFinal) displayFinalResult(msg);
+                                break;
+
+                            case 'quiz_terminated':
+                                showMessage("Der Host hat das Quiz beendet.", 'info');
+                                resetPlayerStateAndUI();
+                                showView('role-selection');
+                                break;
+
+                            case 'error':
+                                showMessage(msg.message, 'error');
+                                resetPlayerStateAndUI();
+                                break;
+                        }
+                    };
+
+                    playerWs.onclose = () => {
+                        console.log('Player WebSocket closed');
+                        if (playerRoomId && playerCurrentId && playerWsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                            playerWsReconnectAttempts++;
+                            waitingMessage.textContent = `Verbindung unterbrochen. Reconnect ${playerWsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`;
+                            setTimeout(connectPlayerWs, RECONNECT_DELAY_MS);
+                        } else if (playerWsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                            showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
+                            resetPlayerStateAndUI();
+                        }
+                    };
+
+                    playerWs.onerror = (err) => {
+                        console.error('Player WebSocket error:', err);
+                    };
                 }
+
+                connectPlayerWs();
             }
 
-            /**
-             * Handles data received from the host (via Supabase Broadcast).
-             * @param {Object} data - The data received from the host.
-             */
-            async function handleHostData(data) { // Made async to allow await for DB fetch
-                console.log('Player received data from host:', data);
-
-                switch (data.type) {
-                    case 'question':
-                        playerCurrentQuestionOptions = data.options; // These are already shuffled
-                        selectedAnswers = []; // Reset selected answers for new question
-                        // Use host's startTime for accurate timing, with fallback to local time
-                        playerQuestionStartTime = data.startTime || Date.now();
-                        displayQuestion(data);
-                        // Calculate remaining time based on host's start time
-                        const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
-                        const remainingDuration = Math.max(1, data.duration - elapsedSinceStart);
-                        startPlayerTimer(remainingDuration);
-                        break;
-                    case 'result':
-                        // Fetch the player's most recent score and answer data from DB
-                        const { data: currentPlayerDbData, error: fetchError } = await supabaseClient
-                            .from('players')
-                            .select('score, last_answer_data')
-                            .eq('id', playerCurrentId)
-                            .single();
-
-                        if (fetchError) {
-                            console.error('Error fetching player data for result display:', fetchError);
-                            // Fallback to previous score if fetch fails
-                            displayResult(data, selectedAnswers, playerScore); // Use local selectedAnswers as fallback
-                        } else {
-                            playerScore = currentPlayerDbData.score || 0;
-                            const playerAnswerFromDb = currentPlayerDbData.last_answer_data || [];
-                            displayResult(data, playerAnswerFromDb, playerScore);
-                        }
-                        
-                        waitingForNext.textContent = data.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
-                        if (data.isFinal) {
-                            displayFinalResult(data);
-                        }
-                        break;
-                    case 'final':
-                        // This case might be redundant if 'result' already handles final.
-                        // However, keeping it for robustness if a separate 'final' broadcast is sent.
-                        displayFinalResult(data);
-                        break;
-                    case 'quiz_terminated':
-                        showMessage("Der Host hat das Quiz beendet.", 'info');
-                        resetPlayerStateAndUI();
-                        showView('role-selection');
-                        break;
-                }
-            }
+            // handleHostData removed — all message handling is now in playerWs.onmessage
 
             /**
              * Starts the player's timer for the current question.
@@ -1768,9 +1454,14 @@ function initializePlayerFeatures() {
                          // Auto-submit current selections if player hasn't already submitted
                          if (!submitAnswerBtn.disabled) {
                              submitAnswerBtn.disabled = true;
-                             supabaseClient.from('players').update({ last_answer_data: selectedAnswers, last_answer_time: new Date().toISOString() }).eq('id', playerCurrentId)
-                                 .then(() => console.log("Auto-submitted player answer on timeout:", selectedAnswers))
-                                 .catch(e => console.error("Error auto-submitting answer:", e));
+                             if (playerWs && playerWs.readyState === WebSocket.OPEN) {
+                                 playerWs.send(JSON.stringify({
+                                     type: 'submit_answer',
+                                     answerData: selectedAnswers,
+                                     answerTime: new Date().toISOString()
+                                 }));
+                                 console.log("Auto-submitted player answer on timeout:", selectedAnswers);
+                             }
                          }
                     }
                 }, 100); // Update every 100ms
@@ -1933,14 +1624,11 @@ function initializePlayerFeatures() {
             /**
              * Resets the player's state and UI to the initial join form.
              */
-            async function resetPlayerStateAndUI() {
-                if (playerSupabaseChannel) {
-                    await supabaseClient.removeChannel(playerSupabaseChannel);
-                    playerSupabaseChannel = null;
-                }
-                // Mark player as disconnected in DB
-                if (playerCurrentId) {
-                    await supabaseClient.from('players').update({ is_connected: false }).eq('id', playerCurrentId);
+            function resetPlayerStateAndUI() {
+                if (playerWs) {
+                    playerWs.onclose = null; // Prevent reconnect
+                    playerWs.close();
+                    playerWs = null;
                 }
 
                 playerScore = 0;

@@ -1,4 +1,4 @@
-# Supabase configuration (contains sensitive API keys)
+# WebSocket server configuration (local dev overrides)
 qlash-config.js
 
 # Node modules (if using npm locally)

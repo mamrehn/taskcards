@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://qlash-server.fly.dev; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self';">
     <meta name="referrer" content="no-referrer">
     <title>Multiplayer Quiz</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="theme.css">
     <script src="theme.js"></script>
@@ -31,8 +30,17 @@
 
             <div id="host-setup">
                 <div class="duration-setting" style="margin-top: 15px;">
-                    <label for="question-duration-input">Fragedauer (Sekunden):</label>
-                    <input type="number" id="question-duration-input" value="20" min="5" max="60" class="w-full p-2 border rounded">
+                    <label>Fragedauer (Sekunden):</label>
+                    <div class="duration-range-row">
+                        <div class="duration-input-group">
+                            <label for="question-duration-min">Min:</label>
+                            <input type="number" id="question-duration-min" value="10" min="5" max="60" class="duration-input">
+                        </div>
+                        <div class="duration-input-group">
+                            <label for="question-duration-max">Max:</label>
+                            <input type="number" id="question-duration-max" value="30" min="5" max="60" class="duration-input">
+                        </div>
+                    </div>
                 </div>
                 <button id="start-quiz-btn" class="btn btn-accent" style="margin-top: 10px;">Quiz starten</button>
 

@@ -12,26 +12,19 @@
 
   <h1>Datenschutzinformationen zur Nutzung der Quiz App</h1>
 
-  <p>Beim Verwenden dieser Quiz App werden bestimmte Daten des Spielers temporär in einer Supabase-Datenbank gespeichert, um den Fortschritt und die Interaktionen während einer Fragerunde zu ermöglichen.</p>
+  <p>Beim Verwenden dieser Quiz App werden bestimmte Daten des Spielers temporär im Arbeitsspeicher des Servers verarbeitet, um den Fortschritt und die Interaktionen während einer Fragerunde zu ermöglichen.</p>
 
   <h2>Gespeicherte Daten</h2>
-  <p>Folgende Daten werden temporär erhoben und gespeichert:</p>
+  <p>Folgende Daten werden temporär erhoben und verarbeitet:</p>
   <ul>
     <li>Nickname (frei wählbar, keine Pflicht zur echten Namensangabe)</li>
-    <li>Spieler-ID (automatisch generiert)</li>
+    <li>Session-ID (automatisch generiert)</li>
     <li>Antworten auf Aufgaben bzw. Lernkarten</li>
     <li>Statistische Informationen wie Antwortzeiten oder Fortschritt</li>
-    <li>Session-Zeitstempel</li>
   </ul>
 
   <h2>Datensicherheit und Löschkonzept</h2>
-  <p>Die Daten werden ausschließlich in Echtzeit verarbeitet und automatisch <strong>einmal täglich</strong> aus der Supabase-Datenbank gelöscht. Es erfolgt keine dauerhafte Speicherung oder Profilbildung. Die Nutzung erfolgt anonymisiert.</p>
-
-  <div class="schema">
-    <h2>Schema der verwendeten Supabase-Datenbank</h2>
-    <p>Nachfolgend ist die Struktur der eingesetzten Datenbank grafisch dargestellt:</p>
-    <img style="margin: 0; padding: 0; width: 1050px; height: 510px; object-fit: none; object-position: 0 0;" src="qlash/supabase-schema-psjanfchvdsefvzxqtac.svg" alt="Supabase Datenbankschema"/>
-  </div>
+  <p>Die Daten werden ausschließlich in Echtzeit über eine WebSocket-Verbindung verarbeitet und nur im Arbeitsspeicher des Servers gehalten. Es erfolgt keine dauerhafte Speicherung in einer Datenbank. Die Daten werden automatisch gelöscht, wenn der Raum beendet wird oder spätestens nach <strong>2 Stunden</strong>. Es erfolgt keine Profilbildung. Die Nutzung erfolgt anonymisiert.</p>
 
 </body>
 </html>
