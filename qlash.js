@@ -1,4 +1,4 @@
-﻿/**
+/**
  * WebSocket Server Configuration
  *
  * This placeholder is replaced during build/deployment with the actual server URL.
@@ -998,7 +998,10 @@ async function initializeHostFeatures() {
                 const adjustedRatio = Math.max(0, correctRatio - wrongPenalty);
 
                 if (adjustedRatio > 0) {
-                    const timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
+                    let timeTaken = p.answerTime !== null ? p.answerTime : totalQuestionTime;
+                    // Clamp timeTaken to avoid negative or excessive values
+                    timeTaken = Math.max(0, Math.min(timeTaken, totalQuestionTime));
+
                     const timeRemaining = Math.max(0, totalQuestionTime - timeTaken);
                     const timeBonus = (timeRemaining / totalQuestionTime) * (currentQuestionBasePoints * 0.5);
 
@@ -1026,7 +1029,7 @@ async function initializeHostFeatures() {
             type: 'send_results',
             correct: currentQ.shuffledCorrect,
             isFinal: isFinalQ,
-            options: currentQ.shuffledOptions,
+            // options: currentQ.shuffledOptions, // Removed: Players use local copy
             leaderboard: leaderboardData,
             playerScores: playerScores
         }));
@@ -1561,7 +1564,8 @@ function initializePlayerFeatures() {
         // Use the actual playerAnswer passed to the function
         const playerAnsSet = new Set(playerAnswer || []);
         const correctSet = new Set(rData.correct);
-        const options = rData.options; // These are the shuffled options from the host
+        // Use local options if not in payload
+        const options = rData.options || playerCurrentQuestionOptions;
 
         const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
         const isCompletelyCorrect = correctHits === correctSet.size &&

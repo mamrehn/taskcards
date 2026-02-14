@@ -323,7 +323,7 @@ function handleSendResults(ws, msg) {
                 type: 'result',
                 correct: msg.correct,
                 isFinal: msg.isFinal,
-                options: msg.options,
+                // options removed for security/bandwidth - client uses local copy
                 leaderboard: msg.leaderboard,
                 playerScore: player.score
             });
