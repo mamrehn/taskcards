@@ -1430,8 +1430,10 @@ function initializePlayerFeatures() {
                         break;
 
                     case 'result':
+                        const oldScore = playerScore;
                         playerScore = msg.playerScore || playerScore;
-                        displayResult(msg, selectedAnswers, playerScore);
+                        const gainedPoints = playerScore - oldScore;
+                        displayResult(msg, selectedAnswers, playerScore, gainedPoints, oldScore);
                         waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
                         if (msg.isFinal) displayFinalResult(msg);
                         break;
@@ -1560,10 +1562,12 @@ function initializePlayerFeatures() {
     /**
      * Displays the result of the just-answered question for the player.
      * @param {Object} rData - The result data received from the host.
-     * @param {Array<number>} playerAnswer - The player's actual answer for this question (fetched from DB or local).
-     * @param {number} currentScore - The player's current score (fetched from DB).
+     * @param {Array<number>} playerAnswer - The player's actual answer for this question.
+     * @param {number} currentScore - The player's current score (total).
+     * @param {number} gainedPoints - Points gained in this round.
+     * @param {number} oldScore - The previous score.
      */
-    function displayResult(rData, playerAnswer, currentScore) {
+    function displayResult(rData, playerAnswer, currentScore, gainedPoints = 0, oldScore = 0) {
         playerQuestionView.classList.add('hidden');
         playerResultView.classList.remove('hidden');
 
@@ -1608,7 +1612,14 @@ function initializePlayerFeatures() {
 
 
         resultDisplay.innerHTML = resultHtml;
-        playerScoreEl.textContent = Math.round(currentScore); // Use currentScore passed to the function
+        resultDisplay.innerHTML = resultHtml;
+
+        // Display score breakdown: Old + Gained = New
+        if (gainedPoints > 0) {
+            playerScoreEl.innerHTML = `${Math.round(oldScore)} + <span class="score-gained">${Math.round(gainedPoints)}</span> = <strong>${Math.round(currentScore)}</strong>`;
+        } else {
+            playerScoreEl.textContent = Math.round(currentScore);
+        }
 
         // Update player option buttons to show correct/incorrect after result
         optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
