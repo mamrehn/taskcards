@@ -16,7 +16,7 @@ const WS_URL = (typeof window !== 'undefined' && window.WS_URL && window.WS_URL 
  * @param {string} type - 'error' or 'info'.
  */
 function showMessage(message, type = 'info') {
-    console.log(`Message (${type}): ${message}`);
+    // console.log(`Message (${type}): ${message}`);
 
     // Remove existing toast if present
     const existing = document.getElementById('toast-notification');
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reconnect WebSocket when tab becomes visible again
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible') return;
-        console.log('Tab became visible, checking connections...');
+        // console.log('Tab became visible, checking connections...');
 
         if (hostWs && hostWs.readyState !== WebSocket.OPEN && hostRoomId) {
             reconnectHostWs();
@@ -202,7 +202,7 @@ function getNonHostPlayerCount() {
  * Initializes all features and event listeners for the host role.
  */
 async function initializeHostFeatures() {
-    console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
+    // console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
     // Initialize quiz state if not already set
     if (!hostGlobalQuizState) {
         hostGlobalQuizState = {
@@ -261,7 +261,7 @@ async function initializeHostFeatures() {
 
     // Only set up event listeners once
     if (!isHostInitialized) {
-        console.log("Setting up host event listeners for the first time.");
+        // console.log("Setting up host event listeners for the first time.");
 
         // Event listener for JSON file import
         jsonFileInput.addEventListener('change', (event) => {
@@ -900,7 +900,7 @@ async function initializeHostFeatures() {
             startTime: hostQuestionStartTime,
             duration: quizState.questionDurations[quizState.currentQuestionIndex]
         }));
-        console.log('Question sent via WebSocket');
+        // console.log('Question sent via WebSocket');
     }
 
     /**
@@ -1040,7 +1040,7 @@ async function initializeHostFeatures() {
             leaderboard: leaderboardData,
             playerScores: playerScores
         }));
-        console.log('Results sent via WebSocket');
+        // console.log('Results sent via WebSocket');
     }
 
     /**
@@ -1280,7 +1280,7 @@ function triggerConfetti() {
  * Initializes all features and event listeners for the player role.
  */
 function initializePlayerFeatures() {
-    console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
+    // console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
 
     // Cache DOM elements for performance
     const roomCodeInput = document.getElementById('room-code-input');
@@ -1305,7 +1305,7 @@ function initializePlayerFeatures() {
     const playerLeaderboardContainer = document.getElementById('player-leaderboard-container');
 
     if (!isPlayerInitialized) {
-        console.log("Setting up player event listeners for the first time.");
+        // console.log("Setting up player event listeners for the first time.");
 
         joinBtn.addEventListener('click', async () => {
             const roomCode = roomCodeInput.value.trim().replace(/\s/g, ''); // Remove spaces
@@ -1328,7 +1328,7 @@ function initializePlayerFeatures() {
 
             submitAnswerBtn.disabled = true;
             optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
-            console.log("Player submitted answer:", selectedAnswers);
+            // console.log("Player submitted answer:", selectedAnswers);
 
             if (playerTimerInterval) {
                 clearInterval(playerTimerInterval);
@@ -1342,7 +1342,7 @@ function initializePlayerFeatures() {
                     answerData: selectedAnswers,
                     answerTime: new Date().toISOString()
                 }));
-                console.log('Player answer sent via WebSocket.');
+                // console.log('Player answer sent via WebSocket.');
             }
         });
 
@@ -1494,7 +1494,7 @@ function initializePlayerFeatures() {
                 playerTimerInterval = null;
                 submitAnswerBtn.classList.add('hidden');
                 optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
-                console.log("Player timer up.");
+                // console.log("Player timer up.");
                 // Auto-submit current selections if player hasn't already submitted
                 if (!submitAnswerBtn.disabled) {
                     submitAnswerBtn.disabled = true;
@@ -1504,7 +1504,7 @@ function initializePlayerFeatures() {
                             answerData: selectedAnswers,
                             answerTime: new Date().toISOString()
                         }));
-                        console.log("Auto-submitted player answer on timeout:", selectedAnswers);
+                        // console.log("Auto-submitted player answer on timeout:", selectedAnswers);
                     }
                 }
             }
@@ -1642,7 +1642,7 @@ function initializePlayerFeatures() {
      * @param {Object} frData - The final results data received from the host.
      */
     function displayFinalResult(frData) {
-        console.log("Displaying final results for player:", frData); // Debug log
+        // console.log("Displaying final results for player:", frData); // Debug log
         playerQuestionView.classList.add('hidden');
         playerResultView.classList.add('hidden');
         waitingRoom.classList.add('hidden');
