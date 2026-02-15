@@ -920,7 +920,10 @@ async function initializeHostFeatures() {
             timerBar.style.width = `${(remaining / totalDurationMs) * 100}%`;
 
             if (remaining <= 0) {
-                endQuestion();
+                // Wait a grace period for client auto-submits to arrive
+                clearInterval(hostTimerInterval);
+                hostTimerInterval = null;
+                setTimeout(() => endQuestion(), 2000);
             }
         }, 100); // Update every 100ms
     }
