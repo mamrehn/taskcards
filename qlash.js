@@ -88,8 +88,8 @@ let modalRoomIdSpan = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Verify WebSocket URL is configured
-    if (!WS_URL || WS_URL === '__WS_URL__') {
-        console.error('WebSocket server URL not configured.');
+    if (!WS_URL || !WS_URL.startsWith('ws')) {
+        console.error('WebSocket server URL not configured or invalid:', WS_URL);
         showMessage('Server-URL nicht konfiguriert. Bitte überprüfe die Konfiguration.', 'error');
         return;
     }
