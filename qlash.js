@@ -1026,7 +1026,8 @@ async function initializeHostFeatures() {
 
         const currentQ = quizState.shuffledQuestions[quizState.currentQuestionIndex];
         const isFinalQ = quizState.currentQuestionIndex === quizState.shuffledQuestions.length - 1;
-        const leaderboardData = getLeaderboardData();
+        // Optimize: Only send leaderboard on final question
+        const leaderboardData = isFinalQ ? getLeaderboardData() : null;
 
         // Build playerScores map so server can store scores for reconnection
         const playerScores = {};
