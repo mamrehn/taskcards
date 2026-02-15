@@ -1576,7 +1576,7 @@ function initializePlayerFeatures() {
         const playerAnsSet = new Set(playerAnswer || []);
         const correctSet = new Set(rData.correct);
         // Use local options if not in payload
-        const options = rData.options || playerCurrentQuestionOptions;
+        const options = playerCurrentQuestionOptions; // Use locally stored options instead of network payload
 
         const correctHits = [...playerAnsSet].filter(item => correctSet.has(item)).length;
         const isCompletelyCorrect = correctHits === correctSet.size &&
