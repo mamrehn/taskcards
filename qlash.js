@@ -598,10 +598,12 @@ async function initializeHostFeatures() {
                     break;
 
                 case 'player_joined':
-                    console.log('New player joined:', msg.name);
+                    // console.log('New player joined:', msg.name);
+                    // Sanitize name immediately upon receipt
+                    const joinedName = sanitizePlayerName(msg.name) || `Spieler ${msg.sessionId.substring(0, 4)}`;
                     quizState.players[msg.sessionId] = {
                         id: msg.sessionId,
-                        name: msg.name,
+                        name: joinedName,
                         score: 0,
                         currentAnswer: [],
                         answerTime: null,
@@ -621,13 +623,16 @@ async function initializeHostFeatures() {
                     break;
 
                 case 'player_reconnected':
+                    const reconnectedName = sanitizePlayerName(msg.name) || `Spieler ${msg.sessionId.substring(0, 4)}`;
                     if (quizState.players[msg.sessionId]) {
                         quizState.players[msg.sessionId].isConnected = true;
                         quizState.players[msg.sessionId].score = msg.score;
+                        // Update name in case it changed (though session ID is key)
+                        quizState.players[msg.sessionId].name = reconnectedName;
                     } else {
                         quizState.players[msg.sessionId] = {
                             id: msg.sessionId,
-                            name: msg.name,
+                            name: reconnectedName,
                             score: msg.score,
                             currentAnswer: [],
                             answerTime: null,
@@ -728,7 +733,9 @@ async function initializeHostFeatures() {
         if (p.currentAnswer && p.currentAnswer.length > 0) return;
 
         quizState.answersReceived++;
-        const answerReceiveTime = msg.answerTime ? new Date(msg.answerTime).getTime() : Date.now();
+        // SECURITY: Use Host time (Date.now()) instead of trusting client's msg.answerTime
+        // This prevents players from spoofing retroactively early answers.
+        const answerReceiveTime = Date.now();
         const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000;
         p.answerTime = timeTaken;
         p.currentAnswer = msg.answerData;

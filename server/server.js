@@ -248,7 +248,9 @@ function handleJoin(ws, msg) {
     } else {
         // New player
         sessionId = generateSessionId();
-        const name = msg.playerName || 'Spieler';
+        // Truncate name to prevent massive strings in memory
+        const rawName = msg.playerName || 'Spieler';
+        const name = rawName.substring(0, 50);
         player = { name, score: 0, ws, isConnected: true };
         room.players.set(sessionId, player);
 
