@@ -59,13 +59,30 @@ const httpServer = http.createServer((req, res) => {
 
 // --- WebSocket Server ---
 
-const wss = new WebSocketServer({ server: httpServer });
+const MAX_PLAYERS_PER_ROOM = 300;
+const RATE_LIMIT_PER_SECOND = 20;
+
+const wss = new WebSocketServer({ server: httpServer, maxPayload: 64 * 1024 }); // 64KB max message
 
 wss.on('connection', (ws) => {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
 
+    // Rate limiting: track messages per second
+    ws._msgCount = 0;
+    ws._msgResetTimer = setInterval(() => { ws._msgCount = 0; }, 1000);
+
     ws.on('message', (raw) => {
+        // Rate limit check
+        if (++ws._msgCount > RATE_LIMIT_PER_SECOND) {
+            send(ws, { type: 'error', message: 'Zu viele Nachrichten. Bitte warte einen Moment.' });
+            if (ws._msgCount > RATE_LIMIT_PER_SECOND * 3) {
+                clearInterval(ws._msgResetTimer);
+                ws.terminate();
+            }
+            return;
+        }
+
         let msg;
         try { msg = JSON.parse(raw); } catch { return; }
 
@@ -81,7 +98,10 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.on('close', () => handleDisconnect(ws));
+    ws.on('close', () => {
+        clearInterval(ws._msgResetTimer);
+        handleDisconnect(ws);
+    });
     ws.on('error', (err) => console.error('WebSocket error:', err.message));
 });
 
@@ -188,10 +208,10 @@ function handleRestoreRoom(ws, msg) {
         hostDisconnectTimer: null
     };
 
-    // Restore players if provided
+    // Restore players if provided (limit to MAX_PLAYERS_PER_ROOM)
     if (msg.players && Array.isArray(msg.players)) {
-        for (const p of msg.players) {
-            // p: { id, name, score, ... }
+        const playersToRestore = msg.players.slice(0, MAX_PLAYERS_PER_ROOM);
+        for (const p of playersToRestore) {
             if (p.id && p.name) {
                 room.players.set(p.id, {
                     name: p.name,
@@ -246,6 +266,12 @@ function handleJoin(ws, msg) {
         }
         console.log(`Player "${player.name}" reconnected to room ${roomCode}`);
     } else {
+        // Enforce max player limit
+        if (room.players.size >= MAX_PLAYERS_PER_ROOM) {
+            send(ws, { type: 'error', message: 'Raum ist voll (max. 300 Spieler).' });
+            return;
+        }
+
         // New player
         sessionId = generateSessionId();
         // Truncate name to prevent massive strings in memory
@@ -279,13 +305,21 @@ function handleSubmitAnswer(ws, msg) {
     const player = room.players.get(ws.sessionId);
     if (!player) return;
 
+    // Validate answerData: must be an array of at most 20 indices
+    if (!Array.isArray(msg.answerData) || msg.answerData.length > 20) return;
+
     if (room.hostWs && room.hostWs.readyState === 1) {
+        // Compute elapsed time on server for fair scoring
+        const serverNow = Date.now();
+        const elapsedMs = room.questionStartTime ? serverNow - room.questionStartTime : null;
+
         send(room.hostWs, {
             type: 'player_answered',
             sessionId: ws.sessionId,
             name: player.name,
             answerData: msg.answerData,
-            answerTime: msg.answerTime
+            answerTime: serverNow,
+            elapsedMs: elapsedMs
         });
     }
 }
@@ -294,14 +328,17 @@ function handleStartQuestion(ws, msg) {
     const room = rooms.get(ws.roomId);
     if (!room || ws.role !== 'host') return;
 
-    // Relay to all players, stripping correct answers for security
+    // Record server-side question start time for fair timing
+    room.questionStartTime = Date.now();
+
+    // Relay to all players, using server timestamp
     broadcastToPlayers(room, {
         type: 'question',
         question: msg.question,
         options: msg.options,
         index: msg.index,
         total: msg.total,
-        startTime: msg.startTime,
+        startTime: room.questionStartTime,
         duration: msg.duration
     });
 }
@@ -404,6 +441,16 @@ const cleanupInterval = setInterval(() => {
 // --- Graceful shutdown ---
 
 process.on('SIGTERM', () => {
+    console.log('SIGTERM received, notifying all rooms...');
+    // Notify all players before shutting down
+    for (const [id, room] of rooms) {
+        broadcastToPlayers(room, { type: 'quiz_terminated' });
+        if (room.hostWs && room.hostWs.readyState === 1) {
+            send(room.hostWs, { type: 'quiz_terminated' });
+        }
+    }
+    rooms.clear();
+
     clearInterval(heartbeatInterval);
     clearInterval(cleanupInterval);
     wss.close(() => {

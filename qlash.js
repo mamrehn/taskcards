@@ -79,6 +79,50 @@ function shuffleArray(array) {
     }
 }
 
+/**
+ * Creates a WebSocket connection with retry logic for Fly.io cold starts.
+ * Retries up to maxRetries times with increasing delays if the connection fails immediately.
+ * @param {string} url - The WebSocket URL.
+ * @param {number} maxRetries - Max retry attempts for initial connection.
+ * @returns {Promise<WebSocket>} A connected WebSocket.
+ */
+function connectWithRetry(url, maxRetries = 3) {
+    return new Promise((resolve, reject) => {
+        let attempt = 0;
+        function tryConnect() {
+            attempt++;
+            const ws = new WebSocket(url);
+            const timeout = setTimeout(() => {
+                ws.onopen = null;
+                ws.onerror = null;
+                ws.close();
+                if (attempt < maxRetries) {
+                    console.log(`WebSocket connection attempt ${attempt} timed out, retrying...`);
+                    setTimeout(tryConnect, 2000 * attempt);
+                } else {
+                    reject(new Error('WebSocket connection failed after retries'));
+                }
+            }, 10000); // 10s timeout per attempt
+
+            ws.onopen = () => {
+                clearTimeout(timeout);
+                resolve(ws);
+            };
+            ws.onerror = () => {
+                clearTimeout(timeout);
+                ws.onopen = null;
+                if (attempt < maxRetries) {
+                    console.log(`WebSocket connection attempt ${attempt} failed, retrying...`);
+                    setTimeout(tryConnect, 2000 * attempt);
+                } else {
+                    reject(new Error('WebSocket connection failed after retries'));
+                }
+            };
+        }
+        tryConnect();
+    });
+}
+
 // --- App initialization ---
 // QR Code Modal elements (declared globally for early access)
 let qrModalOverlay = null;
@@ -550,13 +594,15 @@ async function initializeHostFeatures() {
     async function initHostConnection() {
         hostWsReconnectAttempts = 0;
 
-        hostWs = new WebSocket(WS_URL);
+        try {
+            hostWs = await connectWithRetry(WS_URL);
+        } catch (e) {
+            showMessage('Server nicht erreichbar. Bitte versuche es später erneut.', 'error');
+            return;
+        }
 
-        hostWs.onopen = () => {
-            console.log('Host WebSocket connected');
-            hostWsReconnectAttempts = 0;
-            hostWs.send(JSON.stringify({ type: 'create_room' }));
-        };
+        console.log('Host WebSocket connected');
+        hostWs.send(JSON.stringify({ type: 'create_room' }));
 
         hostWs.onmessage = (event) => {
             let msg;
@@ -672,6 +718,11 @@ async function initializeHostFeatures() {
      * Reconnects the host WebSocket after a disconnect.
      */
     function reconnectHostWs() {
+        // Capture original handlers BEFORE reassigning hostWs to avoid infinite recursion
+        const originalOnMessage = hostWs ? hostWs.onmessage : null;
+        const originalOnClose = hostWs ? hostWs.onclose : null;
+        const originalOnError = hostWs ? hostWs.onerror : null;
+
         const ws = new WebSocket(WS_URL);
 
         ws.onopen = () => {
@@ -686,8 +737,6 @@ async function initializeHostFeatures() {
 
             if (msg.type === 'room_not_found_try_restore') {
                 console.log("Room needs restoration. Sending state...");
-                // Server lost the room (e.g., restart), but we have the valid session.
-                // Attempt to restore the room with current players.
                 const playersToRestore = [];
                 if (hostGlobalQuizState && hostGlobalQuizState.players) {
                     for (const p of Object.values(hostGlobalQuizState.players)) {
@@ -705,17 +754,17 @@ async function initializeHostFeatures() {
                     sessionId: hostSessionId,
                     players: playersToRestore
                 }));
-                return; // Wait for host_reconnected
+                return;
             }
 
-            // Delegate to original handler for other messages
-            if (hostWs && hostWs.onmessage) {
-                hostWs.onmessage(event);
+            // Delegate to captured original handler (not hostWs.onmessage which would be self)
+            if (originalOnMessage) {
+                originalOnMessage(event);
             }
         };
 
-        ws.onclose = hostWs ? hostWs.onclose : null;
-        ws.onerror = hostWs ? hostWs.onerror : null;
+        ws.onclose = originalOnClose;
+        ws.onerror = originalOnError;
 
         hostWs = ws;
     }
@@ -733,10 +782,8 @@ async function initializeHostFeatures() {
         if (p.currentAnswer && p.currentAnswer.length > 0) return;
 
         quizState.answersReceived++;
-        // SECURITY: Use Host time (Date.now()) instead of trusting client's msg.answerTime
-        // This prevents players from spoofing retroactively early answers.
-        const answerReceiveTime = Date.now();
-        const timeTaken = (answerReceiveTime - hostQuestionStartTime) / 1000;
+        // Use server-measured elapsed time for fair scoring (immune to client clock manipulation)
+        const timeTaken = msg.elapsedMs != null ? msg.elapsedMs / 1000 : (Date.now() - hostQuestionStartTime) / 1000;
         p.answerTime = timeTaken;
         p.currentAnswer = msg.answerData;
         answersCount.textContent = quizState.answersReceived.toString();
@@ -1170,15 +1217,17 @@ let playerBeforeUnloadHandler = null;
  * Reconnects the player WebSocket (called from visibilitychange).
  */
 function reconnectPlayerWs() {
+    // Capture handlers BEFORE nulling onclose, to avoid losing them
+    const originalOnMessage = playerWs ? playerWs.onmessage : null;
+    const originalOnClose = playerWs ? playerWs.onclose : null;
+    const originalOnError = playerWs ? playerWs.onerror : null;
+
     if (playerWs) {
-        playerWs.onclose = null;
+        playerWs.onclose = null; // Prevent reconnect loop from old socket closing
         playerWs.close();
     }
     const session = getPlayerSession(playerRoomId);
     const name = session ? session.playerName : 'Spieler';
-    // initPlayerConnection is defined inside initializePlayerFeatures but the call
-    // goes through the module-scoped playerWs reconnect logic inside connectPlayerWs
-    // We need a different approach: just re-open the WS and send join with sessionId
     const ws = new WebSocket(WS_URL);
     ws.onopen = () => {
         ws.send(JSON.stringify({
@@ -1188,12 +1237,9 @@ function reconnectPlayerWs() {
             sessionId: playerCurrentId
         }));
     };
-    // Copy handlers from existing playerWs if available
-    if (playerWs) {
-        ws.onmessage = playerWs.onmessage;
-        ws.onclose = playerWs.onclose;
-        ws.onerror = playerWs.onerror;
-    }
+    ws.onmessage = originalOnMessage;
+    ws.onclose = originalOnClose;
+    ws.onerror = originalOnError;
     playerWs = ws;
 }
 
@@ -1386,7 +1432,7 @@ function initializePlayerFeatures() {
      * @param {string} roomCode - The room code to join.
      * @param {string} pName - The player's name.
      */
-    function initPlayerConnection(roomCode, pName) {
+    async function initPlayerConnection(roomCode, pName) {
         playerRoomId = roomCode;
         let playerWsReconnectAttempts = 0;
         const MAX_RECONNECT_ATTEMPTS = 30;
@@ -1400,9 +1446,9 @@ function initializePlayerFeatures() {
         const existingSessionId = existingSession ? existingSession.playerId : null;
 
         function connectPlayerWs() {
-            playerWs = new WebSocket(WS_URL);
-
-            playerWs.onopen = () => {
+            // Use retry helper for initial connection (handles Fly.io cold starts)
+            connectWithRetry(WS_URL).then(ws => {
+                playerWs = ws;
                 console.log('Player WebSocket connected');
                 playerWsReconnectAttempts = 0;
                 playerWs.send(JSON.stringify({
@@ -1411,69 +1457,72 @@ function initializePlayerFeatures() {
                     playerName: pName,
                     sessionId: existingSessionId || playerCurrentId
                 }));
-            };
 
-            playerWs.onmessage = (event) => {
-                let msg;
-                try { msg = JSON.parse(event.data); } catch { return; }
+                playerWs.onmessage = (event) => {
+                    let msg;
+                    try { msg = JSON.parse(event.data); } catch { return; }
 
-                switch (msg.type) {
-                    case 'joined':
-                        playerCurrentId = msg.sessionId;
-                        playerScore = msg.score || 0;
-                        savePlayerSession(roomCode, msg.sessionId, msg.playerName || pName);
-                        waitingMessage.textContent = msg.isReconnect
-                            ? 'Wieder verbunden! Warte auf Host...'
-                            : 'Verbunden! Warte auf Host...';
-                        break;
+                    switch (msg.type) {
+                        case 'joined':
+                            playerCurrentId = msg.sessionId;
+                            playerScore = msg.score || 0;
+                            savePlayerSession(roomCode, msg.sessionId, msg.playerName || pName);
+                            waitingMessage.textContent = msg.isReconnect
+                                ? 'Wieder verbunden! Warte auf Host...'
+                                : 'Verbunden! Warte auf Host...';
+                            break;
 
-                    case 'question':
-                        playerCurrentQuestionOptions = msg.options;
-                        selectedAnswers = [];
-                        playerQuestionStartTime = msg.startTime || Date.now();
-                        displayQuestion(msg);
-                        const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
-                        const remainingDuration = Math.max(1, msg.duration - elapsedSinceStart);
-                        startPlayerTimer(remainingDuration);
-                        break;
+                        case 'question':
+                            playerCurrentQuestionOptions = msg.options;
+                            selectedAnswers = [];
+                            playerQuestionStartTime = msg.startTime || Date.now();
+                            displayQuestion(msg);
+                            const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
+                            const remainingDuration = Math.max(1, msg.duration - elapsedSinceStart);
+                            startPlayerTimer(remainingDuration);
+                            break;
 
-                    case 'result':
-                        const oldScore = playerScore;
-                        playerScore = msg.playerScore || playerScore;
-                        const gainedPoints = playerScore - oldScore;
-                        displayResult(msg, selectedAnswers, playerScore, gainedPoints, oldScore);
-                        waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
-                        if (msg.isFinal) displayFinalResult(msg);
-                        break;
+                        case 'result':
+                            const oldScore = playerScore;
+                            playerScore = msg.playerScore || playerScore;
+                            const gainedPoints = playerScore - oldScore;
+                            displayResult(msg, selectedAnswers, playerScore, gainedPoints, oldScore);
+                            waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
+                            if (msg.isFinal) displayFinalResult(msg);
+                            break;
 
-                    case 'quiz_terminated':
-                        showMessage("Der Host hat das Quiz beendet.", 'info');
+                        case 'quiz_terminated':
+                            showMessage("Der Host hat das Quiz beendet.", 'info');
+                            resetPlayerStateAndUI();
+                            showView('role-selection');
+                            break;
+
+                        case 'error':
+                            showMessage(msg.message, 'error');
+                            resetPlayerStateAndUI();
+                            break;
+                    }
+                };
+
+                playerWs.onclose = () => {
+                    console.log('Player WebSocket closed');
+                    if (playerRoomId && playerCurrentId && playerWsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        playerWsReconnectAttempts++;
+                        waitingMessage.textContent = `Verbindung unterbrochen. Reconnect ${playerWsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`;
+                        setTimeout(connectPlayerWs, RECONNECT_DELAY_MS);
+                    } else if (playerWsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                        showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
                         resetPlayerStateAndUI();
-                        showView('role-selection');
-                        break;
+                    }
+                };
 
-                    case 'error':
-                        showMessage(msg.message, 'error');
-                        resetPlayerStateAndUI();
-                        break;
-                }
-            };
-
-            playerWs.onclose = () => {
-                console.log('Player WebSocket closed');
-                if (playerRoomId && playerCurrentId && playerWsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    playerWsReconnectAttempts++;
-                    waitingMessage.textContent = `Verbindung unterbrochen. Reconnect ${playerWsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`;
-                    setTimeout(connectPlayerWs, RECONNECT_DELAY_MS);
-                } else if (playerWsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                    showMessage('Verbindung zum Quiz-Raum verloren. Bitte lade die Seite neu.', 'error');
-                    resetPlayerStateAndUI();
-                }
-            };
-
-            playerWs.onerror = (err) => {
-                console.error('Player WebSocket error:', err);
-            };
+                playerWs.onerror = (err) => {
+                    console.error('Player WebSocket error:', err);
+                };
+            }).catch(() => {
+                showMessage('Server nicht erreichbar. Bitte versuche es später erneut.', 'error');
+                resetPlayerStateAndUI();
+            });
         }
 
         connectPlayerWs();
