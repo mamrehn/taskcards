@@ -53,6 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('quiz-btn').addEventListener('click', (e) => {
         e.preventDefault();
-        triggerConfettiTo('qlash.html');
+        triggerConfettiTo('quiz.html');
     });
 });

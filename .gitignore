@@ -1,5 +1,5 @@
 # WebSocket server configuration (local dev overrides)
-qlash-config.js
+quiz-config.js
 
 # Node modules (if using npm locally)
 node_modules/

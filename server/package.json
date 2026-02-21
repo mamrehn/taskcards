@@ -1,7 +1,7 @@
 {
-  "name": "qlash-server",
+  "name": "quiz-server",
   "version": "1.0.0",
-  "description": "WebSocket relay server for Qlash multiplayer quiz",
+  "description": "WebSocket relay server for multiplayer quiz",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

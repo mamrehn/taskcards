@@ -1,5 +1,6 @@
 const { WebSocketServer } = require('ws');
 const http = require('http');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 
@@ -19,7 +20,13 @@ function generateRoomId() {
 }
 
 function generateSessionId() {
-    return 'sess-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    return 'sess-' + crypto.randomUUID();
+}
+
+function sanitizeName(name) {
+    if (typeof name !== 'string') return 'Spieler';
+    // Strip HTML tags and control characters, then trim and truncate
+    return name.replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '').trim().substring(0, 50) || 'Spieler';
 }
 
 function send(ws, data) {
@@ -59,7 +66,7 @@ const httpServer = http.createServer((req, res) => {
 
 // --- WebSocket Server ---
 
-const MAX_PLAYERS_PER_ROOM = 300;
+const MAX_PLAYERS_PER_ROOM = 240;
 const RATE_LIMIT_PER_SECOND = 20;
 
 const wss = new WebSocketServer({ server: httpServer, maxPayload: 64 * 1024 }); // 64KB max message
@@ -176,7 +183,7 @@ function handleReconnectHost(ws, msg) {
 
 function handleRestoreRoom(ws, msg) {
     // msg should contain: roomId, sessionId, gameState (optional players list etc.)
-    const roomId = (msg.roomId || '').toUpperCase();
+    let roomId = (msg.roomId || '').toUpperCase();
     const hostSessionId = msg.sessionId;
 
     if (!roomId || !hostSessionId) {
@@ -185,18 +192,14 @@ function handleRestoreRoom(ws, msg) {
     }
 
     if (rooms.has(roomId)) {
-        // Room actually exists, maybe created by someone else or race condition?
-        // Check if it matches this host
         const existingRoom = rooms.get(roomId);
         if (existingRoom.hostSessionId === hostSessionId) {
             // It's this host's room, just reconnect normally
             handleReconnectHost(ws, msg);
             return;
-        } else {
-            // Room ID taken by someone else (unlikely with random IDs but possible)
-            send(ws, { type: 'error', message: 'Raum-ID bereits vergeben. Bitte neues Quiz starten.' });
-            return;
         }
+        // Room ID taken by someone else — generate a new one for restoration
+        roomId = generateRoomId();
     }
 
     // Re-create the room
@@ -214,8 +217,8 @@ function handleRestoreRoom(ws, msg) {
         for (const p of playersToRestore) {
             if (p.id && p.name) {
                 room.players.set(p.id, {
-                    name: p.name,
-                    score: p.score || 0,
+                    name: sanitizeName(p.name),
+                    score: typeof p.score === 'number' ? p.score : 0,
                     ws: null,       // WebSocket connection is lost, they must reconnect
                     isConnected: false
                 });
@@ -229,7 +232,12 @@ function handleRestoreRoom(ws, msg) {
     ws.sessionId = hostSessionId;
     ws.role = 'host';
 
-    send(ws, { type: 'host_reconnected', roomId, players: msg.players || [], isRestored: true });
+    // Send back sanitized player data from the server-built Map, not raw client input
+    const playerList = [];
+    for (const [sid, p] of room.players) {
+        playerList.push({ sessionId: sid, name: p.name, score: p.score, isConnected: p.isConnected });
+    }
+    send(ws, { type: 'host_reconnected', roomId, players: playerList, isRestored: true });
     console.log(`Room ${roomId} RESTORED by host ${hostSessionId}`);
 }
 
@@ -268,15 +276,13 @@ function handleJoin(ws, msg) {
     } else {
         // Enforce max player limit
         if (room.players.size >= MAX_PLAYERS_PER_ROOM) {
-            send(ws, { type: 'error', message: 'Raum ist voll (max. 300 Spieler).' });
+            send(ws, { type: 'error', message: 'Raum ist voll (max. 240 Spieler).' });
             return;
         }
 
         // New player
         sessionId = generateSessionId();
-        // Truncate name to prevent massive strings in memory
-        const rawName = msg.playerName || 'Spieler';
-        const name = rawName.substring(0, 50);
+        const name = sanitizeName(msg.playerName);
         player = { name, score: 0, ws, isConnected: true };
         room.players.set(sessionId, player);
 
@@ -326,7 +332,12 @@ function handleSubmitAnswer(ws, msg) {
 
 function handleStartQuestion(ws, msg) {
     const room = rooms.get(ws.roomId);
-    if (!room || ws.role !== 'host') return;
+    if (!room || ws.sessionId !== room.hostSessionId) return;
+
+    // Validate question and options content size
+    if (typeof msg.question !== 'string' || msg.question.length > 4000) return;
+    if (!Array.isArray(msg.options) || msg.options.length > 20) return;
+    if (msg.options.some(o => typeof o !== 'string' || o.length > 500)) return;
 
     // Record server-side question start time for fair timing
     room.questionStartTime = Date.now();
@@ -345,7 +356,7 @@ function handleStartQuestion(ws, msg) {
 
 function handleSendResults(ws, msg) {
     const room = rooms.get(ws.roomId);
-    if (!room || ws.role !== 'host') return;
+    if (!room || ws.sessionId !== room.hostSessionId) return;
 
     // Update stored scores from host
     if (msg.playerScores) {
@@ -372,7 +383,7 @@ function handleSendResults(ws, msg) {
 
 function handleTerminate(ws, msg) {
     const room = rooms.get(ws.roomId);
-    if (!room || ws.role !== 'host') return;
+    if (!room || ws.sessionId !== room.hostSessionId) return;
 
     broadcastToPlayers(room, { type: 'quiz_terminated' });
     rooms.delete(ws.roomId);
@@ -464,5 +475,5 @@ process.on('SIGTERM', () => {
 // --- Start ---
 
 httpServer.listen(PORT, () => {
-    console.log(`Qlash WebSocket server listening on port ${PORT}`);
+    console.log(`Quiz WebSocket server listening on port ${PORT}`);
 });

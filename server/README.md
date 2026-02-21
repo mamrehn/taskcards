@@ -1,6 +1,6 @@
-# Qlash WebSocket Server
+# Quiz WebSocket Server
 
-WebSocket relay server for the Qlash multiplayer quiz. Handles room management, player connections, and message relay between host and players. All state is held in memory (no database).
+WebSocket relay server for the multiplayer quiz. Handles room management, player connections, and message relay between host and players. All state is held in memory (no database).
 
 ## Local Development
 
@@ -12,7 +12,7 @@ node server.js
 
 The server starts on port 8080 (or `PORT` env variable). Health check: `GET http://localhost:8080/health`
 
-To connect from the client, set `WS_URL` in your local `qlash-config.js`:
+To connect from the client, set `WS_URL` in your local `quiz-config.js`:
 
 ```js
 const WS_URL = 'ws://localhost:8080';
@@ -68,5 +68,5 @@ Pushes to `main` that change files in `server/` automatically trigger deployment
 - `auto_start_machines = true`: machine wakes on incoming request (~2-3s cold start)
 - In-memory state is lost when machine sleeps, but rooms auto-expire after 2 hours anyway
 - Rooms are cleaned up when the host terminates the quiz or after 2 hours of inactivity
-- Host disconnect grace period: 60 seconds before the room is terminated
+- Host disconnect grace period: 5 minutes before the room is terminated
 - Ping/pong heartbeat every 30 seconds to detect dead connections

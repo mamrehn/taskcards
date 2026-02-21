@@ -7,9 +7,9 @@
     --correct-color: #00c853;
     --wrong-color: #ff3d00;
 
-    --qlash-surface: #f1f1f1;
-    --qlash-surface-alt: #f0f0f0;
-    --qlash-hover: #e9e9e9;
+    --quiz-surface: #f1f1f1;
+    --quiz-surface-alt: #f0f0f0;
+    --quiz-hover: #e9e9e9;
     --success-bg: #d4edda;
     --success-border: #c3e6cb;
 }
@@ -180,7 +180,7 @@ input, select {
 }
 
 .question-item {
-    background-color: var(--qlash-surface);
+    background-color: var(--quiz-surface);
     padding: 15px;
     border-radius: 4px;
     margin-bottom: 10px;
@@ -194,7 +194,7 @@ input, select {
     margin-bottom: 8px; /* Larger margin from first file */
     border: 1px solid var(--input-border);
     border-radius: 8px; /* More rounded corners from first file */
-    background-color: var(--qlash-surface-alt);
+    background-color: var(--quiz-surface-alt);
     color: var(--text-color);
     text-align: left;
     cursor: pointer;
@@ -203,7 +203,7 @@ input, select {
 }
 
 .option-btn:hover:not(:disabled) {
-    background-color: var(--qlash-hover);
+    background-color: var(--quiz-hover);
 }
 
 /* Styling for the selected option button (player side) */
@@ -237,7 +237,7 @@ input, select {
 }
 
 .host-options-list li {
-    background-color: var(--qlash-surface-alt);
+    background-color: var(--quiz-surface-alt);
     border: 1px solid var(--input-border);
     padding: 10px; /* Increased padding from first file */
     margin-bottom: 8px; /* Increased margin from first file */
@@ -493,7 +493,7 @@ input, select {
 }
 
 .player-item {
-    background-color: var(--qlash-surface);
+    background-color: var(--quiz-surface);
     padding: 10px;
     border-radius: 4px;
     margin-bottom: 5px;
@@ -665,9 +665,9 @@ input, select {
     --correct-color: #4caf50;
     --wrong-color: #ff6e40;
 
-    --qlash-surface: #2a2a3c;
-    --qlash-surface-alt: #323248;
-    --qlash-hover: #3a3a50;
+    --quiz-surface: #2a2a3c;
+    --quiz-surface-alt: #323248;
+    --quiz-hover: #3a3a50;
     --success-bg: rgba(76, 175, 80, 0.2);
     --success-border: rgba(76, 175, 80, 0.3);
 }

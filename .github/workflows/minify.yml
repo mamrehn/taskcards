@@ -37,8 +37,8 @@ jobs:
             exit 1
           fi
           echo "WS_URL is set (length: ${#WS_URL})"
-          sed -i "s|'__WS_URL__'|'$WS_URL'|g" qlash.js
-          if grep -q "__WS_URL__" qlash.js; then
+          sed -i "s|'__WS_URL__'|'$WS_URL'|g" quiz.js
+          if grep -q "__WS_URL__" quiz.js; then
             echo "WS_URL injection may have failed"
             exit 1
           fi
@@ -48,14 +48,14 @@ jobs:
         run: |
           terser index.js --compress --mangle -o index.js
           terser cards.js --compress --mangle -o cards.js
-          terser qlash.js --compress --mangle -o qlash.js
+          terser quiz.js --compress --mangle -o quiz.js
           terser sanitize.js --compress --mangle -o sanitize.js
           terser theme.js --compress --mangle -o theme.js
 
       - name: Minify CSS files
         run: |
           csso cards.css -o cards.css
-          csso qlash.css -o qlash.css
+          csso quiz.css -o quiz.css
           csso theme.css -o theme.css
 
       - name: Add inline attributes to HTML files for inlining
@@ -72,17 +72,17 @@ jobs:
           sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' cards.html
           sed -i 's|<script src="cards\.js"></script>|<script inline src="cards.js"></script>|g' cards.html
 
-          # qlash.html - need to handle external CDN scripts differently
-          sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' qlash.html
-          sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' qlash.html
-          sed -i 's|<link rel="stylesheet" href="qlash\.css">|<link inline rel="stylesheet" href="qlash.css">|g' qlash.html
-          sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' qlash.html
-          sed -i 's|<script src="qlash\.js"></script>|<script inline src="qlash.js"></script>|g' qlash.html
+          # quiz.html - need to handle external CDN scripts differently
+          sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' quiz.html
+          sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' quiz.html
+          sed -i 's|<link rel="stylesheet" href="quiz\.css">|<link inline rel="stylesheet" href="quiz.css">|g' quiz.html
+          sed -i 's|<script src="sanitize\.js"></script>|<script inline src="sanitize.js"></script>|g' quiz.html
+          sed -i 's|<script src="quiz\.js"></script>|<script inline src="quiz.js"></script>|g' quiz.html
 
           # datenschutz.html
           sed -i 's|<link rel="stylesheet" href="theme\.css">|<link inline rel="stylesheet" href="theme.css">|g' datenschutz.html
           sed -i 's|<script src="theme\.js"></script>|<script inline src="theme.js"></script>|g' datenschutz.html
-          sed -i 's|<link rel="stylesheet" href="qlash\.css">|<link inline rel="stylesheet" href="qlash.css">|g' datenschutz.html
+          sed -i 's|<link rel="stylesheet" href="quiz\.css">|<link inline rel="stylesheet" href="quiz.css">|g' datenschutz.html
 
       - name: Inline CSS and JS into HTML files
         run: |
@@ -94,9 +94,9 @@ jobs:
           inline-source cards.html --compress false --root ./ > cards.inline.html
           mv cards.inline.html cards.html
           
-          # Inline qlash.html
-          inline-source qlash.html --compress false --root ./ > qlash.inline.html
-          mv qlash.inline.html qlash.html
+          # Inline quiz.html
+          inline-source quiz.html --compress false --root ./ > quiz.inline.html
+          mv quiz.inline.html quiz.html
 
           # Inline datenschutz.html
           inline-source datenschutz.html --compress false --root ./ > datenschutz.inline.html
@@ -138,7 +138,7 @@ jobs:
             --remove-script-type-attributes \
             --remove-style-link-type-attributes \
             --use-short-doctype \
-            qlash.html -o qlash.html
+            quiz.html -o quiz.html
           
           html-minifier \
             --collapse-boolean-attributes \
@@ -156,7 +156,7 @@ jobs:
 
       - name: Commit minified and inlined files
         run: |
-          git add *.html qlash/
+          git add *.html
           git diff --quiet && git diff --staged --quiet || git commit -m "Minify and inline for deployment (SHA: ${{ github.sha }})"
 
       - name: Deploy to gh-pages

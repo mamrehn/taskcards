@@ -1,4 +1,4 @@
-name: Deploy Qlash Server
+name: Deploy Quiz Server
 run-name: Deploy WebSocket server to Fly.io
 
 on:

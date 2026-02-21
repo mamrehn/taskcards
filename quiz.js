@@ -439,6 +439,27 @@ async function initializeHostFeatures(reconnectInfo) {
                 showMessage('Bitte gültige Fragedauer eingeben: Min 5-80, Max >= Min.', 'error');
                 return;
             }
+            // Validate question and option lengths against server limits
+            const MAX_QUESTION_LENGTH = 4000;
+            const MAX_OPTION_LENGTH = 500;
+            const MAX_OPTIONS = 20;
+            for (let i = 0; i < quizState.questions.length; i++) {
+                const q = quizState.questions[i];
+                if (q.question.length > MAX_QUESTION_LENGTH) {
+                    showMessage(`Frage ${i + 1} ist zu lang (${q.question.length}/${MAX_QUESTION_LENGTH} Zeichen).`, 'error');
+                    return;
+                }
+                if (q.options.length > MAX_OPTIONS) {
+                    showMessage(`Frage ${i + 1} hat zu viele Optionen (${q.options.length}/${MAX_OPTIONS}).`, 'error');
+                    return;
+                }
+                const longOption = q.options.findIndex(o => o.length > MAX_OPTION_LENGTH);
+                if (longOption !== -1) {
+                    showMessage(`Frage ${i + 1}, Option ${longOption + 1} ist zu lang (${q.options[longOption].length}/${MAX_OPTION_LENGTH} Zeichen).`, 'error');
+                    return;
+                }
+            }
+
             quizState.durationMin = dMin;
             quizState.durationMax = dMax;
 
@@ -968,7 +989,7 @@ async function initializeHostFeatures(reconnectInfo) {
     }
 
     /**
-     * Updates the join link to include the host's Peer ID.
+     * Updates the join link to include the room code as a URL parameter.
      * @param {string} roomId - The room ID (4-digit alphanumeric code).
      * @returns {string} The full join URL.
      */
@@ -1377,7 +1398,7 @@ function reconnectPlayerWs() {
  * @returns {string} The localStorage key.
  */
 function getPlayerStorageKey(roomId) {
-    return `qlash_player_${roomId}`;
+    return `quiz_player_${roomId}`;
 }
 
 /**
@@ -1428,7 +1449,7 @@ function clearPlayerSession(roomId) {
 }
 
 // --- Active Session Helpers (for auto-reconnect on page load) ---
-const ACTIVE_SESSION_KEY = 'qlash_active_session';
+const ACTIVE_SESSION_KEY = 'quiz_active_session';
 
 /**
  * Saves the active session info so the user can auto-reconnect after page refresh.
@@ -1714,8 +1735,6 @@ function initializePlayerFeatures(reconnectInfo) {
         connectPlayerWs();
     }
 
-    // handleHostData removed — all message handling is now in playerWs.onmessage
-
     /**
      * Starts the player's timer for the current question.
      * @param {number} durationSeconds - The total duration of the timer in seconds.
@@ -1735,9 +1754,6 @@ function initializePlayerFeatures(reconnectInfo) {
             if (remaining <= 0) {
                 clearInterval(playerTimerInterval);
                 playerTimerInterval = null;
-                submitAnswerBtn.classList.add('hidden');
-                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
-                // console.log("Player timer up.");
                 // Auto-submit current selections if player hasn't already submitted
                 if (!submitAnswerBtn.disabled) {
                     submitAnswerBtn.disabled = true;
@@ -1747,9 +1763,10 @@ function initializePlayerFeatures(reconnectInfo) {
                             answerData: selectedAnswers,
                             answerTime: new Date().toISOString()
                         }));
-                        // console.log("Auto-submitted player answer on timeout:", selectedAnswers);
                     }
                 }
+                submitAnswerBtn.classList.add('hidden');
+                optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
             }
         }, 100); // Update every 100ms
     }
@@ -1854,7 +1871,6 @@ function initializePlayerFeatures(reconnectInfo) {
         });
 
 
-        resultDisplay.innerHTML = resultHtml;
         resultDisplay.innerHTML = resultHtml;
 
         // Display score breakdown: Old + Gained = New

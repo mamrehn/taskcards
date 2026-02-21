@@ -32,13 +32,6 @@ primary_region = 'fra'
     hard_limit = 250
     soft_limit = 200
 
-  [[services.http_checks]]
-    interval = '15s'
-    grace_period = '5s'
-    method = 'get'
-    path = '/health'
-    protocol = 'http'
-
 [[vm]]
   memory = '256mb'
   cpus = 1
