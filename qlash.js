@@ -175,19 +175,51 @@ document.addEventListener('DOMContentLoaded', () => {
         initializePlayerFeatures();
     });
 
-    // Check URL parameters for a host ID to auto-join on page load
+    // Determine initial view: URL params or role selection
     const urlParams = new URLSearchParams(window.location.search);
     const hostIdFromUrl = urlParams.get('host');
 
     if (hostIdFromUrl) {
-        // If host ID is in URL, navigate directly to player view and pre-fill
+        // URL param: navigate directly to player view and pre-fill room code
         showView('player-view');
-        initializePlayerFeatures(); // Initialize player features first
+        initializePlayerFeatures();
         document.getElementById('room-code-input').value = hostIdFromUrl;
     } else {
-        // Otherwise, show the role selection view
         showView('role-selection');
     }
+
+    // Show reconnect buttons if a saved session exists in localStorage
+    const reconnectHostBtn = document.getElementById('reconnect-host-btn');
+    const reconnectPlayerBtn = document.getElementById('reconnect-player-btn');
+    const savedSession = getActiveSession();
+
+    if (savedSession && savedSession.role === 'host') {
+        reconnectHostBtn.classList.remove('hidden');
+    } else if (savedSession && savedSession.role === 'player') {
+        reconnectPlayerBtn.classList.remove('hidden');
+    }
+
+    reconnectHostBtn.addEventListener('click', () => {
+        const session = getActiveSession();
+        if (!session || session.role !== 'host') {
+            showMessage('Keine aktive Host-Sitzung gefunden.', 'error');
+            reconnectHostBtn.classList.add('hidden');
+            return;
+        }
+        showView('host-view');
+        initializeHostFeatures({ roomId: session.roomId, sessionId: session.sessionId });
+    });
+
+    reconnectPlayerBtn.addEventListener('click', () => {
+        const session = getActiveSession();
+        if (!session || session.role !== 'player') {
+            showMessage('Keine aktive Spieler-Sitzung gefunden.', 'error');
+            reconnectPlayerBtn.classList.add('hidden');
+            return;
+        }
+        showView('player-view');
+        initializePlayerFeatures({ roomId: session.roomId, sessionId: session.sessionId, playerName: session.playerName });
+    });
 
     // Reconnect WebSocket when tab becomes visible again
     document.addEventListener('visibilitychange', () => {
@@ -245,7 +277,7 @@ function getNonHostPlayerCount() {
 /**
  * Initializes all features and event listeners for the host role.
  */
-async function initializeHostFeatures() {
+async function initializeHostFeatures(reconnectInfo) {
     // console.log("Initializing Host Features. Initialized flag:", isHostInitialized);
     // Initialize quiz state if not already set
     if (!hostGlobalQuizState) {
@@ -257,8 +289,8 @@ async function initializeHostFeatures() {
             answersReceived: 0,
             isQuestionActive: false,
             roomId: null, // This will be the 4-digit alphanumeric code
-            durationMin: 10, // Minimum question duration in seconds
-            durationMax: 30, // Maximum question duration in seconds
+            durationMin: 20, // Minimum question duration in seconds
+            durationMax: 40, // Maximum question duration in seconds
             questionDurations: [] // Per-question durations (computed at quiz start)
         };
     }
@@ -403,8 +435,8 @@ async function initializeHostFeatures() {
             }
             const dMin = parseInt(durationMinInput.value, 10);
             const dMax = parseInt(durationMaxInput.value, 10);
-            if (isNaN(dMin) || isNaN(dMax) || dMin < 5 || dMax > 60 || dMin > dMax) {
-                showMessage('Bitte gültige Fragedauer eingeben: Min 5-60, Max >= Min.', 'error');
+            if (isNaN(dMin) || isNaN(dMax) || dMin < 5 || dMax > 80 || dMin > dMax) {
+                showMessage('Bitte gültige Fragedauer eingeben: Min 5-80, Max >= Min.', 'error');
                 return;
             }
             quizState.durationMin = dMin;
@@ -455,6 +487,7 @@ async function initializeHostFeatures() {
         // Event listener for starting a new quiz
         newQuizBtn.addEventListener('click', async () => {
             // Terminate room on server and close WebSocket
+            clearActiveSession();
             if (hostWs && hostWs.readyState === WebSocket.OPEN) {
                 hostWs.send(JSON.stringify({ type: 'terminate' }));
             }
@@ -552,6 +585,10 @@ async function initializeHostFeatures() {
         if (hostViewHeading) hostViewHeading.classList.remove('hidden'); // Show "Quiz hosten" heading
     }
 
+    // Auto-reconnect host if called with reconnectInfo (page reload scenario)
+    if (reconnectInfo && reconnectInfo.roomId && reconnectInfo.sessionId) {
+        initHostReconnection(reconnectInfo);
+    }
 
     /**
      * Renders the list of added questions in the host setup view.
@@ -589,6 +626,101 @@ async function initializeHostFeatures() {
     }
 
     /**
+     * Central handler for all host-side WebSocket messages.
+     * Shared between initHostConnection, initHostReconnection, and reconnectHostWs.
+     */
+    function handleHostMessage(msg) {
+        switch (msg.type) {
+            case 'room_created':
+                hostRoomId = msg.roomId;
+                hostSessionId = msg.sessionId;
+                quizState.roomId = msg.roomId.substring(0, 2) + ' ' + msg.roomId.substring(2, 4);
+                hostSetup.classList.add('hidden');
+                qrContainer.classList.remove('hidden');
+                roomIdElement.textContent = quizState.roomId;
+                const currentJoinUrl = updateJoinLink(hostRoomId);
+                generateQRCode(currentJoinUrl);
+                if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+                saveActiveSession('host', hostRoomId, hostSessionId);
+                break;
+
+            case 'host_reconnected':
+                console.log('Host reconnected, restoring player state');
+                if (msg.players) {
+                    msg.players.forEach(p => {
+                        if (quizState.players[p.sessionId]) {
+                            quizState.players[p.sessionId].isConnected = p.isConnected;
+                            quizState.players[p.sessionId].score = p.score;
+                        } else {
+                            quizState.players[p.sessionId] = {
+                                id: p.sessionId,
+                                name: p.name,
+                                score: p.score,
+                                currentAnswer: [],
+                                answerTime: null,
+                                isConnected: p.isConnected
+                            };
+                        }
+                    });
+                }
+                refreshPlayerDisplay();
+                break;
+
+            case 'player_joined': {
+                const joinedName = sanitizePlayerName(msg.name) || `Spieler ${msg.sessionId.substring(0, 4)}`;
+                quizState.players[msg.sessionId] = {
+                    id: msg.sessionId,
+                    name: joinedName,
+                    score: 0,
+                    currentAnswer: [],
+                    answerTime: null,
+                    isConnected: true
+                };
+                refreshPlayerDisplay();
+                break;
+            }
+
+            case 'player_left':
+                if (quizState.players[msg.sessionId]) {
+                    quizState.players[msg.sessionId].isConnected = false;
+                    refreshPlayerDisplay();
+                    if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
+                        endQuestion();
+                    }
+                }
+                break;
+
+            case 'player_reconnected': {
+                const reconnectedName = sanitizePlayerName(msg.name) || `Spieler ${msg.sessionId.substring(0, 4)}`;
+                if (quizState.players[msg.sessionId]) {
+                    quizState.players[msg.sessionId].isConnected = true;
+                    quizState.players[msg.sessionId].score = msg.score;
+                    quizState.players[msg.sessionId].name = reconnectedName;
+                } else {
+                    quizState.players[msg.sessionId] = {
+                        id: msg.sessionId,
+                        name: reconnectedName,
+                        score: msg.score,
+                        currentAnswer: [],
+                        answerTime: null,
+                        isConnected: true
+                    };
+                }
+                refreshPlayerDisplay();
+                break;
+            }
+
+            case 'player_answered':
+                handlePlayerAnswer(msg);
+                break;
+
+            case 'error':
+                showMessage(msg.message, 'error');
+                break;
+        }
+    }
+
+    /**
      * Initializes WebSocket connection for the host, creates a room, and sets up message handlers.
      */
     async function initHostConnection() {
@@ -607,95 +739,7 @@ async function initializeHostFeatures() {
         hostWs.onmessage = (event) => {
             let msg;
             try { msg = JSON.parse(event.data); } catch { return; }
-
-            switch (msg.type) {
-                case 'room_created':
-                    hostRoomId = msg.roomId;
-                    hostSessionId = msg.sessionId;
-                    quizState.roomId = msg.roomId.substring(0, 2) + ' ' + msg.roomId.substring(2, 4);
-                    hostSetup.classList.add('hidden');
-                    qrContainer.classList.remove('hidden');
-                    roomIdElement.textContent = quizState.roomId;
-                    const currentJoinUrl = updateJoinLink(hostRoomId);
-                    generateQRCode(currentJoinUrl);
-                    if (hostViewHeading) hostViewHeading.classList.remove('hidden');
-                    break;
-
-                case 'host_reconnected':
-                    console.log('Host reconnected, restoring player state');
-                    if (msg.players) {
-                        msg.players.forEach(p => {
-                            if (quizState.players[p.sessionId]) {
-                                quizState.players[p.sessionId].isConnected = p.isConnected;
-                                quizState.players[p.sessionId].score = p.score;
-                            } else {
-                                quizState.players[p.sessionId] = {
-                                    id: p.sessionId,
-                                    name: p.name,
-                                    score: p.score,
-                                    currentAnswer: [],
-                                    answerTime: null,
-                                    isConnected: p.isConnected
-                                };
-                            }
-                        });
-                    }
-                    refreshPlayerDisplay();
-                    break;
-
-                case 'player_joined':
-                    // console.log('New player joined:', msg.name);
-                    // Sanitize name immediately upon receipt
-                    const joinedName = sanitizePlayerName(msg.name) || `Spieler ${msg.sessionId.substring(0, 4)}`;
-                    quizState.players[msg.sessionId] = {
-                        id: msg.sessionId,
-                        name: joinedName,
-                        score: 0,
-                        currentAnswer: [],
-                        answerTime: null,
-                        isConnected: true
-                    };
-                    refreshPlayerDisplay();
-                    break;
-
-                case 'player_left':
-                    if (quizState.players[msg.sessionId]) {
-                        quizState.players[msg.sessionId].isConnected = false;
-                        refreshPlayerDisplay();
-                        if (quizState.isQuestionActive && quizState.answersReceived >= getNonHostPlayerCount()) {
-                            endQuestion();
-                        }
-                    }
-                    break;
-
-                case 'player_reconnected':
-                    const reconnectedName = sanitizePlayerName(msg.name) || `Spieler ${msg.sessionId.substring(0, 4)}`;
-                    if (quizState.players[msg.sessionId]) {
-                        quizState.players[msg.sessionId].isConnected = true;
-                        quizState.players[msg.sessionId].score = msg.score;
-                        // Update name in case it changed (though session ID is key)
-                        quizState.players[msg.sessionId].name = reconnectedName;
-                    } else {
-                        quizState.players[msg.sessionId] = {
-                            id: msg.sessionId,
-                            name: reconnectedName,
-                            score: msg.score,
-                            currentAnswer: [],
-                            answerTime: null,
-                            isConnected: true
-                        };
-                    }
-                    refreshPlayerDisplay();
-                    break;
-
-                case 'player_answered':
-                    handlePlayerAnswer(msg);
-                    break;
-
-                case 'error':
-                    showMessage(msg.message, 'error');
-                    break;
-            }
+            handleHostMessage(msg);
         };
 
         hostWs.onclose = () => {
@@ -715,14 +759,88 @@ async function initializeHostFeatures() {
     }
 
     /**
+     * Reconnects the host to an existing room after a full page reload.
+     * Uses saved session info to restore the connection without re-entering room code.
+     * @param {Object} info - { roomId, sessionId }
+     */
+    async function initHostReconnection(info) {
+        hostWsReconnectAttempts = 0;
+        hostRoomId = info.roomId;
+        hostSessionId = info.sessionId;
+        quizState.roomId = info.roomId.substring(0, 2) + ' ' + info.roomId.substring(2, 4);
+
+        try {
+            hostWs = await connectWithRetry(WS_URL);
+        } catch (e) {
+            showMessage('Server nicht erreichbar. Bitte versuche es später erneut.', 'error');
+            clearActiveSession();
+            hostRoomId = null;
+            hostSessionId = null;
+            document.getElementById('role-selection').classList.remove('hidden');
+            showView('role-selection');
+            return;
+        }
+
+        hostWs.send(JSON.stringify({ type: 'reconnect_host', roomId: hostRoomId, sessionId: hostSessionId }));
+
+        hostWs.onmessage = (event) => {
+            let msg;
+            try { msg = JSON.parse(event.data); } catch { return; }
+
+            if (msg.type === 'room_not_found_try_restore') {
+                // Room expired on server — no quiz state to restore after page reload
+                showMessage('Der Raum ist abgelaufen. Bitte starte ein neues Quiz.', 'error');
+                clearActiveSession();
+                hostRoomId = null;
+                hostSessionId = null;
+                document.getElementById('role-selection').classList.remove('hidden');
+                showView('role-selection');
+                return;
+            }
+
+            if (msg.type === 'error') {
+                showMessage(msg.message, 'error');
+                clearActiveSession();
+                hostRoomId = null;
+                hostSessionId = null;
+                document.getElementById('role-selection').classList.remove('hidden');
+                showView('role-selection');
+                return;
+            }
+
+            // For host_reconnected: show the QR/waiting view
+            if (msg.type === 'host_reconnected') {
+                hostSetup.classList.add('hidden');
+                qrContainer.classList.remove('hidden');
+                roomIdElement.textContent = quizState.roomId;
+                const currentJoinUrl = updateJoinLink(hostRoomId);
+                generateQRCode(currentJoinUrl);
+                if (hostViewHeading) hostViewHeading.classList.remove('hidden');
+            }
+
+            // Delegate to the standard host message handler
+            handleHostMessage(msg);
+        };
+
+        hostWs.onclose = () => {
+            console.log('Host WebSocket closed');
+            if (hostRoomId && hostWsReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
+                hostWsReconnectAttempts++;
+                setTimeout(reconnectHostWs, RECONNECT_DELAY_MS);
+            } else if (hostWsReconnectAttempts >= HOST_MAX_RECONNECT_ATTEMPTS) {
+                showMessage('Verbindung zum Server verloren. Bitte lade die Seite neu.', 'error');
+            }
+        };
+
+        hostWs.onerror = (err) => {
+            console.error('Host WebSocket error:', err);
+        };
+    }
+
+    /**
      * Reconnects the host WebSocket after a disconnect.
      */
     function reconnectHostWs() {
-        // Capture original handlers BEFORE reassigning hostWs to avoid infinite recursion
-        const originalOnMessage = hostWs ? hostWs.onmessage : null;
-        const originalOnClose = hostWs ? hostWs.onclose : null;
-        const originalOnError = hostWs ? hostWs.onerror : null;
-
         const ws = new WebSocket(WS_URL);
 
         ws.onopen = () => {
@@ -757,14 +875,22 @@ async function initializeHostFeatures() {
                 return;
             }
 
-            // Delegate to captured original handler (not hostWs.onmessage which would be self)
-            if (originalOnMessage) {
-                originalOnMessage(event);
+            handleHostMessage(msg);
+        };
+
+        ws.onclose = () => {
+            console.log('Host WebSocket closed');
+            if (hostRoomId && hostWsReconnectAttempts < HOST_MAX_RECONNECT_ATTEMPTS) {
+                hostWsReconnectAttempts++;
+                setTimeout(reconnectHostWs, RECONNECT_DELAY_MS);
+            } else if (hostWsReconnectAttempts >= HOST_MAX_RECONNECT_ATTEMPTS) {
+                showMessage('Verbindung zum Server verloren. Bitte lade die Seite neu.', 'error');
             }
         };
 
-        ws.onclose = originalOnClose;
-        ws.onerror = originalOnError;
+        ws.onerror = (err) => {
+            console.error('Host WebSocket error:', err);
+        };
 
         hostWs = ws;
     }
@@ -1176,6 +1302,7 @@ async function initializeHostFeatures() {
      * Resets the host's state and UI to the initial setup form.
      */
     async function resetHostStateAndUI() {
+        clearActiveSession();
         // Close WebSocket connection
         if (hostWs) {
             hostWs.onclose = null; // Prevent reconnect
@@ -1300,6 +1427,54 @@ function clearPlayerSession(roomId) {
     localStorage.removeItem(getPlayerStorageKey(roomId));
 }
 
+// --- Active Session Helpers (for auto-reconnect on page load) ---
+const ACTIVE_SESSION_KEY = 'qlash_active_session';
+
+/**
+ * Saves the active session info so the user can auto-reconnect after page refresh.
+ * @param {string} role - 'host' or 'player'
+ * @param {string} roomId - The room ID
+ * @param {string} sessionId - The session ID from the server
+ * @param {string} [playerName] - Player name (only for player role)
+ */
+function saveActiveSession(role, roomId, sessionId, playerName) {
+    localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify({
+        role, roomId, sessionId, playerName: playerName || null, timestamp: Date.now()
+    }));
+}
+
+/**
+ * Retrieves the active session info from localStorage.
+ * @returns {Object|null} Session data or null if not found/expired (2h expiry).
+ */
+function getActiveSession() {
+    const data = localStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!data) return null;
+    try {
+        const session = JSON.parse(data);
+        if (Date.now() - session.timestamp > 2 * 60 * 60 * 1000) {
+            localStorage.removeItem(ACTIVE_SESSION_KEY);
+            return null;
+        }
+        return session;
+    } catch {
+        localStorage.removeItem(ACTIVE_SESSION_KEY);
+        return null;
+    }
+}
+
+/**
+ * Clears the active session info from localStorage.
+ */
+function clearActiveSession() {
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+    // Hide reconnect buttons since session is no longer valid
+    const rHost = document.getElementById('reconnect-host-btn');
+    const rPlayer = document.getElementById('reconnect-player-btn');
+    if (rHost) rHost.classList.add('hidden');
+    if (rPlayer) rPlayer.classList.add('hidden');
+}
+
 /**
  * Triggers confetti animation for correct answers.
  */
@@ -1333,7 +1508,7 @@ function triggerConfetti() {
 /**
  * Initializes all features and event listeners for the player role.
  */
-function initializePlayerFeatures() {
+function initializePlayerFeatures(reconnectInfo) {
     // console.log("Initializing Player Features. Initialized flag:", isPlayerInitialized);
 
     // Cache DOM elements for performance
@@ -1426,6 +1601,12 @@ function initializePlayerFeatures() {
     playerResultView.classList.add('hidden');
     playerFinalResultView.classList.add('hidden');
 
+    // Auto-reconnect player if called with reconnectInfo (page reload scenario)
+    if (reconnectInfo && reconnectInfo.roomId && reconnectInfo.sessionId) {
+        playerCurrentId = reconnectInfo.sessionId;
+        const name = reconnectInfo.playerName || 'Spieler';
+        initPlayerConnection(reconnectInfo.roomId, name);
+    }
 
     /**
      * Initializes WebSocket connection for the player and joins a room.
@@ -1467,6 +1648,7 @@ function initializePlayerFeatures() {
                             playerCurrentId = msg.sessionId;
                             playerScore = msg.score || 0;
                             savePlayerSession(roomCode, msg.sessionId, msg.playerName || pName);
+                            saveActiveSession('player', roomCode, msg.sessionId, msg.playerName || pName);
                             waitingMessage.textContent = msg.isReconnect
                                 ? 'Wieder verbunden! Warte auf Host...'
                                 : 'Verbunden! Warte auf Host...';
@@ -1500,6 +1682,8 @@ function initializePlayerFeatures() {
                         case 'error':
                             showMessage(msg.message, 'error');
                             resetPlayerStateAndUI();
+                            document.getElementById('role-selection').classList.remove('hidden');
+                            showView('role-selection');
                             break;
                     }
                 };
@@ -1522,6 +1706,8 @@ function initializePlayerFeatures() {
             }).catch(() => {
                 showMessage('Server nicht erreichbar. Bitte versuche es später erneut.', 'error');
                 resetPlayerStateAndUI();
+                document.getElementById('role-selection').classList.remove('hidden');
+                showView('role-selection');
             });
         }
 
@@ -1736,6 +1922,7 @@ function initializePlayerFeatures() {
      * Resets the player's state and UI to the initial join form.
      */
     function resetPlayerStateAndUI() {
+        clearActiveSession();
         if (playerWs) {
             playerWs.onclose = null; // Prevent reconnect
             playerWs.close();

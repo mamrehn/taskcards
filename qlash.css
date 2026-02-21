@@ -87,6 +87,19 @@ header {
     background-color: var(--accent-color);
 }
 
+.btn-reconnect {
+    background-color: transparent;
+    color: var(--secondary-color);
+    border: 2px solid var(--secondary-color);
+    font-size: 0.95em;
+    margin-top: 5px;
+}
+
+.btn-reconnect:hover {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
 .btn-accent:hover {
     background-color: #e62b4c;
 }
