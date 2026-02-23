@@ -246,6 +246,7 @@ let hostRoomId = null;
 let hostViewHeading = null;
 let hostBeforeUnloadHandler = null;
 let hostWsReconnectAttempts = 0;
+let hostPendingQuestion = null;
 const HOST_MAX_RECONNECT_ATTEMPTS = 30;
 const RECONNECT_DELAY_MS = 10000;
 
@@ -511,6 +512,23 @@ async function initializeHostFeatures(reconnectInfo) {
             clearActiveSession();
             if (hostWs && hostWs.readyState === WebSocket.OPEN) {
                 hostWs.send(JSON.stringify({ type: 'terminate' }));
+            } else if (hostRoomId && hostSessionId) {
+                // Host is disconnected — open one-shot connection to terminate
+                try {
+                    const savedRoomId = hostRoomId;
+                    const savedSessionId = hostSessionId;
+                    const tempWs = new WebSocket(WS_URL);
+                    tempWs.onopen = () => {
+                        tempWs.send(JSON.stringify({ type: 'reconnect_host', roomId: savedRoomId, sessionId: savedSessionId }));
+                        tempWs.onmessage = () => {
+                            tempWs.send(JSON.stringify({ type: 'terminate' }));
+                            tempWs.close();
+                        };
+                    };
+                    tempWs.onerror = () => tempWs.close();
+                } catch (e) {
+                    // Server's 5-minute timeout will handle cleanup
+                }
             }
             if (hostWs) {
                 hostWs.onclose = null; // Prevent reconnect on intentional close
@@ -685,6 +703,19 @@ async function initializeHostFeatures(reconnectInfo) {
                     });
                 }
                 refreshPlayerDisplay();
+                // If a question was active when we disconnected, restart it
+                // so players get a fresh copy and answers reset
+                if (quizState.isQuestionActive) {
+                    console.log('Restarting active question after reconnect');
+                    startQuestion();
+                } else if (hostPendingQuestion) {
+                    // Resend question that failed to send before disconnect
+                    console.log('Resending pending question after reconnect');
+                    if (hostWs && hostWs.readyState === WebSocket.OPEN) {
+                        hostWs.send(JSON.stringify(hostPendingQuestion));
+                        hostPendingQuestion = null;
+                    }
+                }
                 break;
 
             case 'player_joined': {
@@ -1088,11 +1119,7 @@ async function initializeHostFeatures(reconnectInfo) {
      * @param {Object} question - The question object to send (contains shuffled options and correct indices).
      */
     async function sendQuestionToPlayers(question) {
-        if (!hostWs || hostWs.readyState !== WebSocket.OPEN) {
-            showMessage('Keine Verbindung zum Server. Bitte überprüfe deine Verbindung.', 'error');
-            return;
-        }
-        hostWs.send(JSON.stringify({
+        const questionPayload = {
             type: 'start_question',
             question: question.question,
             options: question.shuffledOptions,
@@ -1100,8 +1127,15 @@ async function initializeHostFeatures(reconnectInfo) {
             total: quizState.shuffledQuestions.length,
             startTime: hostQuestionStartTime,
             duration: quizState.questionDurations[quizState.currentQuestionIndex]
-        }));
-        // console.log('Question sent via WebSocket');
+        };
+
+        if (!hostWs || hostWs.readyState !== WebSocket.OPEN) {
+            showMessage('Keine Verbindung zum Server. Frage wird nach Reconnect gesendet.', 'error');
+            hostPendingQuestion = questionPayload;
+            return;
+        }
+        hostPendingQuestion = null;
+        hostWs.send(JSON.stringify(questionPayload));
     }
 
     /**
@@ -1336,6 +1370,7 @@ async function initializeHostFeatures(reconnectInfo) {
         isHostInitialized = false;
         hostRoomId = null;
         hostSessionId = null;
+        hostPendingQuestion = null;
 
         fileStatus.textContent = '';
         if (jsonFileInput) jsonFileInput.value = '';
@@ -1359,6 +1394,7 @@ let playerCurrentQuestionOptions = [];
 let selectedAnswers = [];
 let playerScore = 0;
 let playerQuestionStartTime = null;
+let playerCurrentQuestionIndex = -1;
 let playerBeforeUnloadHandler = null;
 
 /**
@@ -1592,7 +1628,8 @@ function initializePlayerFeatures(reconnectInfo) {
                     answerData: selectedAnswers,
                     answerTime: new Date().toISOString()
                 }));
-                // console.log('Player answer sent via WebSocket.');
+            } else {
+                showMessage('Verbindung unterbrochen. Antwort konnte nicht gesendet werden.', 'error');
             }
         });
 
@@ -1678,14 +1715,19 @@ function initializePlayerFeatures(reconnectInfo) {
                         case 'question':
                             playerCurrentQuestionOptions = msg.options;
                             selectedAnswers = [];
-                            playerQuestionStartTime = msg.startTime || Date.now();
+                            playerCurrentQuestionIndex = msg.index;
+                            // Use local clock for timer — immune to clock skew
+                            playerQuestionStartTime = Date.now();
                             displayQuestion(msg);
-                            const elapsedSinceStart = (Date.now() - playerQuestionStartTime) / 1000;
-                            const remainingDuration = Math.max(1, msg.duration - elapsedSinceStart);
-                            startPlayerTimer(remainingDuration);
+                            startPlayerTimer(msg.duration);
                             break;
 
-                        case 'result':
+                        case 'result': {
+                            // Ignore stale results from a previous question
+                            if (msg.questionIndex !== undefined && msg.questionIndex !== playerCurrentQuestionIndex) {
+                                console.log(`Ignoring stale result for question ${msg.questionIndex}, current is ${playerCurrentQuestionIndex}`);
+                                break;
+                            }
                             const oldScore = playerScore;
                             playerScore = msg.playerScore || playerScore;
                             const gainedPoints = playerScore - oldScore;
@@ -1693,6 +1735,7 @@ function initializePlayerFeatures(reconnectInfo) {
                             waitingForNext.textContent = msg.isFinal ? 'Warten auf Endergebnisse...' : 'Warten auf nächste Frage...';
                             if (msg.isFinal) displayFinalResult(msg);
                             break;
+                        }
 
                         case 'quiz_terminated':
                             showMessage("Der Host hat das Quiz beendet.", 'info');
@@ -1763,6 +1806,8 @@ function initializePlayerFeatures(reconnectInfo) {
                             answerData: selectedAnswers,
                             answerTime: new Date().toISOString()
                         }));
+                    } else {
+                        showMessage('Verbindung unterbrochen. Antwort konnte nicht gesendet werden.', 'error');
                     }
                 }
                 submitAnswerBtn.classList.add('hidden');
@@ -1949,6 +1994,7 @@ function initializePlayerFeatures(reconnectInfo) {
         selectedAnswers = [];
         playerCurrentQuestionOptions = [];
         playerQuestionStartTime = null;
+        playerCurrentQuestionIndex = -1;
         playerRoomId = null;
         playerCurrentId = null;
 

@@ -69,7 +69,13 @@ const httpServer = http.createServer((req, res) => {
 const MAX_PLAYERS_PER_ROOM = 240;
 const RATE_LIMIT_PER_SECOND = 20;
 
-const wss = new WebSocketServer({ server: httpServer, maxPayload: 64 * 1024 }); // 64KB max message
+const ROOM_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+const wss = new WebSocketServer({
+    server: httpServer,
+    maxPayload: 64 * 1024, // 64KB max message
+    perMessageDeflate: { clientNoContextTakeover: true }
+});
 
 wss.on('connection', (ws) => {
     ws.isAlive = true;
@@ -91,7 +97,10 @@ wss.on('connection', (ws) => {
         }
 
         let msg;
-        try { msg = JSON.parse(raw); } catch { return; }
+        try { msg = JSON.parse(raw); } catch {
+            send(ws, { type: 'error', message: 'Ungültiges Nachrichtenformat.' });
+            return;
+        }
 
         switch (msg.type) {
             case 'create_room': handleCreateRoom(ws, msg); break;
@@ -102,6 +111,9 @@ wss.on('connection', (ws) => {
             case 'start_question': handleStartQuestion(ws, msg); break;
             case 'send_results': handleSendResults(ws, msg); break;
             case 'terminate': handleTerminate(ws, msg); break;
+            default:
+                console.warn(`Unknown message type: ${msg.type}`);
+                break;
         }
     });
 
@@ -114,21 +126,39 @@ wss.on('connection', (ws) => {
 
 // --- Handlers ---
 
-function handleCreateRoom(ws, msg) {
+function handleCreateRoom(ws) {
+    // Limit: one room per host connection
+    if (ws._hasRoom) {
+        send(ws, { type: 'error', message: 'Du hast bereits einen Raum erstellt.' });
+        return;
+    }
+
     const roomId = generateRoomId();
     const hostSessionId = generateSessionId();
 
-    rooms.set(roomId, {
+    const room = {
         hostWs: ws,
         hostSessionId: hostSessionId,
         players: new Map(),
         createdAt: Date.now(),
-        hostDisconnectTimer: null
-    });
+        hostDisconnectTimer: null,
+        expiryTimer: null
+    };
+    rooms.set(roomId, room);
 
     ws.roomId = roomId;
     ws.sessionId = hostSessionId;
     ws.role = 'host';
+
+    ws._hasRoom = true;
+
+    // Set per-room expiry timer
+    room.expiryTimer = setTimeout(() => {
+        broadcastToPlayers(room, { type: 'quiz_terminated' });
+        if (room.hostDisconnectTimer) clearTimeout(room.hostDisconnectTimer);
+        rooms.delete(roomId);
+        console.log(`Room ${roomId} cleaned up (expired)`);
+    }, ROOM_MAX_AGE_MS);
 
     send(ws, { type: 'room_created', roomId, sessionId: hostSessionId });
     console.log(`Room ${roomId} created by host ${hostSessionId}`);
@@ -182,7 +212,14 @@ function handleReconnectHost(ws, msg) {
 }
 
 function handleRestoreRoom(ws, msg) {
-    // msg should contain: roomId, sessionId, gameState (optional players list etc.)
+    // Rate limit: max once per 5 seconds per connection
+    const now = Date.now();
+    if (ws._lastRestore && now - ws._lastRestore < 5000) {
+        send(ws, { type: 'error', message: 'Bitte warte einen Moment vor der nächsten Wiederherstellung.' });
+        return;
+    }
+    ws._lastRestore = now;
+
     let roomId = (msg.roomId || '').toUpperCase();
     const hostSessionId = msg.sessionId;
 
@@ -208,18 +245,20 @@ function handleRestoreRoom(ws, msg) {
         hostSessionId: hostSessionId,
         players: new Map(),
         createdAt: Date.now(),
-        hostDisconnectTimer: null
+        hostDisconnectTimer: null,
+        expiryTimer: null
     };
 
     // Restore players if provided (limit to MAX_PLAYERS_PER_ROOM)
     if (msg.players && Array.isArray(msg.players)) {
         const playersToRestore = msg.players.slice(0, MAX_PLAYERS_PER_ROOM);
         for (const p of playersToRestore) {
-            if (p.id && p.name) {
+            // Validate player ID format
+            if (typeof p.id === 'string' && p.id.startsWith('sess-') && p.name) {
                 room.players.set(p.id, {
                     name: sanitizeName(p.name),
-                    score: typeof p.score === 'number' ? p.score : 0,
-                    ws: null,       // WebSocket connection is lost, they must reconnect
+                    score: typeof p.score === 'number' && isFinite(p.score) && p.score >= 0 ? p.score : 0,
+                    ws: null,
                     isConnected: false
                 });
             }
@@ -231,6 +270,14 @@ function handleRestoreRoom(ws, msg) {
     ws.roomId = roomId;
     ws.sessionId = hostSessionId;
     ws.role = 'host';
+
+    // Set per-room expiry timer
+    room.expiryTimer = setTimeout(() => {
+        broadcastToPlayers(room, { type: 'quiz_terminated' });
+        if (room.hostDisconnectTimer) clearTimeout(room.hostDisconnectTimer);
+        rooms.delete(roomId);
+        console.log(`Room ${roomId} cleaned up (expired)`);
+    }, ROOM_MAX_AGE_MS);
 
     // Send back sanitized player data from the server-built Map, not raw client input
     const playerList = [];
@@ -251,6 +298,10 @@ function handleJoin(ws, msg) {
     }
 
     let sessionId = msg.sessionId;
+    // Validate session ID format — ignore invalid ones
+    if (sessionId && (typeof sessionId !== 'string' || !sessionId.startsWith('sess-'))) {
+        sessionId = null;
+    }
     let player = sessionId ? room.players.get(sessionId) : null;
 
     if (player) {
@@ -306,10 +357,16 @@ function handleJoin(ws, msg) {
 
 function handleSubmitAnswer(ws, msg) {
     const room = rooms.get(ws.roomId);
-    if (!room) return;
+    if (!room) {
+        send(ws, { type: 'error', message: 'Raum nicht mehr aktiv.' });
+        return;
+    }
 
     const player = room.players.get(ws.sessionId);
-    if (!player) return;
+    if (!player) {
+        send(ws, { type: 'error', message: 'Spieler nicht gefunden.' });
+        return;
+    }
 
     // Validate answerData: must be an array of at most 20 indices
     if (!Array.isArray(msg.answerData) || msg.answerData.length > 20) return;
@@ -339,18 +396,24 @@ function handleStartQuestion(ws, msg) {
     if (!Array.isArray(msg.options) || msg.options.length > 20) return;
     if (msg.options.some(o => typeof o !== 'string' || o.length > 500)) return;
 
+    // Validate relay fields
+    const questionIndex = typeof msg.index === 'number' && msg.index >= 0 ? msg.index : 0;
+    const questionTotal = typeof msg.total === 'number' && msg.total > 0 ? msg.total : 1;
+    const duration = typeof msg.duration === 'number' && msg.duration > 0 && msg.duration <= 80 ? msg.duration : 30;
+
     // Record server-side question start time for fair timing
     room.questionStartTime = Date.now();
+    room.currentQuestionIndex = questionIndex;
 
     // Relay to all players, using server timestamp
     broadcastToPlayers(room, {
         type: 'question',
         question: msg.question,
         options: msg.options,
-        index: msg.index,
-        total: msg.total,
+        index: questionIndex,
+        total: questionTotal,
         startTime: room.questionStartTime,
-        duration: msg.duration
+        duration: duration
     });
 }
 
@@ -358,34 +421,47 @@ function handleSendResults(ws, msg) {
     const room = rooms.get(ws.roomId);
     if (!room || ws.sessionId !== room.hostSessionId) return;
 
-    // Update stored scores from host
+    // Update stored scores from host (with validation)
     if (msg.playerScores) {
         for (const [sid, score] of Object.entries(msg.playerScores)) {
             const player = room.players.get(sid);
-            if (player) player.score = score;
+            if (player && typeof score === 'number' && isFinite(score) && score >= 0) {
+                player.score = score;
+            }
         }
     }
 
+    // Validate leaderboard structure if present
+    let leaderboard = null;
+    if (Array.isArray(msg.leaderboard)) {
+        leaderboard = msg.leaderboard.slice(0, MAX_PLAYERS_PER_ROOM).map(entry => ({
+            name: typeof entry.name === 'string' ? entry.name.substring(0, 50) : 'Spieler',
+            score: typeof entry.score === 'number' && isFinite(entry.score) ? entry.score : 0
+        }));
+    }
+
     // Send personalized results to each player
-    for (const [sid, player] of room.players) {
+    for (const player of room.players.values()) {
         if (player.ws && player.ws.readyState === 1) {
             send(player.ws, {
                 type: 'result',
                 correct: msg.correct,
                 isFinal: msg.isFinal,
-                // options removed for security/bandwidth - client uses local copy
-                leaderboard: msg.leaderboard,
+                questionIndex: room.currentQuestionIndex,
+                leaderboard: leaderboard,
                 playerScore: player.score
             });
         }
     }
 }
 
-function handleTerminate(ws, msg) {
+function handleTerminate(ws) {
     const room = rooms.get(ws.roomId);
     if (!room || ws.sessionId !== room.hostSessionId) return;
 
     broadcastToPlayers(room, { type: 'quiz_terminated' });
+    if (room.expiryTimer) clearTimeout(room.expiryTimer);
+    if (room.hostDisconnectTimer) clearTimeout(room.hostDisconnectTimer);
     rooms.delete(ws.roomId);
     console.log(`Room ${ws.roomId} terminated by host`);
 }
@@ -400,11 +476,14 @@ function handleDisconnect(ws) {
         console.log(`Host disconnected from room ${ws.roomId}, grace period started`);
 
         // Grace period: terminate room if host doesn't reconnect within 5 minutes
+        const disconnectedRoomId = ws.roomId;
         room.hostDisconnectTimer = setTimeout(() => {
-            if (!room.hostWs) {
+            // Verify room still exists in Map and host is still disconnected
+            if (!room.hostWs && rooms.get(disconnectedRoomId) === room) {
                 broadcastToPlayers(room, { type: 'quiz_terminated' });
-                rooms.delete(ws.roomId);
-                console.log(`Room ${ws.roomId} terminated (host timeout)`);
+                if (room.expiryTimer) clearTimeout(room.expiryTimer);
+                rooms.delete(disconnectedRoomId);
+                console.log(`Room ${disconnectedRoomId} terminated (host timeout)`);
             }
         }, 5 * 60 * 1000);
     } else if (ws.role === 'player') {
@@ -436,34 +515,24 @@ const heartbeatInterval = setInterval(() => {
     });
 }, 30000);
 
-// --- Room cleanup: remove stale rooms older than 2 hours ---
-
-const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [id, room] of rooms) {
-        if (now - room.createdAt > 2 * 60 * 60 * 1000) {
-            broadcastToPlayers(room, { type: 'quiz_terminated' });
-            rooms.delete(id);
-            console.log(`Room ${id} cleaned up (expired)`);
-        }
-    }
-}, 60000);
+// Room cleanup is now handled per-room via expiryTimer (set on creation/restore)
 
 // --- Graceful shutdown ---
 
 process.on('SIGTERM', () => {
     console.log('SIGTERM received, notifying all rooms...');
     // Notify all players before shutting down
-    for (const [id, room] of rooms) {
+    for (const [, room] of rooms) {
         broadcastToPlayers(room, { type: 'quiz_terminated' });
         if (room.hostWs && room.hostWs.readyState === 1) {
             send(room.hostWs, { type: 'quiz_terminated' });
         }
+        if (room.expiryTimer) clearTimeout(room.expiryTimer);
+        if (room.hostDisconnectTimer) clearTimeout(room.hostDisconnectTimer);
     }
     rooms.clear();
 
     clearInterval(heartbeatInterval);
-    clearInterval(cleanupInterval);
     wss.close(() => {
         httpServer.close(() => {
             console.log('Server shut down gracefully');
