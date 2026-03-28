@@ -231,6 +231,7 @@ function initializeApp() {
     deselectAllBucketsBtn.addEventListener('click', debounce(deselectAllSRBuckets, 200));
     cleanupOrphansBtn.addEventListener('click', throttle(cleanupOrphanedSRData, 500));
     bookViewBackBtn.addEventListener('click', throttle(closeBookView, 300));
+    document.getElementById('book-view-csv').addEventListener('click', throttle(exportToCsv, 300));
     document.getElementById('book-view-anki').addEventListener('click', throttle(exportToAnki, 300));
 
     // Add event listener for text explanation toggle
@@ -2550,6 +2551,63 @@ function closeBookView() {
         studyModeSelect.style.display = 'inline-block';
         openSrManagerBtn.style.display = studyMode === 'spaced-repetition' ? 'inline-block' : 'none';
     }
+}
+
+/**
+ * Export currently displayed book view cards as Anki-importable tab-separated text file
+ */
+/**
+ * Export currently displayed book view cards as CSV
+ */
+function exportToCsv() {
+    if (bookViewCurrentCards.length === 0) return;
+
+    const rows = [['Frage', 'Antwort', 'Erklärung', 'Optionen', 'Korrekte Optionen', 'Kategorien', 'Deck']];
+
+    for (const card of bookViewCurrentCards) {
+        const question = card.question || '';
+        let answer = '';
+        let explanation = '';
+        let options = '';
+        let correctOptions = '';
+
+        if (card.options && Array.isArray(card.options)) {
+            options = card.options.join('; ');
+            correctOptions = (card.correct || []).map(i => card.options[i]).join('; ');
+            // Collect explanations
+            if (card.explanations) {
+                const parts = [];
+                for (const [idx, text] of Object.entries(card.explanations)) {
+                    parts.push(`${card.options[parseInt(idx)] || idx}: ${text}`);
+                }
+                explanation = parts.join('; ');
+            }
+        } else {
+            answer = card.answer || '';
+            explanation = card.explanation || '';
+        }
+
+        const categories = (card.categories || []).join('; ');
+        const deck = card.sourceDeck || '';
+
+        rows.push([question, answer, explanation, options, correctOptions, categories, deck]);
+    }
+
+    const csvContent = rows.map(row =>
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    // BOM for Excel UTF-8 detection
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lernkarten-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showMessage(`${bookViewCurrentCards.length} Karten als CSV exportiert.`);
 }
 
 /**
