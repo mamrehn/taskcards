@@ -29,6 +29,7 @@
                 <option value="spaced-repetition">Spaced Repetition</option>
                 <option value="incorrect-first">Falsche zuerst</option>
                 <option value="incorrect-only">Nur falsche wiederholen</option>
+                <option value="read-through">Lesemodus</option>
             </select>
             <button id="open-sr-manager" class="btn btn-secondary sr-manager-btn" title="Spaced Repetition Karten verwalten / Decks anzeigen">
                 📊 Karten verwalten
@@ -236,6 +237,15 @@
             </div>
 
             <div id="error-message" class="error-message hidden"></div>
+        </div>
+
+        <div id="book-view" class="hidden">
+            <div class="book-view-toolbar">
+                <button class="btn btn-secondary" id="book-view-back">← Zurück</button>
+                <span class="book-view-title" id="book-view-title">Lesemodus</span>
+                <button class="btn btn-secondary" id="book-view-print" onclick="window.print()">🖨️ Drucken</button>
+            </div>
+            <div id="book-view-cards"></div>
         </div>
     </div>
 

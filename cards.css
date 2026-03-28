@@ -1403,3 +1403,185 @@ body {
 [data-theme="dark"] .btn-danger:focus-visible {
     box-shadow: 0 0 0 4px rgba(239, 83, 80, 0.3);
 }
+
+/* ============================================================================
+   Book View / Lesemodus
+   ============================================================================ */
+
+.book-view-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--input-border);
+    gap: 0.5rem;
+}
+
+.book-view-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--primary);
+    text-align: center;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.book-card {
+    background-color: var(--surface-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 4px var(--shadow-color);
+    page-break-inside: avoid;
+}
+
+.book-card-number {
+    font-size: 0.75rem;
+    color: var(--text-muted, #888);
+    margin-bottom: 0.4rem;
+}
+
+.book-card-question {
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--text-color);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
+.book-card-answer {
+    color: var(--text-color);
+    padding: 0.6rem 0.75rem;
+    background-color: var(--bg-color);
+    border-left: 3px solid var(--success, #27ae60);
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.book-card-explanation {
+    color: var(--text-muted, #888);
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--bg-color);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 4px 4px 0;
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+.book-card-source {
+    font-size: 0.75rem;
+    color: var(--text-muted, #888);
+    margin-top: 0.5rem;
+    text-align: right;
+}
+
+.book-card-options {
+    margin-bottom: 0.5rem;
+}
+
+.book-option {
+    padding: 0.3rem 0.5rem;
+    margin: 0.25rem 0;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+.book-option-correct {
+    background-color: rgba(39, 174, 96, 0.12);
+    border-left: 3px solid var(--success, #27ae60);
+}
+
+.book-option-wrong {
+    opacity: 0.65;
+}
+
+.book-option-explanation {
+    font-size: 0.85rem;
+    color: var(--text-muted, #888);
+    margin-left: 1.2rem;
+    margin-bottom: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-left: 3px solid var(--primary);
+    background-color: var(--bg-color);
+    border-radius: 0 4px 4px 0;
+    line-height: 1.4;
+}
+
+.sr-bucket-book-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: 4px;
+}
+
+.sr-bucket-book-btn:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 768px) {
+    .book-view-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .book-view-title {
+        order: -1;
+        flex-basis: 100%;
+        white-space: normal;
+        margin-bottom: 0.5rem;
+    }
+
+    .book-card {
+        padding: 1rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    body {
+        background: white !important;
+        color: black !important;
+    }
+
+    .container {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .header,
+    .book-view-toolbar,
+    #confetti-container {
+        display: none !important;
+    }
+
+    #book-view {
+        display: block !important;
+    }
+
+    .book-card {
+        box-shadow: none !important;
+        border: 1px solid #ddd;
+        break-inside: avoid;
+    }
+
+    .book-card-answer {
+        background-color: #f5f5f5 !important;
+    }
+
+    .book-card-explanation {
+        background-color: #f5f5f5 !important;
+    }
+}

@@ -140,6 +140,10 @@ let startSelectedBucketsBtn;
 let selectAllBucketsBtn;
 let deselectAllBucketsBtn;
 let cleanupOrphansBtn;
+let bookView;
+let bookViewCards;
+let bookViewTitle;
+let bookViewBackBtn;
 
 // ============================================================================
 // Initialization
@@ -202,6 +206,10 @@ function initializeApp() {
     selectAllBucketsBtn = document.getElementById('select-all-buckets');
     deselectAllBucketsBtn = document.getElementById('deselect-all-buckets');
     cleanupOrphansBtn = document.getElementById('cleanup-orphans-btn');
+    bookView = document.getElementById('book-view');
+    bookViewCards = document.getElementById('book-view-cards');
+    bookViewTitle = document.getElementById('book-view-title');
+    bookViewBackBtn = document.getElementById('book-view-back');
 
     // Set up event listeners with debouncing/throttling for performance
     fileInput.addEventListener('change', handleFileUpload);
@@ -222,6 +230,7 @@ function initializeApp() {
     selectAllBucketsBtn.addEventListener('click', debounce(selectAllSRBuckets, 200));
     deselectAllBucketsBtn.addEventListener('click', debounce(deselectAllSRBuckets, 200));
     cleanupOrphansBtn.addEventListener('click', throttle(cleanupOrphanedSRData, 500));
+    bookViewBackBtn.addEventListener('click', throttle(closeBookView, 300));
 
     // Add event listener for text explanation toggle
     textExplanationContainer.addEventListener('click', toggleTextExplanation);
@@ -1028,6 +1037,12 @@ function filterCardsByCategories(cards, selectedCategories) {
  * Start quiz with selected decks
  */
 function startSelectedDecks() {
+    // Lesemodus: open book view instead of quiz
+    if (studyMode === 'read-through') {
+        startBookViewFromDecks();
+        return;
+    }
+
     const selectedPerDeck = getSelectedCategoriesPerDeck();
     if (selectedPerDeck.size === 0) return;
 
@@ -2042,17 +2057,29 @@ function showError(message) {
  */
 function handleStudyModeChange(event) {
     studyMode = event.target.value;
-    
+
     // Show/hide SR button based on mode
     if (studyMode === 'spaced-repetition') {
         openSrManagerBtn.style.display = 'inline-block';
     } else {
         openSrManagerBtn.style.display = 'none';
     }
-    
+
+    // Lesemodus: switch to book view for current cards
+    if (studyMode === 'read-through') {
+        const title = activeDecks.length === 1
+            ? `Lesemodus — ${activeDecks[0]}`
+            : `Lesemodus — ${activeDecks.length} Decks`;
+        bookViewReturnTo = 'decks';
+        bookViewFromQuiz = true;
+        appContent.classList.add('hidden');
+        openBookView(cards, title);
+        return;
+    }
+
     // Reorganize cards based on study mode
     reorganizeCardsByStudyMode();
-    
+
     // Reset to first card
     currentCardIndex = 0;
     showCurrentCard();
@@ -2344,6 +2371,161 @@ function triggerConfetti() {
 }
 
 // ============================================================================
+// Book View / Lesemodus
+// ============================================================================
+
+/**
+ * Render cards in book view format
+ * @param {Array<Object>} cardsToShow - Cards to render
+ * @param {string} title - Title for the book view
+ */
+function openBookView(cardsToShow, title) {
+    bookViewTitle.textContent = title;
+    bookViewCards.innerHTML = '';
+
+    for (let i = 0; i < cardsToShow.length; i++) {
+        const card = cardsToShow[i];
+        const cardEl = document.createElement('div');
+        cardEl.className = 'book-card';
+
+        let html = `<div class="book-card-number">Karte ${i + 1} von ${cardsToShow.length}`;
+        if (card.categories && card.categories.length > 0) {
+            html += ` · ${card.categories.map(c => sanitizeHTML(c)).join(', ')}`;
+        }
+        html += '</div>';
+        html += `<div class="book-card-question">${sanitizeHTML(card.question)}</div>`;
+
+        if (card.options && Array.isArray(card.options)) {
+            // Multiple choice card
+            html += '<div class="book-card-options">';
+            for (let j = 0; j < card.options.length; j++) {
+                const isCorrect = card.correct && card.correct.includes(j);
+                html += `<div class="book-option ${isCorrect ? 'book-option-correct' : 'book-option-wrong'}">`;
+                html += `<span>${isCorrect ? '✓' : '✗'}</span> <span>${sanitizeHTML(card.options[j])}</span>`;
+                html += '</div>';
+                if (card.explanations && card.explanations[String(j)]) {
+                    html += `<div class="book-option-explanation">${sanitizeHTML(card.explanations[String(j)])}</div>`;
+                }
+            }
+            html += '</div>';
+        } else {
+            // Standard card
+            html += `<div class="book-card-answer">${sanitizeHTML(card.answer)}</div>`;
+            if (card.explanation) {
+                html += `<div class="book-card-explanation">${sanitizeHTML(card.explanation)}</div>`;
+            }
+        }
+
+        if (card.sourceDeck) {
+            html += `<div class="book-card-source">Quelle: ${sanitizeHTML(card.sourceDeck)}</div>`;
+        }
+
+        cardEl.innerHTML = html;
+        bookViewCards.appendChild(cardEl);
+    }
+
+    // Hide everything else, show book view
+    document.getElementById('file-input-container').style.display = 'none';
+    appContent.classList.add('hidden');
+    bookView.classList.remove('hidden');
+}
+
+/** Track where book view was opened from so we can return there */
+let bookViewReturnTo = 'decks'; // 'decks' or 'sr-manager'
+
+/** Track whether book view was opened mid-quiz */
+let bookViewFromQuiz = false;
+
+/**
+ * Close book view and return to the previous screen
+ */
+function closeBookView() {
+    bookView.classList.add('hidden');
+
+    if (bookViewReturnTo === 'sr-manager') {
+        // Return to SR manager
+        document.getElementById('file-input-container').style.display = 'block';
+        srManagerContainer.classList.remove('hidden');
+    } else if (bookViewFromQuiz) {
+        // Returning from mid-quiz Lesemodus switch — restore quiz
+        bookViewFromQuiz = false;
+        appContent.classList.remove('hidden');
+        studyMode = 'spaced-repetition';
+        studyModeSelect.value = 'spaced-repetition';
+        openSrManagerBtn.style.display = 'inline-block';
+    } else {
+        // Return to deck selection screen
+        const fileInputContainer = document.getElementById('file-input-container');
+        const savedDecksEl = document.getElementById('saved-decks-container');
+        const uploadSection = document.querySelector('.upload-section');
+        const subtitle = document.getElementById('app-subtitle');
+
+        fileInputContainer.style.display = 'block';
+        savedDecksEl.classList.remove('hidden');
+        if (uploadSection) uploadSection.classList.remove('hidden');
+        if (subtitle) subtitle.style.display = 'block';
+        srManagerContainer.classList.add('hidden');
+        studyModeSelect.style.display = 'inline-block';
+        openSrManagerBtn.style.display = 'inline-block';
+    }
+}
+
+/**
+ * Open book view for cards selected via deck/category checkboxes (Lesemodus)
+ */
+function startBookViewFromDecks() {
+    const selectedPerDeck = getSelectedCategoriesPerDeck();
+    if (selectedPerDeck.size === 0) return;
+
+    const selectedDeckNames = [...selectedPerDeck.keys()];
+
+    let allCards = [];
+    selectedPerDeck.forEach((selectedCats, deckName) => {
+        if (savedDecks[deckName]) {
+            const filtered = filterCardsByCategories(savedDecks[deckName].cards, selectedCats);
+            const cardsWithSource = filtered.map(card => ({ ...card, sourceDeck: deckName }));
+            allCards = [...allCards, ...cardsWithSource];
+        }
+    });
+
+    if (allCards.length === 0) return;
+
+    const title = selectedDeckNames.length === 1
+        ? `Lesemodus — ${selectedDeckNames[0]}`
+        : `Lesemodus — ${selectedDeckNames.length} Decks`;
+
+    bookViewReturnTo = 'decks';
+    openBookView(allCards, title);
+}
+
+/**
+ * Open book view for a specific SR bucket interval
+ * @param {number} interval - The bucket interval in days
+ */
+function openBookViewForBucket(interval) {
+    const cardsInBucket = [];
+
+    Object.entries(spacedRepetitionData).forEach(([key, data]) => {
+        if (data.interval === interval) {
+            const card = getCardFromKey(key);
+            if (card) {
+                cardsInBucket.push(card);
+            }
+        }
+    });
+
+    if (cardsInBucket.length === 0) {
+        showMessage('Keine Karten in diesem Bucket gefunden.');
+        return;
+    }
+
+    const label = getIntervalLabel(interval);
+    bookViewReturnTo = 'sr-manager';
+    srManagerContainer.classList.add('hidden');
+    openBookView(cardsInBucket, `${label} — ${cardsInBucket.length} Karten`);
+}
+
+// ============================================================================
 // Spaced Repetition Manager
 // ============================================================================
 
@@ -2442,6 +2624,7 @@ function displaySpacedRepetitionBuckets() {
                         <span class="sr-bucket-title">${intervalLabel}</span>
                         <span class="sr-bucket-count">${cards.length} Karten${overdueCount > 0 ? ` (${overdueCount} fällig)` : ''}</span>
                     </div>
+                    <button class="sr-bucket-book-btn" onclick="event.stopPropagation(); openBookViewForBucket(${interval})" title="Buchansicht">📖</button>
                     <span class="sr-bucket-interval">${interval} Tag${interval !== 1 ? 'e' : ''}</span>
                 </div>
                 <div class="sr-bucket-cards" id="bucket-cards-${interval}">
