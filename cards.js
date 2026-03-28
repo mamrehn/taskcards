@@ -2065,15 +2065,18 @@ function handleStudyModeChange(event) {
         openSrManagerBtn.style.display = 'none';
     }
 
-    // Lesemodus: switch to book view for current cards
+    // Lesemodus: if mid-quiz, switch to book view for current cards
+    // If on deck selection screen (no active quiz), just set the mode — "Start" will handle it
     if (studyMode === 'read-through') {
-        const title = activeDecks.length === 1
-            ? `Lesemodus — ${activeDecks[0]}`
-            : `Lesemodus — ${activeDecks.length} Decks`;
-        bookViewReturnTo = 'decks';
-        bookViewFromQuiz = true;
-        appContent.classList.add('hidden');
-        openBookView(cards, title);
+        if (cards.length > 0 && !appContent.classList.contains('hidden')) {
+            const title = activeDecks.length === 1
+                ? `Lesemodus — ${activeDecks[0]}`
+                : `Lesemodus — ${activeDecks.length} Decks`;
+            bookViewReturnTo = 'decks';
+            bookViewFromQuiz = true;
+            appContent.classList.add('hidden');
+            openBookView(cards, title);
+        }
         return;
     }
 
