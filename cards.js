@@ -2097,26 +2097,6 @@ function reorganizeCardsByStudyMode() {
     shuffleArray(cards);
 
     switch (studyMode) {
-        case 'incorrect-first':
-            // Show incorrect cards first (current session + previous sessions), then correct/unanswered
-            cards.sort((a, b) => {
-                // Check if answered incorrectly in current session
-                const aIncorrectNow = cardAnswerMap.get(a) === false;
-                const bIncorrectNow = cardAnswerMap.get(b) === false;
-
-                // Check if was incorrect in previous session
-                const aIncorrectBefore = isCardIncorrectFromPreviousSession(a);
-                const bIncorrectBefore = isCardIncorrectFromPreviousSession(b);
-
-                // Combine both: incorrect in current session OR incorrect in previous session
-                const aIncorrect = aIncorrectNow || aIncorrectBefore;
-                const bIncorrect = bIncorrectNow || bIncorrectBefore;
-
-                // Incorrect cards come first (1), then others (0)
-                return bIncorrect - aIncorrect;
-            });
-            break;
-
         case 'incorrect-only':
             // Filter to show only incorrect cards (current session + previous sessions)
             const incorrectCards = [];
