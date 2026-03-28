@@ -243,7 +243,10 @@
             <div class="book-view-toolbar">
                 <button class="btn btn-secondary" id="book-view-back">← Zurück</button>
                 <span class="book-view-title" id="book-view-title">Lesemodus</span>
-                <button class="btn btn-secondary" id="book-view-print" onclick="window.print()">🖨️ Drucken</button>
+                <div class="book-view-export-btns">
+                    <button class="btn btn-secondary" id="book-view-print" onclick="window.print()">🖨️ Drucken</button>
+                    <button class="btn btn-secondary" id="book-view-anki">📥 Anki</button>
+                </div>
             </div>
             <div id="book-view-cards"></div>
         </div>

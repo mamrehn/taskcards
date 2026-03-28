@@ -231,6 +231,7 @@ function initializeApp() {
     deselectAllBucketsBtn.addEventListener('click', debounce(deselectAllSRBuckets, 200));
     cleanupOrphansBtn.addEventListener('click', throttle(cleanupOrphanedSRData, 500));
     bookViewBackBtn.addEventListener('click', throttle(closeBookView, 300));
+    document.getElementById('book-view-anki').addEventListener('click', throttle(exportToAnki, 300));
 
     // Add event listener for text explanation toggle
     textExplanationContainer.addEventListener('click', toggleTextExplanation);
@@ -2387,12 +2388,16 @@ function triggerConfetti() {
 // Book View / Lesemodus
 // ============================================================================
 
+/** Cards currently displayed in book view, for export */
+let bookViewCurrentCards = [];
+
 /**
  * Render cards in book view format
  * @param {Array<Object>} cardsToShow - Cards to render
  * @param {string} title - Title for the book view
  */
 function openBookView(cardsToShow, title) {
+    bookViewCurrentCards = cardsToShow;
     bookViewTitle.textContent = title;
     bookViewCards.innerHTML = '';
 
@@ -2545,6 +2550,91 @@ function closeBookView() {
         studyModeSelect.style.display = 'inline-block';
         openSrManagerBtn.style.display = studyMode === 'spaced-repetition' ? 'inline-block' : 'none';
     }
+}
+
+/**
+ * Export currently displayed book view cards as Anki-importable tab-separated text file
+ */
+function exportToAnki() {
+    if (bookViewCurrentCards.length === 0) return;
+
+    const lines = [
+        '#separator:tab',
+        '#html:true',
+        '#tags column:4',
+        '#columns:Front\tBack\tExtra\tTags'
+    ];
+
+    for (const card of bookViewCurrentCards) {
+        let front = escapeAnkiField(card.question);
+        let back;
+        let extra = '';
+
+        if (card.options && Array.isArray(card.options)) {
+            // MC: add options to front, correct answers + explanations to back
+            front += '<br><br>';
+            front += card.options.map((opt, i) => {
+                const letter = String.fromCharCode(65 + i); // A, B, C...
+                return `${letter}) ${escapeAnkiField(opt)}`;
+            }).join('<br>');
+
+            const correctLabels = (card.correct || []).map(i => {
+                const letter = String.fromCharCode(65 + i);
+                return `${letter}) ${escapeAnkiField(card.options[i])}`;
+            });
+            back = correctLabels.join('<br>');
+
+            // Explanations as extra
+            if (card.explanations) {
+                const explanationParts = [];
+                for (const [idx, text] of Object.entries(card.explanations)) {
+                    const letter = String.fromCharCode(65 + parseInt(idx));
+                    explanationParts.push(`${letter}: ${escapeAnkiField(text)}`);
+                }
+                if (explanationParts.length > 0) {
+                    extra = explanationParts.join('<br>');
+                }
+            }
+        } else {
+            // Standard card
+            back = escapeAnkiField(card.answer || '');
+            if (card.explanation) {
+                extra = escapeAnkiField(card.explanation);
+            }
+        }
+
+        // Tags: categories + source deck, space-separated
+        const tags = [];
+        if (card.categories && card.categories.length > 0) {
+            tags.push(...card.categories.map(c => c.replace(/\s+/g, '_')));
+        }
+        if (card.sourceDeck) {
+            tags.push('deck::' + card.sourceDeck.replace(/\s+/g, '_'));
+        }
+
+        lines.push(`${front}\t${back}\t${extra}\t${tags.join(' ')}`);
+    }
+
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lernkarten-anki-export.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showMessage(`${bookViewCurrentCards.length} Karten als Anki-Datei exportiert.`);
+}
+
+/**
+ * Escape a string for use in an Anki tab-separated field
+ */
+function escapeAnkiField(text) {
+    return text
+        .replace(/\t/g, ' ')
+        .replace(/\n/g, '<br>');
 }
 
 /**

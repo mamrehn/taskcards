@@ -1430,6 +1430,12 @@ body {
     white-space: nowrap;
 }
 
+.book-view-export-btns {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
 .book-card {
     background-color: var(--surface-color);
     border-radius: 8px;
