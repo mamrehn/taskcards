@@ -1654,16 +1654,22 @@ function showAnswer() {
         selectedOptionsContainer.classList.add('hidden');
         mcCorrectAnswerContainer.classList.add('hidden');
         
-        // Automatically evaluate the answer
-        let isCorrect;
-        if (selectedOptionIndices.length > 0) {
-            // Check if the answer is correct
-            isCorrect = arraysEqual([...selectedOptionIndices].sort((a, b) => a - b), [...card.correct].sort((a, b) => a - b));
+        // Automatically evaluate the answer with partial scoring
+        let score;
+        if (selectedOptionIndices.length > 0 || card.correct.length === 0) {
+            // Count how many options were handled correctly
+            let correctChoices = 0;
+            for (let i = 0; i < card.options.length; i++) {
+                const shouldBeSelected = card.correct.includes(i);
+                const wasSelected = selectedOptionIndices.includes(i);
+                if (shouldBeSelected === wasSelected) correctChoices++;
+            }
+            score = card.options.length > 0 ? correctChoices / card.options.length : 0;
         } else {
-            // No selection was made - treat as incorrect (unless there are no correct answers)
-            isCorrect = card.correct.length === 0;
+            // No selection was made
+            score = 0;
         }
-        markAnswer(isCorrect);
+        markAnswer(score);
         
         // For multiple choice, always hide Richtig/Falsch buttons and show Next button
         markCorrectBtn.style.display = 'none';
@@ -1735,50 +1741,66 @@ function arraysEqual(a, b) {
 }
 
 /**
- * Mark the current answer as correct or incorrect
- * @param {boolean} isCorrect - Whether the answer was correct
+ * Format a score for display: show as integer if whole, otherwise one decimal
+ * @param {number} value - Score value
+ * @returns {string} Formatted score
  */
-function markAnswer(isCorrect) {
+function formatScore(value) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/**
+ * Mark the current answer as correct or incorrect
+ * @param {number|boolean} scoreOrBool - Score from 0.0 to 1.0, or boolean
+ */
+function markAnswer(scoreOrBool) {
     if (isAnswered) {
         return;
     }
 
+    // Normalize: boolean → number (true=1, false=0), number stays as-is
+    const score = typeof scoreOrBool === 'boolean' ? (scoreOrBool ? 1 : 0) : scoreOrBool;
+    const isFullyCorrect = score === 1;
+
     isAnswered = true;
-    answeredCards[currentCardIndex] = isCorrect;
+    answeredCards[currentCardIndex] = score;
     const card = cards[currentCardIndex];
     const deckName = card.sourceDeck;
 
-    // Update spaced repetition data
+    // Update spaced repetition data (binary: only fully correct counts)
     const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
     if (studyMode === 'spaced-repetition' || isFromSRBuckets) {
-        updateSpacedRepetition(card, isCorrect);
+        updateSpacedRepetition(card, isFullyCorrect);
     }
 
-    if (isCorrect) {
-        correctCount++;
+    // Accumulate fractional scores
+    correctCount += score;
+    if (deckStats[deckName]) {
+        deckStats[deckName].correct += score;
+    }
+    if (score < 1) {
+        incorrectCount += (1 - score);
         if (deckStats[deckName]) {
-            deckStats[deckName].correct++;
+            deckStats[deckName].incorrect += (1 - score);
         }
-        
-        // Trigger confetti animation for correct answers
+    }
+
+    if (isFullyCorrect) {
+        // Trigger confetti animation for fully correct answers
         triggerConfetti();
-    } else {
-        incorrectCount++;
-        if (deckStats[deckName]) {
-            deckStats[deckName].incorrect++;
-        }
-        
-        // Store the incorrect card in the source deck's incorrect indices
+    }
+
+    if (!isFullyCorrect) {
+        // Store the incorrect/partial card in the source deck's incorrect indices
         if (deckName && savedDecks[deckName]) {
-            // Find original index in the source deck
             const originalDeckCards = savedDecks[deckName].cards;
-            const originalIndex = originalDeckCards.findIndex(c => 
-                c.question === card.question && 
-                (c.answer === card.answer || 
-                (Array.isArray(c.options) && Array.isArray(card.options) && 
+            const originalIndex = originalDeckCards.findIndex(c =>
+                c.question === card.question &&
+                (c.answer === card.answer ||
+                (Array.isArray(c.options) && Array.isArray(card.options) &&
                 JSON.stringify(c.options) === JSON.stringify(card.options)))
             );
-            
+
             if (originalIndex !== -1) {
                 if (!previousIncorrectIndices[deckName]) {
                     previousIncorrectIndices[deckName] = [];
@@ -1840,14 +1862,14 @@ function showNextCard() {
  */
 function updateStatistics() {
     const totalCards = cards.length;
-    const completedCards = correctCount + incorrectCount;
+    const completedCards = answeredCards.filter(a => a !== null).length;
     const remainingCards = totalCards - completedCards;
     const percentageComplete = totalCards > 0 ? (completedCards / totalCards) * 100 : 0;
 
     cardsRemainingElement.textContent = remainingCards;
     cardsCompletedElement.textContent = completedCards;
-    correctCountElement.textContent = correctCount;
-    incorrectCountElement.textContent = incorrectCount;
+    correctCountElement.textContent = formatScore(correctCount);
+    incorrectCountElement.textContent = formatScore(incorrectCount);
 
     progressBar.style.width = `${percentageComplete}%`;
 }
@@ -1863,7 +1885,7 @@ function showFeedback() {
     const totalAnswered = correctCount + incorrectCount;
     const percentageCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
 
-    finalScoreElement.textContent = `${percentageCorrect}%`;
+    finalScoreElement.textContent = `${percentageCorrect}% (${formatScore(correctCount)} von ${formatScore(totalAnswered)})`;
     feedbackElement.classList.remove('hidden');
     cardContainer.classList.add('hidden');
 
@@ -1902,8 +1924,8 @@ function showFeedback() {
             deckStatItem.className = 'deck-stat-item';
             deckStatItem.innerHTML = `
                 <strong>${sanitizeHTML(deckName)}:</strong>
-                ${stats.correct} richtig,
-                ${stats.incorrect} falsch,
+                ${formatScore(stats.correct)} richtig,
+                ${formatScore(stats.incorrect)} falsch,
                 ${deckAccuracy}% Genauigkeit
             `;
             
@@ -2104,7 +2126,8 @@ function reorganizeCardsByStudyMode() {
             // Filter to show only incorrect cards (current session + previous sessions)
             const incorrectCards = [];
             cards.forEach((card) => {
-                const incorrectNow = cardAnswerMap.get(card) === false;
+                const cardScore = cardAnswerMap.get(card);
+                const incorrectNow = cardScore !== null && cardScore < 1;
                 const incorrectBefore = isCardIncorrectFromPreviousSession(card);
 
                 if (incorrectNow || incorrectBefore) {
