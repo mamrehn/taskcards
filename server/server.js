@@ -25,8 +25,8 @@ function generateSessionId() {
 
 function sanitizeName(name) {
     if (typeof name !== 'string') return 'Spieler';
-    // Strip HTML tags and control characters, then trim and truncate
-    return name.replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '').trim().substring(0, 50) || 'Spieler';
+    // Whitelist: letters, digits, German umlauts, spaces, hyphens, underscores, dots
+    return name.replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df\s\-_.]/g, '').trim().substring(0, 50) || 'Spieler';
 }
 
 function send(ws, data) {
@@ -71,10 +71,32 @@ const RATE_LIMIT_PER_SECOND = 20;
 
 const ROOM_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
+const ALLOWED_ORIGINS = [
+    'https://mamrehn.github.io',
+    'http://localhost',
+    'http://127.0.0.1'
+];
+
 const wss = new WebSocketServer({
-    server: httpServer,
+    noServer: true,
     maxPayload: 64 * 1024, // 64KB max message
     perMessageDeflate: { clientNoContextTakeover: true }
+});
+
+httpServer.on('upgrade', (req, socket, head) => {
+    const origin = req.headers.origin || '';
+    const isAllowed = !origin || ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed));
+
+    if (!isAllowed) {
+        console.warn(`Rejected WebSocket from origin: ${origin}`);
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+    }
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+    });
 });
 
 wss.on('connection', (ws) => {
@@ -397,8 +419,8 @@ function handleStartQuestion(ws, msg) {
     if (msg.options.some(o => typeof o !== 'string' || o.length > 500)) return;
 
     // Validate relay fields
-    const questionIndex = typeof msg.index === 'number' && msg.index >= 0 ? msg.index : 0;
-    const questionTotal = typeof msg.total === 'number' && msg.total > 0 ? msg.total : 1;
+    const questionIndex = typeof msg.index === 'number' && msg.index >= 0 ? Math.min(msg.index, 10000) : 0;
+    const questionTotal = typeof msg.total === 'number' && msg.total > 0 ? Math.min(msg.total, 10000) : 1;
     const duration = typeof msg.duration === 'number' && msg.duration > 0 && msg.duration <= 80 ? msg.duration : 30;
 
     // Record server-side question start time for fair timing

@@ -539,6 +539,7 @@ async function initializeHostFeatures(reconnectInfo) {
             hostRoomId = null;
             hostSessionId = null;
             hostGlobalQuizState = null;
+            hostPendingQuestion = null;
             isHostInitialized = false;
             fileStatus.textContent = '';
             if (jsonFileInput) jsonFileInput.value = '';
@@ -1392,6 +1393,7 @@ let isPlayerInitialized = false;
 let playerTimerInterval = null;
 let playerCurrentQuestionOptions = [];
 let selectedAnswers = [];
+let playerHasSubmitted = false;
 let playerScore = 0;
 let playerQuestionStartTime = null;
 let playerCurrentQuestionIndex = -1;
@@ -1607,11 +1609,13 @@ function initializePlayerFeatures(reconnectInfo) {
         });
 
         submitAnswerBtn.addEventListener('click', async () => {
+            if (playerHasSubmitted) return;
             if (selectedAnswers.length === 0) {
                 showMessage('Bitte wähle mindestens eine Antwort aus.', 'info');
                 return;
             }
 
+            playerHasSubmitted = true;
             submitAnswerBtn.disabled = true;
             optionsContainer.querySelectorAll('button.option-btn').forEach(btn => btn.disabled = true);
             // console.log("Player submitted answer:", selectedAnswers);
@@ -1798,7 +1802,8 @@ function initializePlayerFeatures(reconnectInfo) {
                 clearInterval(playerTimerInterval);
                 playerTimerInterval = null;
                 // Auto-submit current selections if player hasn't already submitted
-                if (!submitAnswerBtn.disabled) {
+                if (!playerHasSubmitted) {
+                    playerHasSubmitted = true;
                     submitAnswerBtn.disabled = true;
                     if (playerWs && playerWs.readyState === WebSocket.OPEN) {
                         playerWs.send(JSON.stringify({
@@ -1858,6 +1863,7 @@ function initializePlayerFeatures(reconnectInfo) {
 
         submitAnswerBtn.classList.add('hidden');
         submitAnswerBtn.disabled = false;
+        playerHasSubmitted = false;
         optionsContainer.querySelectorAll('button.option-btn').forEach(btn => {
             btn.disabled = false;
             btn.classList.remove('correct-answer', 'incorrect-answer', 'selected'); // Clean up previous result styles
