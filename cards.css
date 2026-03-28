@@ -1474,6 +1474,37 @@ body {
     line-height: 1.4;
 }
 
+.book-card-sr-badge {
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+    background-color: var(--bg-color);
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    margin-bottom: 0.6rem;
+    display: inline-block;
+}
+
+.book-sr-overdue {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.book-sr-good {
+    color: var(--success, #27ae60);
+    border-color: var(--success, #27ae60);
+}
+
+.book-section-separator {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    padding: 1rem 0 0.5rem;
+    margin: 0.5rem 0;
+    border-top: 2px solid var(--input-border);
+    font-size: 0.9rem;
+}
+
 .book-card-source {
     font-size: 0.75rem;
     color: var(--text-muted, #888);

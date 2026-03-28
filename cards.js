@@ -1767,10 +1767,10 @@ function markAnswer(scoreOrBool) {
     const card = cards[currentCardIndex];
     const deckName = card.sourceDeck;
 
-    // Update spaced repetition data (binary: only fully correct counts)
+    // Update spaced repetition data
     const isFromSRBuckets = activeDecks.length === 1 && activeDecks[0] === 'SR Buckets';
     if (studyMode === 'spaced-repetition' || isFromSRBuckets) {
-        updateSpacedRepetition(card, isFullyCorrect);
+        updateSpacedRepetition(card, isFullyCorrect, score);
     }
 
     // Accumulate fractional scores
@@ -2196,14 +2196,21 @@ function getCardKey(card) {
  * @param {Object} card - Card object
  * @param {boolean} wasCorrect - Whether answer was correct
  */
-function updateSpacedRepetition(card, wasCorrect) {
+function updateSpacedRepetition(card, wasCorrect, score) {
     const key = getCardKey(card);
     let data = spacedRepetitionData[key] || {
         interval: 1,
         easeFactor: 2.5,
         repetitions: 0,
-        nextReview: new Date()
+        nextReview: new Date(),
+        history: []
     };
+
+    // Ensure history array exists (backward compat with old data)
+    if (!data.history) data.history = [];
+
+    // Record attempt (score: 0.0-1.0, or 1/0 for text cards)
+    data.history.push(score !== undefined ? score : (wasCorrect ? 1 : 0));
 
     if (wasCorrect) {
         if (data.repetitions === 0) {
@@ -2389,20 +2396,74 @@ function openBookView(cardsToShow, title) {
     bookViewTitle.textContent = title;
     bookViewCards.innerHTML = '';
 
-    for (let i = 0; i < cardsToShow.length; i++) {
-        const card = cardsToShow[i];
+    // Enrich cards with SR data and sort: wrong/partial first, then correct, then unanswered
+    const enriched = cardsToShow.map(card => {
+        const key = getCardKey(card);
+        const srData = spacedRepetitionData[key] || null;
+        return { card, srData };
+    });
+
+    enriched.sort((a, b) => {
+        const aHist = a.srData && a.srData.history && a.srData.history.length > 0;
+        const bHist = b.srData && b.srData.history && b.srData.history.length > 0;
+        // Unanswered cards go to bottom
+        if (!aHist && !bHist) return 0;
+        if (!aHist) return 1;
+        if (!bHist) return -1;
+        // Among answered: lower average score (weaker cards) first
+        const aAvg = a.srData.history.reduce((x, y) => x + y, 0) / a.srData.history.length;
+        const bAvg = b.srData.history.reduce((x, y) => x + y, 0) / b.srData.history.length;
+        return aAvg - bAvg;
+    });
+
+    // Find where unanswered section starts
+    const firstUnansweredIdx = enriched.findIndex(e => e.srData === null);
+    const answeredCount = firstUnansweredIdx === -1 ? enriched.length : firstUnansweredIdx;
+
+    for (let i = 0; i < enriched.length; i++) {
+        const { card, srData } = enriched[i];
+
+        // Insert separator before unanswered section
+        if (i === answeredCount && answeredCount > 0 && answeredCount < enriched.length) {
+            const separator = document.createElement('div');
+            separator.className = 'book-section-separator';
+            separator.textContent = `Noch nicht beantwortet (${enriched.length - answeredCount})`;
+            bookViewCards.appendChild(separator);
+        }
+
         const cardEl = document.createElement('div');
         cardEl.className = 'book-card';
 
-        let html = `<div class="book-card-number">Karte ${i + 1} von ${cardsToShow.length}`;
+        let html = `<div class="book-card-number">Karte ${i + 1} von ${enriched.length}`;
         if (card.categories && card.categories.length > 0) {
             html += ` · ${card.categories.map(c => sanitizeHTML(c)).join(', ')}`;
         }
         html += '</div>';
+
+        // Attempt history badge for answered cards
+        if (srData) {
+            const history = srData.history || [];
+            if (history.length > 0) {
+                const hasPartialScores = history.some(s => s > 0 && s < 1);
+                let badgeText;
+                if (hasPartialScores) {
+                    // MC with partial scores: show percentages per attempt
+                    const pcts = history.map(s => Math.round(s * 100) + '%');
+                    badgeText = `${pcts.join(' → ')} richtig durch die letzten ${history.length} Versuche`;
+                } else {
+                    // Binary scores: show "X von Y Mal richtig"
+                    const correctAttempts = history.filter(s => s === 1).length;
+                    badgeText = `${correctAttempts} von ${history.length} Mal richtig beantwortet`;
+                }
+                const avgScore = history.reduce((a, b) => a + b, 0) / history.length;
+                const badgeClass = avgScore >= 0.8 ? 'book-sr-good' : avgScore >= 0.5 ? '' : 'book-sr-overdue';
+                html += `<div class="book-card-sr-badge ${badgeClass}">${sanitizeHTML(badgeText)}</div>`;
+            }
+        }
+
         html += `<div class="book-card-question">${sanitizeHTML(card.question)}</div>`;
 
         if (card.options && Array.isArray(card.options)) {
-            // Multiple choice card
             html += '<div class="book-card-options">';
             for (let j = 0; j < card.options.length; j++) {
                 const isCorrect = card.correct && card.correct.includes(j);
@@ -2415,7 +2476,6 @@ function openBookView(cardsToShow, title) {
             }
             html += '</div>';
         } else {
-            // Standard card
             html += `<div class="book-card-answer">${sanitizeHTML(card.answer)}</div>`;
             if (card.explanation) {
                 html += `<div class="book-card-explanation">${sanitizeHTML(card.explanation)}</div>`;
