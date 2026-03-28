@@ -2410,6 +2410,8 @@ function openBookView(cardsToShow, title) {
     // Hide everything else, show book view
     document.getElementById('file-input-container').style.display = 'none';
     appContent.classList.add('hidden');
+    studyModeSelect.style.display = 'none';
+    openSrManagerBtn.style.display = 'none';
     bookView.classList.remove('hidden');
 }
 
@@ -2429,6 +2431,15 @@ function closeBookView() {
         // Return to SR manager
         document.getElementById('file-input-container').style.display = 'block';
         srManagerContainer.classList.remove('hidden');
+        document.getElementById('saved-decks-container').classList.add('hidden');
+        const uploadSection = document.querySelector('.upload-section');
+        if (uploadSection) uploadSection.classList.add('hidden');
+        const subtitle = document.getElementById('app-subtitle');
+        if (subtitle) subtitle.classList.add('hidden');
+        studyModeSelect.style.display = 'none';
+        openSrManagerBtn.textContent = '📚 Decks anzeigen';
+        openSrManagerBtn.classList.add('active');
+        openSrManagerBtn.style.display = 'inline-block';
     } else if (bookViewFromQuiz) {
         // Returning from mid-quiz Lesemodus switch — restore quiz
         bookViewFromQuiz = false;
@@ -2449,7 +2460,7 @@ function closeBookView() {
         if (subtitle) subtitle.style.display = 'block';
         srManagerContainer.classList.add('hidden');
         studyModeSelect.style.display = 'inline-block';
-        openSrManagerBtn.style.display = 'inline-block';
+        openSrManagerBtn.style.display = studyMode === 'spaced-repetition' ? 'inline-block' : 'none';
     }
 }
 
