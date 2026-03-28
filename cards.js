@@ -744,6 +744,33 @@ function updateIncorrectIndices() {
 /**
  * Display all saved decks in the UI with checkboxes
  */
+/**
+ * Extract unique categories from a deck's cards
+ * @param {string} deckName - Name of the deck
+ * @returns {Map<string, number>} Map of category name to card count
+ */
+function extractCategories(deckName) {
+    const categories = new Map();
+    let uncategorizedCount = 0;
+    const deckCards = savedDecks[deckName].cards;
+
+    for (const card of deckCards) {
+        if (card.categories && card.categories.length > 0) {
+            for (const cat of card.categories) {
+                categories.set(cat, (categories.get(cat) || 0) + 1);
+            }
+        } else {
+            uncategorizedCount++;
+        }
+    }
+
+    if (uncategorizedCount > 0) {
+        categories.set('__uncategorized__', uncategorizedCount);
+    }
+
+    return categories;
+}
+
 function displaySavedDecks(searchTerm = '') {
     const savedDecksDiv = document.getElementById('saved-decks');
     savedDecksDiv.innerHTML = '';
@@ -756,10 +783,18 @@ function displaySavedDecks(searchTerm = '') {
         return;
     }
 
-    // Filter decks by search term
-    const filteredDeckNames = Object.keys(savedDecks).filter(deckName =>
-        deckName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const lowerSearch = searchTerm.toLowerCase();
+
+    // Filter decks by search term (match deck name or category names)
+    const filteredDeckNames = Object.keys(savedDecks).filter(deckName => {
+        if (!searchTerm) return true;
+        if (deckName.toLowerCase().includes(lowerSearch)) return true;
+        const categories = extractCategories(deckName);
+        for (const catName of categories.keys()) {
+            if (catName !== '__uncategorized__' && catName.toLowerCase().includes(lowerSearch)) return true;
+        }
+        return false;
+    });
 
     if (filteredDeckNames.length === 0 && searchTerm) {
         const noResultsMessage = document.createElement('p');
@@ -770,20 +805,44 @@ function displaySavedDecks(searchTerm = '') {
     }
 
     for (const deckName of filteredDeckNames) {
-        const deckElement = document.createElement('div');
-        deckElement.className = 'saved-deck';
+        const categories = extractCategories(deckName);
+        const hasCategories = categories.size > 0 &&
+            !(categories.size === 1 && categories.has('__uncategorized__'));
+        const totalCards = savedDecks[deckName].cards.length;
+
+        const folder = document.createElement('div');
+        folder.className = 'deck-folder';
+
+        // --- Header row ---
+        const header = document.createElement('div');
+        header.className = 'deck-folder-header';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.id = `deck-checkbox-${deckName}`;
         checkbox.className = 'deck-checkbox';
         checkbox.dataset.deckName = deckName;
-        checkbox.addEventListener('change', updateStartButtonState);
+        checkbox.addEventListener('click', (e) => e.stopPropagation());
+        checkbox.addEventListener('change', () => {
+            onDeckCheckboxChange(deckName, checkbox.checked);
+            updateStartButtonState();
+        });
 
-        const deckTitle = document.createElement('label');
+        const chevron = document.createElement('span');
+        chevron.className = 'deck-chevron';
+        chevron.textContent = hasCategories ? '▶' : '';
+
+        const folderIcon = document.createElement('span');
+        folderIcon.className = 'deck-folder-icon';
+        folderIcon.textContent = '📁';
+
+        const deckTitle = document.createElement('span');
         deckTitle.className = 'deck-title';
-        deckTitle.htmlFor = `deck-checkbox-${deckName}`;
-        deckTitle.textContent = `${deckName} (${savedDecks[deckName].cards.length} Karten)`;
+        deckTitle.textContent = deckName;
+
+        const cardCount = document.createElement('span');
+        cardCount.className = 'deck-card-count';
+        cardCount.textContent = `(${totalCards} Karten)`;
 
         const deleteButton = document.createElement('button');
         deleteButton.className = 'delete-deck';
@@ -794,41 +853,196 @@ function displaySavedDecks(searchTerm = '') {
             deleteSavedDeck(deckName);
         });
 
-        deckElement.appendChild(checkbox);
-        deckElement.appendChild(deckTitle);
-        deckElement.appendChild(deleteButton);
-        savedDecksDiv.appendChild(deckElement);
+        header.appendChild(checkbox);
+        header.appendChild(chevron);
+        header.appendChild(folderIcon);
+        header.appendChild(deckTitle);
+        header.appendChild(cardCount);
+        header.appendChild(deleteButton);
+        folder.appendChild(header);
+
+        // Toggle expand/collapse on header click (but not on checkbox or delete)
+        if (hasCategories) {
+            header.addEventListener('click', (e) => {
+                if (e.target === checkbox || e.target === deleteButton) return;
+                folder.classList.toggle('expanded');
+            });
+        }
+
+        // --- Category list ---
+        if (hasCategories) {
+            const catContainer = document.createElement('div');
+            catContainer.className = 'deck-categories';
+
+            const sortedCategories = [...categories.entries()].sort((a, b) => {
+                if (a[0] === '__uncategorized__') return 1;
+                if (b[0] === '__uncategorized__') return -1;
+                return a[0].localeCompare(b[0], 'de');
+            });
+
+            for (const [catName, count] of sortedCategories) {
+                const catItem = document.createElement('div');
+                catItem.className = 'category-item';
+
+                const catCheckbox = document.createElement('input');
+                catCheckbox.type = 'checkbox';
+                catCheckbox.id = `cat-checkbox-${deckName}-${catName}`;
+                catCheckbox.className = 'category-checkbox';
+                catCheckbox.dataset.deckName = deckName;
+                catCheckbox.dataset.category = catName;
+                catCheckbox.addEventListener('change', () => {
+                    onCategoryCheckboxChange(deckName);
+                    updateStartButtonState();
+                });
+
+                const catLabel = document.createElement('label');
+                catLabel.htmlFor = catCheckbox.id;
+
+                const catIcon = document.createElement('span');
+                catIcon.className = 'category-icon';
+                catIcon.textContent = '🏷️';
+
+                const catText = document.createTextNode(
+                    catName === '__uncategorized__' ? ' Allgemein' : ` ${catName}`
+                );
+
+                const catCount = document.createElement('span');
+                catCount.className = 'category-count';
+                catCount.textContent = ` (${count})`;
+
+                catLabel.appendChild(catIcon);
+                catLabel.appendChild(catText);
+                catLabel.appendChild(catCount);
+
+                catItem.appendChild(catCheckbox);
+                catItem.appendChild(catLabel);
+                catContainer.appendChild(catItem);
+            }
+
+            folder.appendChild(catContainer);
+        }
+
+        savedDecksDiv.appendChild(folder);
     }
-    
+
     updateStartButtonState();
+}
+
+/**
+ * Handle deck-level checkbox change: check/uncheck all its category checkboxes
+ */
+function onDeckCheckboxChange(deckName, checked) {
+    const escapedName = CSS.escape(deckName);
+    const catCheckboxes = document.querySelectorAll(`.category-checkbox[data-deck-name="${escapedName}"]`);
+    catCheckboxes.forEach(cb => { cb.checked = checked; });
+}
+
+/**
+ * Handle category checkbox change: update parent deck checkbox state
+ */
+function onCategoryCheckboxChange(deckName) {
+    const escapedName = CSS.escape(deckName);
+    const catCheckboxes = document.querySelectorAll(`.category-checkbox[data-deck-name="${escapedName}"]`);
+    if (catCheckboxes.length === 0) return;
+
+    const deckCheckbox = document.getElementById(`deck-checkbox-${deckName}`);
+    if (!deckCheckbox) return;
+
+    const checkedCount = [...catCheckboxes].filter(cb => cb.checked).length;
+    if (checkedCount === 0) {
+        deckCheckbox.checked = false;
+        deckCheckbox.indeterminate = false;
+    } else if (checkedCount === catCheckboxes.length) {
+        deckCheckbox.checked = true;
+        deckCheckbox.indeterminate = false;
+    } else {
+        deckCheckbox.checked = false;
+        deckCheckbox.indeterminate = true;
+    }
 }
 
 /**
  * Update the enabled state of the start button based on checkbox selections
  */
 function updateStartButtonState() {
-    const checkboxes = document.querySelectorAll('.deck-checkbox:checked');
-    startSelectedDecksBtn.disabled = checkboxes.length === 0;
+    const deckChecked = document.querySelectorAll('.deck-checkbox:checked').length > 0;
+    const deckIndeterminate = [...document.querySelectorAll('.deck-checkbox')].some(cb => cb.indeterminate);
+    const catChecked = document.querySelectorAll('.category-checkbox:checked').length > 0;
+    startSelectedDecksBtn.disabled = !(deckChecked || deckIndeterminate || catChecked);
+}
+
+/**
+ * Get selected categories per deck from the UI
+ * @returns {Map<string, Set<string>|null>} Map of deckName → Set of selected categories (null = all cards)
+ */
+function getSelectedCategoriesPerDeck() {
+    const selection = new Map();
+
+    const deckCheckboxes = document.querySelectorAll('.deck-checkbox');
+    for (const deckCb of deckCheckboxes) {
+        const deckName = deckCb.dataset.deckName;
+        const catCheckboxes = document.querySelectorAll(`.category-checkbox[data-deck-name="${CSS.escape(deckName)}"]`);
+
+        if (catCheckboxes.length === 0) {
+            // No categories in this deck — select all if deck is checked
+            if (deckCb.checked) {
+                selection.set(deckName, null);
+            }
+        } else if (deckCb.checked && !deckCb.indeterminate) {
+            // Deck fully checked — all cards
+            selection.set(deckName, null);
+        } else {
+            // Check individual category selections
+            const selectedCats = new Set();
+            for (const catCb of catCheckboxes) {
+                if (catCb.checked) {
+                    selectedCats.add(catCb.dataset.category);
+                }
+            }
+            if (selectedCats.size > 0) {
+                selection.set(deckName, selectedCats);
+            }
+        }
+    }
+
+    return selection;
+}
+
+/**
+ * Filter cards from a deck by selected categories
+ */
+function filterCardsByCategories(cards, selectedCategories) {
+    if (selectedCategories === null) return cards; // null = all cards
+    return cards.filter(card => {
+        if (selectedCategories.has('__uncategorized__')) {
+            if (!card.categories || card.categories.length === 0) return true;
+        }
+        if (card.categories && card.categories.length > 0) {
+            return card.categories.some(cat => selectedCategories.has(cat));
+        }
+        return false;
+    });
 }
 
 /**
  * Start quiz with selected decks
  */
 function startSelectedDecks() {
-    const selectedCheckboxes = document.querySelectorAll('.deck-checkbox:checked');
-    if (selectedCheckboxes.length === 0) return;
+    const selectedPerDeck = getSelectedCategoriesPerDeck();
+    if (selectedPerDeck.size === 0) return;
 
-    const selectedDeckNames = Array.from(selectedCheckboxes).map(cb => cb.dataset.deckName);
+    const selectedDeckNames = [...selectedPerDeck.keys()];
     activeDecks = selectedDeckNames;
 
     // Update the app title
     updateAppTitle(selectedDeckNames);
 
-    // Merge selected decks
+    // Merge selected decks, filtered by categories
     let mergedCards = [];
-    selectedDeckNames.forEach(deckName => {
+    selectedPerDeck.forEach((selectedCats, deckName) => {
         if (savedDecks[deckName]) {
-            const cardsWithSource = savedDecks[deckName].cards.map(card => ({
+            const filtered = filterCardsByCategories(savedDecks[deckName].cards, selectedCats);
+            const cardsWithSource = filtered.map(card => ({
                 ...card,
                 sourceDeck: deckName
             }));
@@ -837,7 +1051,7 @@ function startSelectedDecks() {
     });
 
     // Initialize statistics tracking for each deck
-    resetDeckStats(selectedDeckNames);
+    resetDeckStats(selectedDeckNames, selectedPerDeck);
 
     // Initialize the quiz with merged cards
     initializeQuiz(mergedCards);
@@ -846,35 +1060,49 @@ function startSelectedDecks() {
 /**
  * Reset deck statistics for the given deck names
  * @param {Array<string>} deckNames - Names of decks to reset stats for
+ * @param {Map<string, Set<string>|null>} [selectedPerDeck] - Category selections per deck
  */
-function resetDeckStats(deckNames) {
+function resetDeckStats(deckNames, selectedPerDeck) {
     deckStats = {};
     deckNames.forEach(deckName => {
+        let total = savedDecks[deckName].cards.length;
+        if (selectedPerDeck && selectedPerDeck.has(deckName)) {
+            const selectedCats = selectedPerDeck.get(deckName);
+            if (selectedCats !== null) {
+                total = filterCardsByCategories(savedDecks[deckName].cards, selectedCats).length;
+            }
+        }
         deckStats[deckName] = {
             correct: 0,
             incorrect: 0,
-            total: savedDecks[deckName].cards.length
+            total: total
         };
     });
 }
 
 /**
- * Select all deck checkboxes
+ * Select all deck and category checkboxes
  */
 function selectAllDecks() {
-    const checkboxes = document.querySelectorAll('.deck-checkbox');
-    checkboxes.forEach(cb => {
+    document.querySelectorAll('.deck-checkbox').forEach(cb => {
+        cb.checked = true;
+        cb.indeterminate = false;
+    });
+    document.querySelectorAll('.category-checkbox').forEach(cb => {
         cb.checked = true;
     });
     updateStartButtonState();
 }
 
 /**
- * Deselect all deck checkboxes
+ * Deselect all deck and category checkboxes
  */
 function deselectAllDecks() {
-    const checkboxes = document.querySelectorAll('.deck-checkbox');
-    checkboxes.forEach(cb => {
+    document.querySelectorAll('.deck-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.indeterminate = false;
+    });
+    document.querySelectorAll('.category-checkbox').forEach(cb => {
         cb.checked = false;
     });
     updateStartButtonState();

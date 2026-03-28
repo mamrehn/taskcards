@@ -106,7 +106,7 @@ body {
 /* Saved Decks Styles */
 #saved-decks {
     margin: 1rem 0;
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
 }
 
@@ -134,6 +134,95 @@ body {
     cursor: pointer;
     font-size: 1.1rem;
     padding: 0.25rem 0.5rem;
+}
+
+/* Deck Folder Structure */
+.deck-folder {
+    background-color: var(--surface-color);
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px var(--shadow-color);
+    overflow: hidden;
+}
+
+.deck-folder-header {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.5rem;
+    gap: 0.4rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.deck-folder-header:hover {
+    background-color: var(--hover-bg, rgba(0,0,0,0.04));
+}
+
+.deck-chevron {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    color: var(--text-muted, #888);
+    flex-shrink: 0;
+    width: 1rem;
+    text-align: center;
+}
+
+.deck-folder.expanded .deck-chevron {
+    transform: rotate(90deg);
+}
+
+.deck-folder-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.deck-folder-header .deck-title {
+    flex: 1;
+    font-weight: 500;
+    color: var(--primary);
+    cursor: pointer;
+}
+
+.deck-card-count {
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+    margin-left: 0.25rem;
+}
+
+.deck-categories {
+    display: none;
+    padding: 0.25rem 0.5rem 0.5rem 2.4rem;
+    border-top: 1px solid var(--input-border);
+    background-color: var(--bg-color);
+}
+
+.deck-folder.expanded .deck-categories {
+    display: block;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+}
+
+.category-item label {
+    cursor: pointer;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.category-item .category-icon {
+    font-size: 0.85rem;
+}
+
+.category-count {
+    font-size: 0.75rem;
+    color: var(--text-muted, #888);
 }
 
 /* Flip Card Animation Styles */
