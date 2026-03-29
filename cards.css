@@ -76,7 +76,7 @@ body {
 
 .header p {
     margin: 0.25rem 0;
-    font-size: 1.0rem;
+    font-size: 1.05rem;
 }
 
 #file-input-container {
@@ -84,20 +84,6 @@ body {
     text-align: center;
 }
 
-#upload-label {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    background-color: var(--primary);
-    color: white;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    margin-top: 1rem;
-}
-
-#upload-label:hover {
-    background-color: var(--secondary);
-}
 
 #file-input {
     display: none;
@@ -130,7 +116,7 @@ body {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     padding: 0.25rem 0.5rem;
 }
 
@@ -178,7 +164,7 @@ body {
 }
 
 .deck-folder-icon {
-    font-size: 1rem;
+    font-size: 1.05rem;
     flex-shrink: 0;
 }
 
@@ -190,7 +176,7 @@ body {
 }
 
 .deck-card-count {
-    font-size: 0.8rem;
+    font-size: 1.05rem;
     color: var(--text-muted, #888);
     margin-left: 0.25rem;
 }
@@ -211,7 +197,7 @@ body {
     align-items: center;
     padding: 0.3rem 0;
     gap: 0.4rem;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
 }
 
 .category-item label {
@@ -324,14 +310,14 @@ body {
 .card-content {
     flex: 1;
     margin-bottom: 0.75rem;
-    font-size: 1.2rem;
+    font-size: 1.05rem;
     overflow-y: auto;
     max-height: 100%;
 }
 
 .question {
     font-weight: bold;
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     color: var(--primary);
     margin-bottom: 0.75rem;
 }
@@ -351,7 +337,7 @@ body {
     margin: 1rem 0;
     border: 1px solid var(--input-border);
     border-radius: 4px;
-    font-size: 1rem;
+    font-size: 1.05rem;
     background-color: var(--input-bg);
     color: var(--text-color);
     transition: border-color 0.15s ease-in-out;
@@ -482,7 +468,7 @@ body {
     transition: all 0.3s;
     flex: 1;
     min-width: 80px;
-    font-size: 1.0rem;
+    font-size: 1.05rem;
 }
 
 .btn-primary {
@@ -544,13 +530,13 @@ body {
 }
 
 .stat-value {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     font-weight: bold;
     color: var(--primary);
 }
 
 .stat-label {
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     color: var(--text-muted);
 }
 
@@ -570,7 +556,7 @@ body {
 }
 
 .feedback {
-    font-size: 1.0rem;
+    font-size: 1.05rem;
     text-align: center;
     margin-top: 1rem;
     color: var(--text-muted);
@@ -612,7 +598,7 @@ body {
 
 .json-toggle {
     margin-top: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     color: var(--primary);
     cursor: pointer;
     text-decoration: underline;
@@ -630,7 +616,7 @@ body {
 
     .btn {
         padding: 0.3rem 0.6rem;
-        font-size: 0.9rem;
+        font-size: 1.05rem;
     }
 
     .card-container {
@@ -650,7 +636,7 @@ body {
     }
 
     .stat-label {
-        font-size: 0.9rem;
+        font-size: 1.05rem;
     }
 }
 
@@ -663,7 +649,7 @@ body {
     padding: 0.5rem 0.75rem;
     border: 2px solid var(--input-border);
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     background-color: var(--input-bg);
     color: var(--text-color);
     cursor: pointer;
@@ -681,6 +667,147 @@ body {
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
+/* Drop Zone */
+.drop-zone {
+    margin-top: 0.75rem;
+    border: 2px dashed var(--text-muted, #aaa);
+    border-radius: 8px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: var(--surface-color, #fff);
+}
+
+.drop-zone:hover {
+    border-color: var(--primary);
+    background-color: var(--cards-hover-bg, #f0f5ff);
+}
+
+.drop-zone.drag-over {
+    border-color: var(--primary);
+    background-color: var(--cards-highlight-bg, #e9f2ff);
+    border-style: solid;
+    box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.15);
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    pointer-events: none;
+}
+
+.drop-zone-icon {
+    font-size: 1.75rem;
+    line-height: 1;
+}
+
+.drop-zone-text {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--dark, #343a40);
+}
+
+.drop-zone-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted, #888);
+}
+
+/* Upload Actions (JSON sample link) */
+.upload-actions {
+    text-align: center;
+    margin: 0.3rem 0 0;
+}
+
+/* Saved Decks Header */
+.saved-decks-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.saved-decks-header h3 {
+    margin: 0;
+}
+
+.saved-decks-header .btn {
+    flex: none;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.65rem;
+    white-space: nowrap;
+}
+
+/* SR Stats Dashboard */
+#sr-stats-dashboard {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+    align-items: center;
+}
+
+.sr-stat-card {
+    background-color: var(--surface-color);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    box-shadow: 0 1px 2px var(--shadow-color);
+    font-size: 1.05rem;
+    color: var(--text-muted, #888);
+}
+
+.sr-stat-value {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.sr-bucket-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: var(--input-border);
+    margin-bottom: 0.25rem;
+    flex-basis: 100%;
+}
+
+.sr-bucket-bar-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.sr-bucket-bar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.75rem;
+    font-size: 0.7rem;
+    color: var(--text-muted, #888);
+    flex-basis: 100%;
+}
+
+.sr-bucket-bar-legend span::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 0.25rem;
+    vertical-align: middle;
+    background-color: var(--legend-color);
+}
+
+/* Undo Button */
+#undo-btn {
+    margin-left: auto;
+}
+
+#undo-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Deck Search */
 .deck-search-container {
     margin-bottom: 1rem;
@@ -689,7 +816,7 @@ body {
 .deck-search-input {
     width: 100%;
     padding: 0.75rem;
-    font-size: 1rem;
+    font-size: 1.05rem;
     border: 2px solid var(--input-border);
     background-color: var(--input-bg);
     color: var(--text-color);
@@ -750,9 +877,9 @@ body {
     }
     
     .header p {
-        font-size: 0.9rem;
+        font-size: 1.05rem;
     }
-    
+
     .study-mode-select {
         width: 100%;
         min-width: unset;
@@ -764,13 +891,13 @@ body {
     }
 
     .deck-folder-header .deck-title {
-        font-size: 0.9rem;
+        font-size: 1.05rem;
         word-break: break-word;
         min-width: 0;
     }
 
     .deck-card-count {
-        font-size: 0.75rem;
+        font-size: 0.85rem;
         white-space: nowrap;
     }
 
@@ -784,7 +911,7 @@ body {
     }
 
     .category-item label {
-        font-size: 0.88rem;
+        font-size: 1.05rem;
     }
 }
 
@@ -870,7 +997,7 @@ body {
     color: white;
     border-radius: 50%;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: bold;
     transition: all 0.2s ease;
     position: relative;
@@ -893,7 +1020,7 @@ body {
     background-color: var(--tooltip-bg);
     color: white;
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     line-height: 1.4;
     white-space: normal;
     min-width: 200px;
@@ -945,7 +1072,7 @@ body {
 .sr-manager-btn {
     margin: 0 0 0 0.5rem;
     padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     white-space: nowrap;
     min-width: 130px;
 }
@@ -970,7 +1097,7 @@ body {
 
 .sr-info {
     color: var(--text-muted);
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     margin-bottom: 1rem;
 }
 
@@ -1029,11 +1156,11 @@ body {
     background: rgba(255, 255, 255, 0.2);
     padding: 0.25rem 0.75rem;
     border-radius: 12px;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
 }
 
 .sr-bucket-interval {
-    font-size: 0.85rem;
+    font-size: 1.05rem;
     opacity: 0.9;
 }
 
@@ -1080,7 +1207,7 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    font-size: 0.85rem;
+    font-size: 1.05rem;
     color: var(--text-muted);
 }
 
@@ -1095,7 +1222,7 @@ body {
 
 .sr-card-actions button {
     padding: 0.25rem 0.5rem;
-    font-size: 0.8rem;
+    font-size: 1.05rem;
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -1298,10 +1425,19 @@ body {
     justify-content: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: background-color 0.3s, transform 0.2s, opacity 0.2s;
-    opacity: 0.6;
+    opacity: 0.75;
     color: var(--text-color);
     padding: 0;
     line-height: 1;
+}
+
+.keyboard-hints-toggle.pulse {
+    animation: hintsPulse 1.5s ease-in-out 3;
+}
+
+@keyframes hintsPulse {
+    0%, 100% { transform: scale(1); opacity: 0.75; }
+    50% { transform: scale(1.15); opacity: 1; box-shadow: 0 2px 12px rgba(74, 111, 165, 0.4); }
 }
 
 .keyboard-hints-toggle:hover,
@@ -1325,7 +1461,7 @@ body {
     padding: 0.75rem;
     box-shadow: 0 4px 12px var(--shadow-color);
     min-width: 240px;
-    font-size: 0.85rem;
+    font-size: 1.05rem;
 }
 
 .keyboard-hints-title {
@@ -1420,7 +1556,7 @@ body {
 
 .book-view-title {
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     color: var(--primary);
     text-align: center;
     flex: 1;
@@ -1471,7 +1607,7 @@ body {
 
 .book-card-explanation {
     color: var(--text-muted, #888);
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     padding: 0.5rem 0.75rem;
     background-color: var(--bg-color);
     border-left: 3px solid var(--primary);
@@ -1481,7 +1617,7 @@ body {
 }
 
 .book-card-sr-badge {
-    font-size: 0.8rem;
+    font-size: 1.05rem;
     color: var(--text-muted, #888);
     background-color: var(--bg-color);
     border: 1px solid var(--input-border);
@@ -1508,7 +1644,7 @@ body {
     padding: 1rem 0 0.5rem;
     margin: 0.5rem 0;
     border-top: 2px solid var(--input-border);
-    font-size: 0.9rem;
+    font-size: 1.05rem;
 }
 
 .book-card-source {
@@ -1526,7 +1662,7 @@ body {
     padding: 0.3rem 0.5rem;
     margin: 0.25rem 0;
     border-radius: 4px;
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
@@ -1542,7 +1678,7 @@ body {
 }
 
 .book-option-explanation {
-    font-size: 0.85rem;
+    font-size: 1.05rem;
     color: var(--text-muted, #888);
     margin-left: 1.2rem;
     margin-bottom: 0.3rem;
@@ -1557,7 +1693,7 @@ body {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
 }

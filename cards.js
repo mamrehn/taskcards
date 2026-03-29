@@ -144,6 +144,12 @@ let bookView;
 let bookViewCards;
 let bookViewTitle;
 let bookViewBackBtn;
+let undoBtn;
+let exportBackupBtn;
+let srStatsDashboard;
+
+/** @type {Array<Object>} Undo stack for going back during quiz */
+let undoStack = [];
 
 // ============================================================================
 // Initialization
@@ -210,6 +216,9 @@ function initializeApp() {
     bookViewCards = document.getElementById('book-view-cards');
     bookViewTitle = document.getElementById('book-view-title');
     bookViewBackBtn = document.getElementById('book-view-back');
+    undoBtn = document.getElementById('undo-btn');
+    exportBackupBtn = document.getElementById('export-backup-btn');
+    srStatsDashboard = document.getElementById('sr-stats-dashboard');
 
     // Set up event listeners with debouncing/throttling for performance
     fileInput.addEventListener('change', handleFileUpload);
@@ -233,6 +242,11 @@ function initializeApp() {
     bookViewBackBtn.addEventListener('click', throttle(closeBookView, 300));
     document.getElementById('book-view-csv').addEventListener('click', throttle(exportToCsv, 300));
     document.getElementById('book-view-anki').addEventListener('click', throttle(exportToAnki, 300));
+    undoBtn.addEventListener('click', throttle(undoLastAnswer, 300));
+    exportBackupBtn.addEventListener('click', throttle(exportBackup, 500));
+
+    // Drop zone drag-and-drop
+    setupDropZone();
 
     // Add event listener for text explanation toggle
     textExplanationContainer.addEventListener('click', toggleTextExplanation);
@@ -302,6 +316,13 @@ function handleGlobalKeyboard(e) {
 
     // Only handle shortcuts when quiz is active
     if (appContent.classList.contains('hidden')) {
+        return;
+    }
+
+    // Undo: Backspace
+    if (e.key === 'Backspace') {
+        e.preventDefault();
+        undoLastAnswer();
         return;
     }
 
@@ -430,13 +451,13 @@ function handleCardBackKeys(e) {
 function handleFeedbackKeys(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
-        // Click first visible action button
         if (restartBtn.style.display !== 'none') {
             restartBtn.click();
         } else if (returnToSrBtn.style.display !== 'none') {
             returnToSrBtn.click();
         }
     }
+    // Backspace on feedback also triggers undo (handled in parent)
 }
 
 /**
@@ -520,9 +541,61 @@ window.moveSRCard = moveSRCard;
 window.deleteSRCard = deleteSRCard;
 
 /**
- * Handle single JSON file upload
- * @param {Event} event - File input change event
+ * Set up drop zone for drag-and-drop file import
  */
+function setupDropZone() {
+    const dropZone = document.getElementById('drop-zone');
+    if (!dropZone) return;
+
+    // Clicking the drop zone triggers the file input
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        // Only remove if leaving the drop zone itself (not a child)
+        if (!dropZone.contains(e.relatedTarget)) {
+            dropZone.classList.remove('drag-over');
+        }
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleDroppedFiles(files);
+        }
+    });
+}
+
+/**
+ * Handle files dropped onto the drop zone
+ * @param {FileList} files - Dropped files
+ */
+function handleDroppedFiles(files) {
+    for (const file of files) {
+        const isJson = file.type === 'application/json' || file.name.endsWith('.json');
+        const isZip = file.type === 'application/zip' || file.name.endsWith('.zip');
+        if (!isJson && !isZip) {
+            showError('Bitte nur JSON- oder ZIP-Dateien ablegen.');
+            continue;
+        }
+        // Create a synthetic event compatible with handleFileUpload
+        const syntheticEvent = { target: { files: [file], value: '' } };
+        handleFileUpload(syntheticEvent);
+    }
+}
+
 /**
  * Handle file upload - supports both JSON and ZIP files
  * @param {Event} event - File input change event
@@ -537,13 +610,32 @@ function handleFileUpload(event) {
         return;
     }
 
-    // Otherwise, treat it as JSON
+    // Otherwise, treat it as JSON — peek to determine if backup or deck
     if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
         showError('Bitte lade eine gültige JSON- oder ZIP-Datei hoch.');
         return;
     }
 
-    processJsonFile(file);
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            // Detect backup file: has flashcardDecks key
+            if (data.flashcardDecks && typeof data.flashcardDecks === 'object' && !data.cards) {
+                handleBackupImport(data);
+                return;
+            }
+
+            // Otherwise treat as a card deck
+            processJsonData(data, file.name);
+        } catch (err) {
+            showError('Fehler beim Lesen der JSON-Datei.');
+            console.error(err);
+        }
+        event.target.value = '';
+    };
+    reader.readAsText(file);
 }
 
 /**
@@ -620,50 +712,62 @@ function handleZipUpload(event) {
 }
 
 /**
- * Process and validate a JSON file containing flashcards
- * @param {File} file - The JSON file to process
+ * Process already-parsed JSON data as a card deck
+ * @param {Object} data - Parsed JSON object
+ * @param {string} fileName - Original file name for deck naming
  */
-function processJsonFile(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
+function processJsonData(data, fileName) {
+    if (!data.cards || !Array.isArray(data.cards) || data.cards.length === 0) {
+        showError('Ungültiges JSON-Format. Bitte stelle sicher, dass deine Datei ein "cards" Array mit mindestens einer Karte enthält.');
+        return;
+    }
 
-            if (!data.cards || !Array.isArray(data.cards) || data.cards.length === 0) {
-                showError('Ungültiges JSON-Format. Bitte stelle sicher, dass deine Datei ein "cards" Array mit mindestens einer Karte enthält.');
-                return;
-            }
+    const validCards = validateCards(data.cards);
 
-            // Validate cards
-            const validCards = validateCards(data.cards);
+    if (validCards.length === 0) {
+        showError('Keine gültigen Karten gefunden. Jede Karte muss entweder ein "question" und ein "answer" Feld ODER ein "question", "options" und "correct" Feld haben.');
+        return;
+    }
 
-            if (validCards.length === 0) {
-                showError('Keine gültigen Karten gefunden. Jede Karte muss entweder ein "question" und ein "answer" Feld ODER ein "question", "options" und "correct" Feld haben.');
-                return;
-            }
+    const deckName = fileName.replace('.json', '');
+    activeDecks = [deckName];
 
-            // Save the deck to local storage
-            const deckName = file.name.replace('.json', '');
-            activeDecks = [deckName]; // Set as the only active deck
+    updateAppTitle([deckName]);
+    saveToLocalStorage(deckName, validCards, []);
+    displaySavedDecks();
+    initializeQuiz(validCards.map(card => ({ ...card, sourceDeck: deckName })));
+    fileInput.value = '';
+}
 
-            // Update the app title with the deck name
-            updateAppTitle([deckName]);
+/**
+ * Handle backup file import (auto-detected from handleFileUpload)
+ * @param {Object} backup - Parsed backup JSON object
+ */
+function handleBackupImport(backup) {
+    const deckCount = Object.keys(backup.flashcardDecks).length;
+    const srCount = backup.spacedRepetitionData ? Object.keys(backup.spacedRepetitionData).length : 0;
 
-            // Save to local storage
-            saveToLocalStorage(deckName, validCards, []);
-            displaySavedDecks();
+    if (!confirm(`Backup erkannt!\n\n${deckCount} Decks und ${srCount} SR-Einträge werden wiederhergestellt.\n\nAchtung: Vorhandene Daten werden überschrieben!`)) {
+        fileInput.value = '';
+        return;
+    }
 
-            // Initialize the quiz with the loaded cards
-            initializeQuiz(validCards.map(card => ({...card, sourceDeck: deckName})));
-            
-            // Reset the file input
-            fileInput.value = '';
-        } catch (error) {
-            showError('Fehler beim Parsen der JSON-Datei. Bitte überprüfe das Dateiformat.');
-            console.error(error);
-        }
-    };
-    reader.readAsText(file);
+    savedDecks = backup.flashcardDecks;
+    localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+
+    if (backup.spacedRepetitionData) {
+        spacedRepetitionData = backup.spacedRepetitionData;
+        localStorage.setItem('spacedRepetitionData', JSON.stringify(spacedRepetitionData));
+    }
+
+    if (backup.flashcardIncorrectIndices) {
+        previousIncorrectIndices = backup.flashcardIncorrectIndices;
+        localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+    }
+
+    displaySavedDecks();
+    showMessage(`Backup importiert: ${deckCount} Decks, ${srCount} SR-Einträge.`);
+    fileInput.value = '';
 }
 
 /**
@@ -1171,12 +1275,31 @@ function initializeQuiz(loadedCards) {
         prioritizeIncorrectCards();
     }
 
+    // Clear undo stack for new quiz
+    undoStack = [];
+    undoBtn.disabled = true;
+
     // Show the app content
     document.getElementById('file-input-container').style.display = 'none';
     appContent.classList.remove('hidden');
-    
+
     // Hide SR button during active quiz
     openSrManagerBtn.style.display = 'none';
+
+    // Auto-show keyboard hints on first ever quiz
+    if (!localStorage.getItem('keyboardHintsShown')) {
+        const hintsPanel = document.querySelector('.keyboard-hints-panel');
+        const hintsToggle = document.querySelector('.keyboard-hints-toggle');
+        if (hintsPanel) {
+            hintsPanel.classList.remove('hidden');
+            localStorage.setItem('keyboardHintsShown', '1');
+            setTimeout(() => hintsPanel.classList.add('hidden'), 5000);
+        }
+        if (hintsToggle) {
+            hintsToggle.classList.add('pulse');
+            hintsToggle.addEventListener('animationend', () => hintsToggle.classList.remove('pulse'), { once: true });
+        }
+    }
 
     // Update UI
     updateStatistics();
@@ -1763,10 +1886,13 @@ function markAnswer(scoreOrBool) {
     // Normalize: boolean → number (true=1, false=0), number stays as-is
     const score = typeof scoreOrBool === 'boolean' ? (scoreOrBool ? 1 : 0) : scoreOrBool;
     const isFullyCorrect = score === 1;
+    const card = cards[currentCardIndex];
+
+    // Capture undo snapshot BEFORE modifying state
+    captureUndoSnapshot(card, score);
 
     isAnswered = true;
     answeredCards[currentCardIndex] = score;
-    const card = cards[currentCardIndex];
     const deckName = card.sourceDeck;
 
     // Update spaced repetition data
@@ -2301,6 +2427,114 @@ function showMessage(message) {
 }
 
 // ============================================================================
+// Backup & Restore
+// ============================================================================
+
+/**
+ * Export all app data as a single JSON backup file
+ */
+function exportBackup() {
+    const backup = {
+        version: 1,
+        exportDate: new Date().toISOString(),
+        flashcardDecks: savedDecks,
+        spacedRepetitionData: spacedRepetitionData,
+        flashcardIncorrectIndices: previousIncorrectIndices
+    };
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lernkarten-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const deckCount = Object.keys(savedDecks).length;
+    const srCount = Object.keys(spacedRepetitionData).length;
+    showMessage(`Backup exportiert: ${deckCount} Decks, ${srCount} SR-Einträge.`);
+}
+
+// ============================================================================
+// Undo / Go Back One Card
+// ============================================================================
+
+/**
+ * Capture a snapshot of the current state before marking an answer.
+ * Called from markAnswer() before any state changes.
+ */
+function captureUndoSnapshot(card, score) {
+    const deckName = card.sourceDeck;
+    const key = getCardKey(card);
+
+    undoStack.push({
+        cardIndex: currentCardIndex,
+        score: score,
+        correctCount: correctCount,
+        incorrectCount: incorrectCount,
+        deckStatsSnapshot: deckStats[deckName] ? { ...deckStats[deckName] } : null,
+        deckName: deckName,
+        srDataSnapshot: spacedRepetitionData[key] ? JSON.parse(JSON.stringify(spacedRepetitionData[key])) : null,
+        srKey: key,
+        previousIncorrectSnapshot: previousIncorrectIndices[deckName] ? [...previousIncorrectIndices[deckName]] : null
+    });
+
+    undoBtn.disabled = false;
+}
+
+/**
+ * Undo the last answer and go back one card
+ */
+function undoLastAnswer() {
+    if (undoStack.length === 0) return;
+
+    const snapshot = undoStack.pop();
+
+    // If on feedback screen, restore card view
+    if (!feedbackElement.classList.contains('hidden')) {
+        feedbackElement.classList.add('hidden');
+        cardContainer.classList.remove('hidden');
+    }
+
+    // Restore global counters
+    correctCount = snapshot.correctCount;
+    incorrectCount = snapshot.incorrectCount;
+
+    // Restore deck stats
+    if (snapshot.deckStatsSnapshot && deckStats[snapshot.deckName]) {
+        deckStats[snapshot.deckName] = snapshot.deckStatsSnapshot;
+    }
+
+    // Restore SR data
+    if (snapshot.srDataSnapshot) {
+        spacedRepetitionData[snapshot.srKey] = snapshot.srDataSnapshot;
+        saveSpacedRepetitionData();
+    } else if (spacedRepetitionData[snapshot.srKey] && !snapshot.srDataSnapshot) {
+        // Card had no SR data before — remove it
+        delete spacedRepetitionData[snapshot.srKey];
+        saveSpacedRepetitionData();
+    }
+
+    // Restore incorrect indices
+    if (snapshot.previousIncorrectSnapshot !== null) {
+        previousIncorrectIndices[snapshot.deckName] = snapshot.previousIncorrectSnapshot;
+    } else if (previousIncorrectIndices[snapshot.deckName]) {
+        delete previousIncorrectIndices[snapshot.deckName];
+    }
+    localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+
+    // Restore card state
+    answeredCards[snapshot.cardIndex] = null;
+    currentCardIndex = snapshot.cardIndex;
+    isAnswered = false;
+
+    // Update UI
+    undoBtn.disabled = undoStack.length === 0;
+    updateStatistics();
+    showCurrentCard();
+}
+
+// ============================================================================
 // Confetti Animation
 // ============================================================================
 
@@ -2790,7 +3024,80 @@ function openSpacedRepetitionManager() {
 /**
  * Display cards grouped by their spaced repetition intervals (buckets)
  */
+/**
+ * Render the progress dashboard at the top of the SR manager
+ */
+function renderSRDashboard() {
+    const srEntries = Object.values(spacedRepetitionData);
+    const totalSRCards = srEntries.length;
+    const totalDecks = Object.keys(savedDecks).length;
+    const now = new Date();
+
+    // Count overdue cards
+    const overdueCount = srEntries.filter(d => new Date(d.nextReview) <= now).length;
+
+    // Calculate average score from histories
+    let totalAttempts = 0;
+    let totalScore = 0;
+    for (const data of srEntries) {
+        if (data.history && data.history.length > 0) {
+            for (const s of data.history) {
+                totalScore += s;
+                totalAttempts++;
+            }
+        }
+    }
+    const avgScore = totalAttempts > 0 ? Math.round((totalScore / totalAttempts) * 100) : 0;
+
+    // Bucket distribution for bar chart
+    const bucketColors = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#27ae60'];
+    const bucketLabels = ['Neu (1d)', '2-7d', '8-30d', '1-3M', '3M+'];
+    const bucketCounts = [0, 0, 0, 0, 0];
+    for (const data of srEntries) {
+        const interval = data.interval;
+        if (interval <= 1) bucketCounts[0]++;
+        else if (interval <= 7) bucketCounts[1]++;
+        else if (interval <= 30) bucketCounts[2]++;
+        else if (interval <= 90) bucketCounts[3]++;
+        else bucketCounts[4]++;
+    }
+
+    let html = '';
+
+    // Stat cards
+    html += `<div class="sr-stat-card"><span class="sr-stat-value">${totalDecks}</span> Decks</div>`;
+    html += `<div class="sr-stat-card"><span class="sr-stat-value">${totalSRCards}</span> SR-Karten</div>`;
+    html += `<div class="sr-stat-card"><span class="sr-stat-value">${overdueCount}</span> Fällig</div>`;
+    html += `<div class="sr-stat-card">Ø <span class="sr-stat-value">${totalAttempts > 0 ? avgScore + '%' : '–'}</span> richtig</div>`;
+    html += `<div class="sr-stat-card"><span class="sr-stat-value">${totalAttempts}</span> Versuche</div>`;
+
+    // Bucket distribution bar
+    if (totalSRCards > 0) {
+        html += '<div class="sr-bucket-bar">';
+        for (let i = 0; i < 5; i++) {
+            const pct = (bucketCounts[i] / totalSRCards) * 100;
+            if (pct > 0) {
+                html += `<div class="sr-bucket-bar-segment" style="width:${pct}%;background:${bucketColors[i]}" title="${bucketLabels[i]}: ${bucketCounts[i]}"></div>`;
+            }
+        }
+        html += '</div>';
+
+        html += '<div class="sr-bucket-bar-legend">';
+        for (let i = 0; i < 5; i++) {
+            if (bucketCounts[i] > 0) {
+                html += `<span style="--legend-color:${bucketColors[i]}">${bucketLabels[i]}: ${bucketCounts[i]}</span>`;
+            }
+        }
+        html += '</div>';
+    }
+
+    srStatsDashboard.innerHTML = html;
+}
+
 function displaySpacedRepetitionBuckets() {
+    // Always render dashboard (even if empty — shows deck count)
+    renderSRDashboard();
+
     // Check if there are any cards with SR data
     if (Object.keys(spacedRepetitionData).length === 0) {
         srBucketsDisplay.innerHTML = '<div class="sr-empty-message">Noch keine Karten im Spaced Repetition System. Beantworte Fragen im Spaced Repetition Modus, um Karten hier zu sehen.</div>';
