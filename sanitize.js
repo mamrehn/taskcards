@@ -4,11 +4,15 @@
  */
 
 /**
- * Sanitize HTML string to prevent XSS attacks
- * Removes potentially dangerous HTML tags and attributes
- * 
+ * Sanitize HTML string to prevent XSS attacks.
+ * Uses textContent→innerHTML round-trip to HTML-entity-encode the input.
+ * The returned string is safe for direct assignment to element.innerHTML.
+ *
+ * IMPORTANT: Do NOT chain this with other sanitize functions before display —
+ * the output is already encoded, so a second pass would double-encode entities.
+ *
  * @param {string} input - The input string to sanitize
- * @returns {string} Sanitized string safe for display
+ * @returns {string} HTML-entity-encoded string safe for innerHTML assignment
  */
 function sanitizeHTML(input) {
     if (typeof input !== 'string') {
@@ -87,24 +91,19 @@ function sanitizeRoomCode(code) {
 }
 
 /**
- * Sanitize question or answer text
- * Allows more characters but removes dangerous content
- * 
+ * Sanitize question or answer text for storage.
+ * Trims, limits length, and removes null bytes. Does NOT HTML-encode —
+ * use sanitizeHTML() separately at display time to avoid double-encoding.
+ *
  * @param {string} text - The text to sanitize
- * @returns {string} Sanitized text
+ * @returns {string} Sanitized text (plain text, not HTML-encoded)
  */
 function sanitizeQuestionText(text) {
     if (typeof text !== 'string') {
         return '';
     }
-    
-    // Remove any HTML tags
-    let sanitized = sanitizeHTML(text);
-    
-    // Trim and limit length
-    sanitized = sanitizeInput(sanitized, 5000);
-    
-    return sanitized;
+
+    return sanitizeInput(text, 5000);
 }
 
 /**
@@ -183,8 +182,28 @@ function setSafeText(element, text) {
 }
 
 /**
+ * Recursively strip prototype-pollution keys (__proto__, constructor, prototype)
+ * from a parsed JSON object. Call this on any user-supplied JSON before assigning
+ * it to application state.
+ *
+ * @param {*} obj - The parsed JSON value to sanitize
+ * @returns {*} The same structure with dangerous keys removed
+ */
+function sanitizeParsedJSON(obj) {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeParsedJSON);
+
+    const clean = {};
+    for (const key of Object.keys(obj)) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+        clean[key] = sanitizeParsedJSON(obj[key]);
+    }
+    return clean;
+}
+
+/**
  * Validate email format (basic check)
- * 
+ *
  * @param {string} email - Email to validate
  * @returns {boolean} True if email format is valid
  */

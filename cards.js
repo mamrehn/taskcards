@@ -601,41 +601,46 @@ function handleDroppedFiles(files) {
  * @param {Event} event - File input change event
  */
 function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-    // Check if it's a ZIP file
-    if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
-        handleZipUpload(event);
-        return;
-    }
-
-    // Otherwise, treat it as JSON — peek to determine if backup or deck
-    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-        showError('Bitte lade eine gültige JSON- oder ZIP-Datei hoch.');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-
-            // Detect backup file: has flashcardDecks key
-            if (data.flashcardDecks && typeof data.flashcardDecks === 'object' && !data.cards) {
-                handleBackupImport(data);
-                return;
-            }
-
-            // Otherwise treat as a card deck
-            processJsonData(data, file.name);
-        } catch (err) {
-            showError('Fehler beim Lesen der JSON-Datei.');
-            console.error(err);
+    for (const file of files) {
+        // Check if it's a ZIP file
+        if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
+            // Create a synthetic single-file event for handleZipUpload
+            const syntheticEvent = { target: { files: [file], value: '' } };
+            handleZipUpload(syntheticEvent);
+            continue;
         }
-        event.target.value = '';
-    };
-    reader.readAsText(file);
+
+        // Otherwise, treat it as JSON — peek to determine if backup or deck
+        if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+            showError('Bitte lade eine gültige JSON- oder ZIP-Datei hoch.');
+            continue;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = sanitizeParsedJSON(JSON.parse(e.target.result));
+
+                // Detect backup file: has flashcardDecks key
+                if (data.flashcardDecks && typeof data.flashcardDecks === 'object' && !data.cards) {
+                    handleBackupImport(data);
+                    return;
+                }
+
+                // Otherwise treat as a card deck
+                processJsonData(data, file.name);
+            } catch (err) {
+                showError('Fehler beim Lesen der JSON-Datei.');
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    event.target.value = '';
 }
 
 /**
@@ -665,7 +670,7 @@ function handleZipUpload(event) {
                 if (!zipEntry.dir && relativePath.endsWith('.json')) {
                     const promise = zipEntry.async('string').then(content => {
                         try {
-                            const data = JSON.parse(content);
+                            const data = sanitizeParsedJSON(JSON.parse(content));
                             
                             if (!data.cards || !Array.isArray(data.cards) || data.cards.length === 0) {
                                 errorCount++;
@@ -752,17 +757,24 @@ function handleBackupImport(backup) {
         return;
     }
 
-    savedDecks = backup.flashcardDecks;
-    localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+    try {
+        savedDecks = backup.flashcardDecks;
+        localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
 
-    if (backup.spacedRepetitionData) {
-        spacedRepetitionData = backup.spacedRepetitionData;
-        localStorage.setItem('spacedRepetitionData', JSON.stringify(spacedRepetitionData));
-    }
+        if (backup.spacedRepetitionData) {
+            spacedRepetitionData = backup.spacedRepetitionData;
+            localStorage.setItem('spacedRepetitionData', JSON.stringify(spacedRepetitionData));
+        }
 
-    if (backup.flashcardIncorrectIndices) {
-        previousIncorrectIndices = backup.flashcardIncorrectIndices;
-        localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+        if (backup.flashcardIncorrectIndices) {
+            previousIncorrectIndices = backup.flashcardIncorrectIndices;
+            localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+        }
+    } catch (error) {
+        console.error('Error restoring backup (storage quota exceeded?):', error);
+        showError('Speicher voll! Backup konnte nicht vollständig importiert werden.');
+        fileInput.value = '';
+        return;
     }
 
     displaySavedDecks();
@@ -784,7 +796,11 @@ function validateCards(cards) {
         // Check multiple choice format (question + options + correct answers)
         if (card.question && Array.isArray(card.options) && card.options.length > 0 &&
             Array.isArray(card.correct) && card.correct.length > 0) {
-            return true;
+            // Validate that all correct indices are within bounds
+            const allIndicesValid = card.correct.every(
+                idx => Number.isInteger(idx) && idx >= 0 && idx < card.options.length
+            );
+            return allIndicesValid;
         }
         return false;
     });
@@ -812,14 +828,24 @@ function updateAppTitle(deckNames) {
  * Load saved decks from localStorage
  */
 function loadSavedDecks() {
-    const savedDecksString = localStorage.getItem('flashcardDecks');
-    if (savedDecksString) {
-        savedDecks = JSON.parse(savedDecksString);
+    try {
+        const savedDecksString = localStorage.getItem('flashcardDecks');
+        if (savedDecksString) {
+            savedDecks = JSON.parse(savedDecksString);
+        }
+    } catch (error) {
+        console.error('Error loading saved decks:', error);
+        savedDecks = {};
     }
-    
-    const incorrectIndicesString = localStorage.getItem('flashcardIncorrectIndices');
-    if (incorrectIndicesString) {
-        previousIncorrectIndices = JSON.parse(incorrectIndicesString);
+
+    try {
+        const incorrectIndicesString = localStorage.getItem('flashcardIncorrectIndices');
+        if (incorrectIndicesString) {
+            previousIncorrectIndices = JSON.parse(incorrectIndicesString);
+        }
+    } catch (error) {
+        console.error('Error loading incorrect indices:', error);
+        previousIncorrectIndices = {};
     }
 }
 
@@ -833,8 +859,15 @@ function saveToLocalStorage(deckName, deckCards, incorrectIndices = []) {
     savedDecks[deckName] = {
         cards: deckCards
     };
-    localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
-    
+    try {
+        localStorage.setItem('flashcardDecks', JSON.stringify(savedDecks));
+    } catch (error) {
+        console.error('Error saving decks (storage quota exceeded?):', error);
+        showError('Speicher voll! Bitte lösche nicht benötigte Decks.');
+        delete savedDecks[deckName];
+        return;
+    }
+
     // Save incorrect indices separately
     if (!previousIncorrectIndices[deckName]) {
         previousIncorrectIndices[deckName] = [];
@@ -842,7 +875,11 @@ function saveToLocalStorage(deckName, deckCards, incorrectIndices = []) {
     if (incorrectIndices.length > 0) {
         previousIncorrectIndices[deckName] = [...incorrectIndices];
     }
-    localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+    try {
+        localStorage.setItem('flashcardIncorrectIndices', JSON.stringify(previousIncorrectIndices));
+    } catch (error) {
+        console.error('Error saving incorrect indices:', error);
+    }
 }
 
 /**
@@ -1568,6 +1605,12 @@ function updateCardContent(card) {
     }
     
     // Clean up any existing tooltips from previous cards
+    document.querySelectorAll('.option-explanation-indicator').forEach(indicator => {
+        if (indicator._tooltip) {
+            indicator._tooltip.remove();
+            indicator._tooltip = null;
+        }
+    });
     document.querySelectorAll('.option-explanation-tooltip').forEach(tooltip => {
         tooltip.remove();
     });
@@ -2349,7 +2392,7 @@ function updateSpacedRepetition(card, wasCorrect, score) {
             data.interval = Math.round(data.interval * data.easeFactor);
         }
         data.repetitions++;
-        data.easeFactor = Math.max(1.3, data.easeFactor + 0.1);
+        data.easeFactor = Math.min(3.0, Math.max(1.3, data.easeFactor + 0.1));
     } else {
         data.repetitions = 0;
         data.interval = 1;
@@ -2656,8 +2699,9 @@ function openBookView(cardsToShow, title) {
         return aAvg - bAvg;
     });
 
-    // Find where unanswered section starts
-    const firstUnansweredIdx = enriched.findIndex(e => e.srData === null);
+    // Find where unanswered section starts (no SR data OR SR data with empty history)
+    const hasAnswerHistory = (e) => e.srData && e.srData.history && e.srData.history.length > 0;
+    const firstUnansweredIdx = enriched.findIndex(e => !hasAnswerHistory(e));
     const answeredCount = firstUnansweredIdx === -1 ? enriched.length : firstUnansweredIdx;
 
     for (let i = 0; i < enriched.length; i++) {

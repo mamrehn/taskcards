@@ -349,10 +349,16 @@ async function initializeHostFeatures(reconnectInfo) {
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    if (data && Array.isArray(data) && data.every(q => q.question && q.options && q.correct)) {
+                    const isValidQuestion = (q) =>
+                        q.question && Array.isArray(q.options) && q.options.length > 0 &&
+                        Array.isArray(q.correct) && q.correct.length > 0 &&
+                        q.correct.every(idx => Number.isInteger(idx) && idx >= 0 && idx < q.options.length);
+
+                    if (data && Array.isArray(data) && data.every(isValidQuestion)) {
                         quizState.questions = data;
                     } else if (data && data.cards && Array.isArray(data.cards)) {
-                        quizState.questions = data.cards;
+                        const validCards = data.cards.filter(isValidQuestion);
+                        quizState.questions = validCards;
                     } else {
                         fileStatus.textContent = 'Ungültiges JSON. Erwartet wird ein Array von Fragen oder eine "Karten"-Struktur.';
                         quizState.questions = [];

@@ -11,12 +11,13 @@ const rooms = new Map();
 
 function generateRoomId() {
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let id;
-    do {
-        id = '';
+    const MAX_ATTEMPTS = 100;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        let id = '';
         for (let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)];
-    } while (rooms.has(id));
-    return id;
+        if (!rooms.has(id)) return id;
+    }
+    return null;
 }
 
 function generateSessionId() {
@@ -143,7 +144,10 @@ wss.on('connection', (ws) => {
         clearInterval(ws._msgResetTimer);
         handleDisconnect(ws);
     });
-    ws.on('error', (err) => console.error('WebSocket error:', err.message));
+    ws.on('error', (err) => {
+        console.error('WebSocket error:', err.message);
+        clearInterval(ws._msgResetTimer);
+    });
 });
 
 // --- Handlers ---
@@ -156,6 +160,10 @@ function handleCreateRoom(ws) {
     }
 
     const roomId = generateRoomId();
+    if (!roomId) {
+        send(ws, { type: 'error', message: 'Server überlastet. Bitte versuche es später erneut.' });
+        return;
+    }
     const hostSessionId = generateSessionId();
 
     const room = {
@@ -259,6 +267,10 @@ function handleRestoreRoom(ws, msg) {
         }
         // Room ID taken by someone else — generate a new one for restoration
         roomId = generateRoomId();
+        if (!roomId) {
+            send(ws, { type: 'error', message: 'Server überlastet. Bitte versuche es später erneut.' });
+            return;
+        }
     }
 
     // Re-create the room
