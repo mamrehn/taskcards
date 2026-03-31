@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var STORAGE_KEY = 'taskcards-theme';
+    var STORAGE_KEY = 'flashcards-theme';
     var DARK = 'dark';
     var LIGHT = 'light';
 

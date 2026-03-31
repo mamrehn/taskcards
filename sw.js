@@ -1,10 +1,10 @@
 ﻿/**
- * Service Worker for TaskCards PWA
+ * Service Worker for Flashcards PWA
  * Provides offline functionality with auto-update capability
  * Strategy: Stale-While-Revalidate for app shell, Cache First for data
  */
 
-const CACHE_NAME = 'taskcards-v11';
+const CACHE_NAME = 'flashcards-v1';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

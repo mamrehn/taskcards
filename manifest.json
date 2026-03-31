@@ -1,6 +1,6 @@
-﻿{
-  "name": "TaskCards - Flashcard Learning",
-  "short_name": "TaskCards",
+{
+  "name": "Flashcards - Flashcard Learning",
+  "short_name": "Flashcards",
   "description": "Interactive flashcard learning application with multiple study modes",
   "start_url": "./index.html",
   "display": "standalone",
